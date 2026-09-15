@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Mascotas - SherekePet PWA{% endblock %}
+
+{% block extra_head %}
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#0d9488">
+{% endblock %}
+
+{% block content %}
+<!-- Contenedor 1 Columna Estilo App Nativa Móvil -->
+<div class="max-w-md mx-auto space-y-5 pb-12">
+
+    <!-- Card Saludo Dueño -->
+    <div class="bg-gradient-to-br from-teal-700 to-emerald-600 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
+        <div class="relative z-10 flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-teal-200">Portal del Dueño</p>
+                <h1 class="text-2xl font-black mt-0.5 tracking-tight">
+                    ¡Hola, {{ cliente.nombre_completo.split()[0] if cliente.nombre_completo else 'Amigo' }}!
+                </h1>
+                <p class="text-xs text-teal-100 mt-1">DNI: {{ cliente.dni }}</p>
+            </div>
+            <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-3xl border border-white/20">
+                🐶
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs">
+            <span class="text-teal-100">Mascotas registradas: <strong>{{ mascotas|length }}</strong></span>
+            <a href="/portal/logout" class="text-xs text-teal-200 hover:text-white underline">Cerrar sesión</a>
+        </div>
+    </div>
+
+    <!-- Alertas de Medicinas Pendientes (si existen) -->
+    {% if dosis_pendientes %}
+    <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-xs space-y-3">
+        <div class="flex items-center space-x-2 text-amber-900">
+            <span class="text-xl animate-bounce">💊</span>
+            <h2 class="text-sm font-black uppercase tracking-wide">¡Medicina Pendiente!</h2>
+        </div>
+        {% for item in dosis_pendientes %}
+        <div class="bg-white p-3.5 rounded-2xl border border-amber-200 flex items-center justify-between">
+            <div>
+                <p class="text-sm font-black text-slate-900">{{ item.mascota.nombre }}</p>
+                <p class="text-xs font-medium text-slate-600">{{ item.plan.medicamento }} (Dosis {{ item.dosis.numero_dosis }}/{{ item.plan.total_dosis }})</p>
+                <p class="text-[11px] text-amber-700 font-bold mt-0.5">
+                    ⏰ Programada: {{ item.dosis.hora_programada.strftime('%I:%M %p') }}
+                </p>
+            </div>
+            <a 
+                href="/portal/carnet/{{ item.mascota.id }}" 
+                class="btn-touch px-3.5 py-2 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs"
+            >
+                Dar toma ➜
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Sección: Mis Mascotas (Tarjetas Grandes 1 Columna) -->
+    <div class="space-y-3">
+        <h2 class="text-xs font-black uppercase tracking-wider text-slate-500 px-1">
+            Mis Mascotas
+        </h2>
+
+        {% if mascotas %}
+        <div class="space-y-3">
+            {% for m in mascotas %}
+            <a 
+                href="/portal/carnet/{{ m.id }}" 
+                class="block bg-white rounded-3xl p-5 border border-slate-200 hover:border-teal-500 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
+            >
+                <div class="flex items-center space-x-4">
+                    <!-- Avatar Mascota Grande -->
+                    <div class="w-16 h-16 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-3xl shadow-xs flex-shrink-0">
+                        {% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-xl font-black text-slate-900 truncate">{{ m.nombre }}</h3>
+                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                                {{ m.especie }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">
+                            Raza: {{ m.raza or 'Mestizo' }} &bull; Peso: {{ m.peso or '--' }} kg
+                        </p>
+                        <div class="mt-2 flex items-center space-x-2 text-xs font-bold text-teal-700">
+                            <span>Ver Carnet & Medicinas</span>
+                            <span>➜</span>
+                        </div>
+                    </div>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-white p-8 rounded-3xl text-center border border-slate-200 text-slate-500">
+            <p class="text-3xl mb-2">🐾</p>
+            <p class="text-sm font-bold text-slate-700">No tienes mascotas registradas todavía</p>
+            <p class="text-xs text-slate-400 mt-1">Acércate a la veterinaria para registrar a tu engreído.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Botón Instalar App PWA -->
+    <div id="pwaInstallBanner" class="hidden bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-lg">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">📲</span>
+            <div>
+                <p class="text-xs font-bold">Instalar SherekePet App</p>
+                <p class="text-[11px] text-slate-400">Acceso directo en tu celular sin descargar nada</p>
+            </div>
+        </div>
+        <button 
+            id="btnInstallPwa"
+            class="btn-touch px-3 py-1.5 text-xs font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl"
+        >
+            Instalar
+        </button>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Registro del Service Worker PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('PWA ServiceWorker registrado con éxito.'))
+            .catch(err => console.log('Error registrando ServiceWorker:', err));
+    });
+}
+
+// Banner de Instalación PWA
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.classList.remove('hidden');
+});
+
+document.getElementById('btnInstallPwa')?.addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+        }
+        deferredPrompt = null;
+    }
+});
+</script>
+{% endblock %}

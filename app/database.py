@@ -13,6 +13,11 @@ from app.clinic.models import (
     RegistroVacuna,
     SeguimientoNotificacion
 )
+from app.follow_up.models import (
+    MedicationPlan,
+    DoseTracking,
+    WebPushSubscription
+)
 
 # Configuración del Engine de Base de Datos
 connect_args = {}

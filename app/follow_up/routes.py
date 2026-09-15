@@ -1,0 +1,398 @@
+import json
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+from sqlalchemy.orm import Session
+
+from app.core.timezone import get_lima_now
+from app.core.security import decode_access_token
+from app.database import get_db
+from app.clinic.models import Cliente, Mascota, RegistroVacuna
+from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
+from app.follow_up.schemas import (
+    MedicationPlanCreateRequest,
+    MedicationPlanResponse,
+    DoseInfo,
+    ConfirmDoseRequest,
+    ConfirmDoseResponse,
+    WebPushSubscriptionRequest
+)
+from app.follow_up.services import crear_plan_medicacion, confirmar_toma
+from app.auth.service import AuthService
+from app.auth.schemas import ClientLoginRequest
+
+templates = Jinja2Templates(directory="app/templates")
+
+router = APIRouter(tags=["Seguimiento de Medicación y Portal Cliente"])
+
+
+# =======================================================
+# 1. PWA STATICS (manifest.json & service-worker.js)
+# =======================================================
+
+@router.get("/manifest.json", summary="PWA Web App Manifest")
+def get_manifest():
+    manifest_data = {
+        "name": "SherekePet - Portal de Medicación",
+        "short_name": "SherekePet",
+        "description": "Portal móvil para dueños de mascotas y control de medicación",
+        "start_url": "/portal/dashboard",
+        "display": "standalone",
+        "background_color": "#ffffff",
+        "theme_color": "#0d9488",
+        "icons": [
+            {
+                "src": "https://img.icons8.com/fluency/192/veterinarian.png",
+                "sizes": "192x192",
+                "type": "image/png"
+            },
+            {
+                "src": "https://img.icons8.com/fluency/512/veterinarian.png",
+                "sizes": "512x512",
+                "type": "image/png"
+            }
+        ]
+    }
+    return JSONResponse(content=manifest_data, media_type="application/manifest+json")
+
+
+@router.get("/service-worker.js", summary="PWA Service Worker")
+def get_service_worker():
+    sw_code = """
+const CACHE_NAME = 'sherekepet-v1';
+const STATIC_ASSETS = [
+    '/portal/dashboard',
+    '/manifest.json'
+];
+
+self.addEventListener('install', event => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+    event.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', event => {
+    // Red primero con fallback a red normal
+    event.respondWith(
+        fetch(event.request).catch(() => caches.match(event.request))
+    );
+});
+
+// Manejo de Notificaciones Web Push
+self.addEventListener('push', event => {
+    let data = { title: 'SherekePet - Hora de Medicación', body: 'Es hora de darle la medicina a tu mascota.' };
+    if (event.data) {
+        try {
+            data = event.data.json();
+        } catch(e) {
+            data.body = event.data.text();
+        }
+    }
+    const options = {
+        body: data.body,
+        icon: 'https://img.icons8.com/fluency/192/veterinarian.png',
+        badge: 'https://img.icons8.com/fluency/192/veterinarian.png',
+        vibrate: [200, 100, 200],
+        data: { url: '/portal/dashboard' }
+    };
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
+    );
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    event.waitUntil(
+        clients.openWindow(event.notification.data.url || '/portal/dashboard')
+    );
+});
+"""
+    return Response(content=sw_code, media_type="application/javascript")
+
+
+# =======================================================
+# 2. ENDPOINTS DE API REST
+# =======================================================
+
+@router.post(
+    "/api/medication/plan",
+    response_model=MedicationPlanResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear plan de medicación para una mascota",
+    description="El veterinario registra la prescripción y el sistema programa la primera dosis automáticamente."
+)
+def api_crear_plan(
+    payload: MedicationPlanCreateRequest,
+    db: Session = Depends(get_db)
+):
+    # Validar existencia de mascota
+    mascota = db.query(Mascota).filter(
+        Mascota.id == payload.pet_id,
+        Mascota.is_deleted == False
+    ).first()
+    if not mascota:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La mascota especificada no existe."
+        )
+
+    plan, primera_dosis = crear_plan_medicacion(
+        db=db,
+        pet_id=payload.pet_id,
+        clinic_id=payload.clinic_id,
+        medicamento=payload.medicamento,
+        frecuencia_horas=payload.frecuencia_horas,
+        total_dosis=payload.total_dosis,
+        es_estricto=payload.es_estricto,
+        hora_inicio=payload.hora_inicio
+    )
+
+    return MedicationPlanResponse(
+        id=plan.id,
+        pet_id=plan.pet_id,
+        clinic_id=plan.clinic_id,
+        medicamento=plan.medicamento,
+        frecuencia_horas=plan.frecuencia_horas,
+        total_dosis=plan.total_dosis,
+        es_estricto=plan.es_estricto,
+        estado=plan.estado,
+        primera_dosis=DoseInfo.model_validate(primera_dosis),
+        mensaje="Plan de medicación creado exitosamente. Primera dosis programada."
+    )
+
+
+@router.post(
+    "/api/medication/dose/{id}/confirm",
+    response_model=ConfirmDoseResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Cliente confirma toma de dosis (Motor Dinámico)",
+    description="Marca la dosis como CONSUMIDO y calcula la siguiente toma con validación de ventana de sueño."
+)
+def api_confirmar_toma(
+    id: int,
+    payload: Optional[ConfirmDoseRequest] = None,
+    db: Session = Depends(get_db)
+):
+    hora_real = payload.hora_real if payload else None
+    dosis, siguiente = confirmar_toma(db=db, dose_id=id, hora_real=hora_real)
+
+    return ConfirmDoseResponse(
+        dosis_confirmada_id=dosis.id,
+        numero_dosis=dosis.numero_dosis,
+        hora_consumo_real=dosis.hora_consumo_real,
+        plan_completado=(siguiente is None),
+        siguiente_dosis=DoseInfo.model_validate(siguiente) if siguiente else None,
+        mensaje="¡Toma registrada con éxito!" if siguiente else "¡Felicidades! Tratamiento completado con éxito."
+    )
+
+
+@router.post(
+    "/api/webpush/subscribe",
+    status_code=status.HTTP_200_OK,
+    summary="Registrar suscripción Web Push"
+)
+def api_subscribe_push(
+    payload: WebPushSubscriptionRequest,
+    db: Session = Depends(get_db)
+):
+    sub = WebPushSubscription(
+        cliente_id=payload.cliente_id,
+        endpoint=payload.endpoint,
+        keys_json=json.dumps(payload.keys)
+    )
+    db.add(sub)
+    db.commit()
+    return {"status": "ok", "mensaje": "Suscripción push guardada con éxito."}
+
+
+# =======================================================
+# 3. VISTAS MÓVILES DEL CLIENTE (PORTAL PWA)
+# =======================================================
+
+def obtener_cliente_autenticado(request: Request, db: Session) -> Optional[Cliente]:
+    """Helper para verificar token JWT en cookie o query param para el portal móvil."""
+    token = request.cookies.get("client_token") or request.query_params.get("token")
+    if not token:
+        # Modo fallback para pruebas si se envía cliente_id en query param
+        cid = request.query_params.get("cliente_id")
+        if cid and cid.isdigit():
+            return db.query(Cliente).filter(Cliente.id == int(cid), Cliente.is_deleted == False).first()
+        return None
+
+    payload = decode_access_token(token)
+    if not payload or payload.get("role") != "client":
+        return None
+
+    cliente_id = int(payload.get("sub"))
+    return db.query(Cliente).filter(Cliente.id == cliente_id, Cliente.is_deleted == False).first()
+
+
+@router.get("/portal/login", response_class=HTMLResponse, summary="Vista Login Cliente PWA")
+def portal_login_view(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="client/login.html",
+        context={"error": None}
+    )
+
+
+@router.post("/portal/login", response_class=HTMLResponse)
+async def portal_login_post(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    dni = str(form.get("dni", "")).strip()
+    pin = str(form.get("pin", "")).strip()
+    clinica_id = int(form.get("clinica_id", 1))
+
+    try:
+        req = ClientLoginRequest(clinica_id=clinica_id, dni=dni, pin=pin if pin else None)
+        auth_resp = AuthService.login_cliente(db, req)
+
+        if auth_resp.requires_pin_setup:
+            return templates.TemplateResponse(
+                request=request,
+                name="client/login.html",
+                context={
+                    "error": "Primer ingreso detectado: Por favor establece tu PIN primero en la clínica.",
+                    "dni": dni
+                }
+            )
+
+        # Login exitoso: redirigir a dashboard guardando cookie
+        response = RedirectResponse(url="/portal/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            key="client_token",
+            value=auth_resp.access_token,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7  # 7 días
+        )
+        return response
+
+    except HTTPException as ex:
+        return templates.TemplateResponse(
+            request=request,
+            name="client/login.html",
+            context={"error": ex.detail, "dni": dni}
+        )
+
+
+@router.get("/portal/logout")
+def portal_logout():
+    resp = RedirectResponse(url="/portal/login", status_code=status.HTTP_303_SEE_OTHER)
+    resp.delete_cookie("client_token")
+    return resp
+
+
+@router.get("/portal/dashboard", response_class=HTMLResponse, summary="Portal Cliente Dashboard PWA")
+def portal_dashboard(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        # Si hay clientes en la DB y estamos en ambiente local, seleccionar el primero para facilitar pruebas
+        primer_cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
+        if primer_cliente:
+            cliente = primer_cliente
+        else:
+            return RedirectResponse(url="/portal/login")
+
+    # Obtener mascotas activas del cliente
+    mascotas = db.query(Mascota).filter(
+        Mascota.cliente_id == cliente.id,
+        Mascota.is_deleted == False
+    ).all()
+
+    # Obtener tratamientos activos con sus próximas dosis
+    mascota_ids = [m.id for m in mascotas]
+    planes_activos = db.query(MedicationPlan).filter(
+        MedicationPlan.pet_id.in_(mascota_ids),
+        MedicationPlan.estado == "ACTIVO",
+        MedicationPlan.is_deleted == False
+    ).all()
+
+    # Recopilar próximas dosis pendientes
+    dosis_pendientes = []
+    for plan in planes_activos:
+        proxima = db.query(DoseTracking).filter(
+            DoseTracking.plan_id == plan.id,
+            DoseTracking.estado == "PENDIENTE"
+        ).order_by(DoseTracking.numero_dosis.asc()).first()
+        if proxima:
+            dosis_pendientes.append({
+                "plan": plan,
+                "dosis": proxima,
+                "mascota": plan.mascota
+            })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="client/dashboard.html",
+        context={
+            "cliente": cliente,
+            "mascotas": mascotas,
+            "dosis_pendientes": dosis_pendientes,
+            "ahora": get_lima_now()
+        }
+    )
+
+
+@router.get("/portal/carnet/{mascota_id}", response_class=HTMLResponse, summary="Carnet Digital y Medicación")
+def portal_carnet_mascota(
+    request: Request,
+    mascota_id: int,
+    db: Session = Depends(get_db)
+):
+    mascota = db.query(Mascota).filter(
+        Mascota.id == mascota_id,
+        Mascota.is_deleted == False
+    ).first()
+
+    if not mascota:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada.")
+
+    # Vacunas (solo lectura)
+    vacunas = db.query(RegistroVacuna).filter(
+        RegistroVacuna.mascota_id == mascota_id,
+        RegistroVacuna.is_deleted == False
+    ).order_by(RegistroVacuna.fecha_aplicacion.desc()).all()
+
+    # Planes de medicación y su próxima dosis pendiente
+    planes = db.query(MedicationPlan).filter(
+        MedicationPlan.pet_id == mascota_id,
+        MedicationPlan.is_deleted == False
+    ).order_by(MedicationPlan.created_at.desc()).all()
+
+    planes_info = []
+    for plan in planes:
+        proxima_dosis = db.query(DoseTracking).filter(
+            DoseTracking.plan_id == plan.id,
+            DoseTracking.estado == "PENDIENTE"
+        ).order_by(DoseTracking.numero_dosis.asc()).first()
+
+        dosis_consumidas = db.query(DoseTracking).filter(
+            DoseTracking.plan_id == plan.id,
+            DoseTracking.estado == "CONSUMIDO"
+        ).count()
+
+        planes_info.append({
+            "plan": plan,
+            "proxima_dosis": proxima_dosis,
+            "dosis_consumidas": dosis_consumidas,
+            "porcentaje": int((dosis_consumidas / plan.total_dosis) * 100) if plan.total_dosis > 0 else 0
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="client/carnet.html",
+        context={
+            "mascota": mascota,
+            "cliente": mascota.cliente,
+            "vacunas": vacunas,
+            "planes": planes_info,
+            "ahora": get_lima_now()
+        }
+    )

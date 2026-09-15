@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}SherekePet - SaaS Veterinario{% endblock %}</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pet: {
+                            50: '#f0fdf9',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    minHeight: {
+                        'touch': '44px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Touch target mínimo 44px accesible en celulares */
+        .btn-touch {
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white">
+
+    <!-- Header / Navbar Mobile-First -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Brand -->
+                <div class="flex items-center space-x-3">
+                    <a href="/dashboard" class="flex items-center space-x-2 group">
+                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-md group-hover:scale-105 transition-transform">
+                            🐾
+                        </div>
+                        <div>
+                            <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                                SherekePet
+                            </span>
+                            <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
+                                Modo Solo
+                            </span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Navigation Links & Quick Actions -->
+                <nav class="flex items-center space-x-2 sm:space-x-4">
+                    <a href="/dashboard" class="btn-touch px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        📊 <span class="hidden md:inline ml-1.5">Dashboard</span>
+                    </a>
+                    <a href="/pacientes/nuevo" class="btn-touch px-4 py-2 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg shadow-sm hover:shadow transition-all flex items-center">
+                        <span class="text-base mr-1.5 font-bold">+</span> Nuevo Paciente
+                    </a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
+        <div class="max-w-7xl mx-auto px-4">
+            SherekePet SaaS Veterinario &bull; Zona Horaria: America/Lima &bull; Multi-Tenant Seguro
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}{{ mascota.nombre }} - Ficha Clínica | SherekePet{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Encabezado de Paciente / Ficha Resumen -->
+    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-start space-x-4">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center text-3xl shadow-md flex-shrink-0">
+                    {% if mascota.especie|lower == 'felino' %}🐱{% elif mascota.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2.5 flex-wrap gap-y-1">
+                        <h1 class="text-2xl font-black text-slate-900">{{ mascota.nombre }}</h1>
+                        <span class="px-3 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                            {{ mascota.especie }}
+                        </span>
+                        {% if mascota.raza %}
+                        <span class="text-xs text-slate-500">&bull; Raza: {{ mascota.raza }}</span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="flex items-center space-x-4 mt-2 text-xs text-slate-600 flex-wrap gap-y-1">
+                        <span><strong>Peso:</strong> <span class="font-mono">{{ mascota.peso or '--' }} kg</span></span>
+                        <span><strong>Dueño:</strong> {{ cliente.nombre_completo or cliente.dni }} (DNI: {{ cliente.dni }})</span>
+                        {% if cliente.telefono %}
+                        <a 
+                            href="https://wa.me/51{{ cliente.telefono|replace(' ', '')|replace('-', '') }}" 
+                            target="_blank" 
+                            class="inline-flex items-center text-emerald-600 font-bold hover:underline"
+                        >
+                            💬 {{ cliente.telefono }}
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    {% if mascota.alergias %}
+                    <div class="mt-2.5 inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                        ⚠️ Alergias/Condiciones: {{ mascota.alergias }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Botón Acción: Nueva Atención -->
+            <button 
+                type="button" 
+                onclick="abrirModalAtencion()"
+                class="btn-touch px-5 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center space-x-2 self-start md:self-center"
+            >
+                <span class="text-base font-black">+</span>
+                <span>Registrar Atención</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Layout 2 Columnas: Carnet de Vacunas & Historial Clínico -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Columna Izquierda: Carnet de Vacunas (1 col) -->
+        <div class="lg:col-span-1 space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">💉</span>
+                        <h2 class="text-base font-bold text-slate-900">Carnet de Vacunas</h2>
+                    </div>
+                    <span class="text-xs text-slate-400">{{ vacunas|length }} registros</span>
+                </div>
+
+                {% if vacunas %}
+                <div class="space-y-3">
+                    {% for item in vacunas %}
+                    {% set v = item.vacuna %}
+                    <div class="p-3.5 rounded-xl border {% if item.esta_vencida %}border-rose-200 bg-rose-50/50{% else %}border-slate-200 bg-slate-50/60{% endif %}">
+                        <div class="flex justify-between items-start">
+                            <h3 class="text-sm font-bold text-slate-900">{{ v.tipo_vacuna }}</h3>
+                            {% if item.esta_vencida %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 uppercase">Vencido</span>
+                            {% else %}
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase">Vigente</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="text-xs text-slate-600 mt-2 space-y-0.5">
+                            <p><strong>Aplicación:</strong> {{ v.fecha_aplicacion.strftime('%d/%m/%Y') }}</p>
+                            <p><strong>Próx. Refuerzo:</strong> <span class="font-bold {% if item.esta_vencida %}text-rose-700{% else %}text-teal-700{% endif %}">{{ v.fecha_proximo_refuerzo.strftime('%d/%m/%Y') }}</span></p>
+                            {% if v.marca_lote %}
+                            <p class="text-[11px] text-slate-400">Lote: {{ v.marca_lote }}</p>
+                            {% endif %}
+                        </div>
+
+                        <!-- Botón WhatsApp para recordar refuerzo -->
+                        <div class="mt-3 pt-2.5 border-t border-slate-200/60">
+                            <a 
+                                href="{{ item.enlace_whatsapp }}" 
+                                target="_blank"
+                                class="btn-touch w-full py-1.5 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors flex items-center justify-center space-x-1"
+                            >
+                                <span>🟢 WhatsApp Refuerzo</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="py-6 text-center text-xs text-slate-400">
+                    No cuenta con vacunas registradas aún.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Columna Derecha: Historial Clínico (2 cols) -->
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">📋</span>
+                        <h2 class="text-base font-bold text-slate-900">Historial de Atenciones</h2>
+                    </div>
+                    <span class="text-xs text-slate-400">{{ atenciones|length }} atenciones</span>
+                </div>
+
+                {% if atenciones %}
+                <div class="space-y-4">
+                    {% for a in atenciones %}
+                    <div class="p-4 rounded-xl border border-slate-200 hover:border-teal-300 transition-colors">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-slate-100 pb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold uppercase tracking-wide
+                                    {% if a.tipo_atencion == 'VACUNACION' %}bg-teal-100 text-teal-800
+                                    {% elif a.tipo_atencion == 'CIRUGIA' %}bg-rose-100 text-rose-800
+                                    {% elif a.tipo_atencion == 'CONSULTA' %}bg-blue-100 text-blue-800
+                                    {% else %}bg-slate-100 text-slate-800{% endif %}">
+                                    {{ a.tipo_atencion }}
+                                </span>
+                                <h3 class="text-sm font-bold text-slate-900">{{ a.motivo }}</h3>
+                            </div>
+                            <span class="text-xs text-slate-400 font-medium">
+                                {{ a.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            </span>
+                        </div>
+
+                        <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            {% if a.diagnostico %}
+                            <div class="bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                <span class="font-bold text-slate-700 block mb-0.5">Diagnóstico:</span>
+                                <p class="text-slate-600 whitespace-pre-line">{{ a.diagnostico }}</p>
+                            </div>
+                            {% endif %}
+
+                            {% if a.tratamiento %}
+                            <div class="bg-teal-50/50 p-2.5 rounded-lg border border-teal-100">
+                                <span class="font-bold text-teal-900 block mb-0.5">Tratamiento / Indicaciones:</span>
+                                <p class="text-slate-600 whitespace-pre-line">{{ a.tratamiento }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        {% if a.peso_actual_kg %}
+                        <div class="mt-2 text-[11px] text-slate-400">
+                            Peso en esta atención: <span class="font-semibold text-slate-600">{{ a.peso_actual_kg }} kg</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="py-10 text-center text-slate-400 text-sm">
+                    No se han registrado consultas ni procedimientos para este paciente.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Modal para Registrar Nueva Atención -->
+<div id="modalAtencion" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs overflow-y-auto p-4 flex items-center justify-center">
+    <div class="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-lg font-bold text-slate-900">Registrar Atención para {{ mascota.nombre }}</h3>
+            <button type="button" onclick="cerrarModalAtencion()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
+        </div>
+
+        <form id="formAtencion" class="p-6 space-y-4">
+            <input type="hidden" id="atencion_clinica_id" value="{{ mascota.clinica_id }}">
+            <input type="hidden" id="atencion_mascota_id" value="{{ mascota.id }}">
+
+            <div>
+                <label for="tipo_atencion" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Tipo de Atención *
+                </label>
+                <select 
+                    id="tipo_atencion" 
+                    onchange="toggleCamposVacuna()"
+                    class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    required
+                >
+                    <option value="CONSULTA">🩺 Consulta Médica</option>
+                    <option value="VACUNACION">💉 Vacunación</option>
+                    <option value="DESPARASITACION">🪱 Desparasitación</option>
+                    <option value="GROOMING">✂️ Grooming / Baño</option>
+                    <option value="CIRUGIA">🏥 Cirugía</option>
+                </select>
+            </div>
+
+            <div>
+                <label for="motivo" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Motivo de Atención *
+                </label>
+                <input 
+                    type="text" 
+                    id="motivo" 
+                    placeholder="Ej: Control de rutina, tos recurrente..." 
+                    class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    required
+                >
+            </div>
+
+            <div>
+                <label for="peso_actual_kg" class="block text-xs font-semibold text-slate-700 mb-1">
+                    Peso Registrado (kg)
+                </label>
+                <input 
+                    type="number" 
+                    step="0.01" 
+                    min="0"
+                    id="peso_actual_kg" 
+                    placeholder="Ej: 13.2" 
+                    value="{{ mascota.peso or '' }}"
+                    class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                >
+            </div>
+
+            <!-- Campos Condicionales de Vacuna -->
+            <div id="seccionVacuna" class="hidden p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-3">
+                <p class="text-xs font-bold text-teal-900 uppercase">Detalles de la Vacuna</p>
+                <div>
+                    <label for="tipo_vacuna" class="block text-xs font-semibold text-slate-700 mb-1">Nombre / Tipo de Vacuna *</label>
+                    <input type="text" id="tipo_vacuna" placeholder="Ej: Séxtuple Canina, Rabia..." class="w-full px-3 py-2 text-sm bg-white border border-teal-300 rounded-lg">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label for="marca_lote" class="block text-xs font-semibold text-slate-700 mb-1">Marca / Lote</label>
+                        <input type="text" id="marca_lote" placeholder="Ej: Zoetis Lote 45B" class="w-full px-3 py-2 text-sm bg-white border border-teal-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label for="fecha_proximo_refuerzo" class="block text-xs font-semibold text-slate-700 mb-1">Próx. Refuerzo</label>
+                        <input type="date" id="fecha_proximo_refuerzo" class="w-full px-3 py-2 text-sm bg-white border border-teal-300 rounded-lg">
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <label for="diagnostico" class="block text-xs font-semibold text-slate-700 mb-1">Diagnóstico</label>
+                <textarea id="diagnostico" rows="2" placeholder="Hallazgos médicos..." class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"></textarea>
+            </div>
+
+            <div>
+                <label for="tratamiento" class="block text-xs font-semibold text-slate-700 mb-1">Tratamiento / Indicaciones</label>
+                <textarea id="tratamiento" rows="2" placeholder="Receta o cuidados en casa..." class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"></textarea>
+            </div>
+
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="cerrarModalAtencion()" class="btn-touch px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btnGuardarAtencion" class="btn-touch px-5 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl">Guardar Atención</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function abrirModalAtencion() {
+    document.getElementById('modalAtencion').classList.remove('hidden');
+}
+
+function cerrarModalAtencion() {
+    document.getElementById('modalAtencion').classList.add('hidden');
+}
+
+function toggleCamposVacuna() {
+    const tipo = document.getElementById('tipo_atencion').value;
+    const seccion = document.getElementById('seccionVacuna');
+    if (tipo === 'VACUNACION') {
+        seccion.classList.remove('hidden');
+    } else {
+        seccion.classList.add('hidden');
+    }
+}
+
+document.getElementById('formAtencion').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnGuardarAtencion');
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    const payload = {
+        clinica_id: parseInt(document.getElementById('atencion_clinica_id').value),
+        mascota_id: parseInt(document.getElementById('atencion_mascota_id').value),
+        tipo_atencion: document.getElementById('tipo_atencion').value,
+        motivo: document.getElementById('motivo').value.trim(),
+        diagnostico: document.getElementById('diagnostico').value.trim() || null,
+        tratamiento: document.getElementById('tratamiento').value.trim() || null,
+        peso_actual_kg: document.getElementById('peso_actual_kg').value ? parseFloat(document.getElementById('peso_actual_kg').value) : null,
+        tipo_vacuna: document.getElementById('tipo_vacuna').value.trim() || null,
+        marca_lote: document.getElementById('marca_lote').value.trim() || null,
+        fecha_proximo_refuerzo: document.getElementById('fecha_proximo_refuerzo').value || null
+    };
+
+    try {
+        const resp = await fetch('/api/clinic/atenciones', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            window.location.reload();
+        } else {
+            const err = await resp.json();
+            alert("Error: " + (err.detail || "No se pudo guardar la atención"));
+            btn.disabled = false;
+            btn.textContent = "Guardar Atención";
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al guardar atención.");
+        btn.disabled = false;
+        btn.textContent = "Guardar Atención";
+    }
+});
+</script>
+{% endblock %}

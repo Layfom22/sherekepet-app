@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.database import init_db
 from app.auth.routes import router as auth_router
+from app.clinic.routes import router as clinic_router
+from fastapi.responses import RedirectResponse
 
 
 @asynccontextmanager
@@ -16,8 +18,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="SaaS Veterinario SherekePet - Backend Core & Auth API (Sprint 1)",
-    version="0.1.0",
+    description="SaaS Veterinario SherekePet - Backend Core, Auth & Panel Clínico (Sprint 1 & 2)",
+    version="0.2.0",
     lifespan=lifespan
 )
 
@@ -32,6 +34,12 @@ app.add_middleware(
 
 # Registrar rutas
 app.include_router(auth_router)
+app.include_router(clinic_router)
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/api/health", tags=["Health"])

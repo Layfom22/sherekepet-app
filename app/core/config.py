@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # Timezone
     DEFAULT_TIMEZONE: str = "America/Lima"
 
+    # RENIEC API
+    APIS_NET_PE_TOKEN: str = "apis-token-13012.n93cG7Vp3E9tcRGXgvH8Hw0UWH31aBRQ"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Paciente (Registro Cero Fricción) - SherekePet{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+
+    <!-- Encabezado -->
+    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-tight">Registro Rápido de Paciente</h1>
+            <p class="text-xs text-slate-500 mt-1">
+                Consulta automática por RENIEC para dar de alta al dueño y su mascota en un solo paso.
+            </p>
+        </div>
+        <a href="/dashboard" class="btn-touch px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
+            ✕ Cancelar
+        </a>
+    </div>
+
+    <!-- Formulario Principal -->
+    <form id="formPaciente" class="space-y-6">
+        <input type="hidden" id="clinica_id" value="{{ clinica_id or 1 }}">
+
+        <!-- Sección 1: Datos del Dueño (RENIEC) -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                <span class="text-xl">👤</span>
+                <h2 class="text-base font-bold text-slate-900">1. Datos del Dueño / Titular</h2>
+            </div>
+
+            <!-- DNI con Autocompletado RENIEC -->
+            <div>
+                <label for="dni" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    DNI del Cliente *
+                </label>
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <input 
+                            type="text" 
+                            id="dni" 
+                            maxlength="8" 
+                            placeholder="Ingrese 8 dígitos..." 
+                            class="w-full px-4 py-3 text-base font-mono bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all tracking-widest"
+                            required
+                        >
+                        <div id="loaderReniec" class="hidden absolute right-3 top-3 text-teal-600 animate-spin">
+                            ⏳
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        id="btnConsultarReniec"
+                        onclick="consultarReniec()"
+                        class="btn-touch px-5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors whitespace-nowrap"
+                    >
+                        🔍 Consultar RENIEC
+                    </button>
+                </div>
+                <p id="reniecStatus" class="text-xs mt-1.5 font-medium"></p>
+            </div>
+
+            <!-- Campos Autocompletados (o editables manualmente) -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label for="nombre_completo" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Nombres y Apellidos Completos *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="nombre_completo" 
+                        placeholder="Se autocompleta con RENIEC o ingrese manualmente" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label for="telefono" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Teléfono / WhatsApp *
+                    </label>
+                    <div class="relative">
+                        <span class="absolute left-3.5 top-3 text-emerald-600 font-bold text-sm">💬</span>
+                        <input 
+                            type="tel" 
+                            id="telefono" 
+                            placeholder="Ej: 987654321" 
+                            class="w-full pl-10 pr-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                            required
+                        >
+                    </div>
+                    <span class="text-[11px] text-slate-400">Usado para recordatorios 1-clic por WhatsApp</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 2: Datos de la Mascota -->
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
+                <span class="text-xl">🐾</span>
+                <h2 class="text-base font-bold text-slate-900">2. Datos de la Mascota</h2>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="mascota_nombre" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Nombre de la Mascota *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="mascota_nombre" 
+                        placeholder="Ej: Firulais, Michi..." 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                        required
+                    >
+                </div>
+
+                <div>
+                    <label for="mascota_especie" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Especie *
+                    </label>
+                    <select 
+                        id="mascota_especie" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                        required
+                    >
+                        <option value="Canino">🐶 Canino (Perro)</option>
+                        <option value="Felino">🐱 Felino (Gato)</option>
+                        <option value="Conejo">🐰 Conejo</option>
+                        <option value="Ave">🦜 Ave</option>
+                        <option value="Otro">🐾 Otro</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="mascota_raza" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Raza (Opcional)
+                    </label>
+                    <input 
+                        type="text" 
+                        id="mascota_raza" 
+                        placeholder="Ej: Labrador, Criollo, Siames..." 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    >
+                </div>
+
+                <div>
+                    <label for="mascota_peso" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Peso Actual (kg)
+                    </label>
+                    <input 
+                        type="number" 
+                        step="0.01" 
+                        min="0"
+                        id="mascota_peso" 
+                        placeholder="Ej: 12.5" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="mascota_alergias" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Alergias / Condiciones Previas (Opcional)
+                    </label>
+                    <input 
+                        type="text" 
+                        id="mascota_alergias" 
+                        placeholder="Ej: Alérgico a la penicilina, dermatitis atópica..." 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <!-- Botón Submit Grande (Touch >= 44px) -->
+        <div class="pt-2">
+            <button 
+                type="submit" 
+                id="btnGuardar"
+                class="btn-touch w-full py-4 px-6 text-base font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-2xl shadow-md hover:shadow-lg transition-all"
+            >
+                ✓ Guardar Paciente y Crear Ficha Clínica
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Detección automática al completar 8 dígitos
+document.getElementById('dni').addEventListener('input', function(e) {
+    if (this.value.length === 8) {
+        consultarReniec();
+    }
+});
+
+async function consultarReniec() {
+    const dniInput = document.getElementById('dni');
+    const dni = dniInput.value.trim();
+    const statusMsg = document.getElementById('reniecStatus');
+    const loader = document.getElementById('loaderReniec');
+    const btn = document.getElementById('btnConsultarReniec');
+
+    if (dni.length !== 8 || !/^\d{8}$/.test(dni)) {
+        statusMsg.className = "text-xs mt-1.5 font-medium text-rose-600";
+        statusMsg.textContent = "Ingrese un DNI válido de 8 dígitos numéricos.";
+        return;
+    }
+
+    loader.classList.remove('hidden');
+    btn.disabled = true;
+    statusMsg.className = "text-xs mt-1.5 font-medium text-teal-600";
+    statusMsg.textContent = "Consultando RENIEC en tiempo real...";
+
+    try {
+        const resp = await fetch(`/api/reniec/dni/${dni}`);
+        if (resp.ok) {
+            const data = await resp.json();
+            document.getElementById('nombre_completo').value = data.nombre_completo;
+            statusMsg.className = "text-xs mt-1.5 font-medium text-emerald-600";
+            statusMsg.textContent = `✓ Datos encontrados: ${data.nombre_completo}`;
+        } else {
+            const err = await resp.json();
+            statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
+            statusMsg.textContent = "DNI no encontrado o servicio temporalmente no disponible. Puede completar los datos manualmente.";
+        }
+    } catch (e) {
+        statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
+        statusMsg.textContent = "Error de conexión. Puede completar los datos manualmente.";
+    } finally {
+        loader.classList.add('hidden');
+        btn.disabled = false;
+    }
+}
+
+// Envío rápido del formulario
+document.getElementById('formPaciente').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    const payload = {
+        clinica_id: parseInt(document.getElementById('clinica_id').value),
+        dni: document.getElementById('dni').value.trim(),
+        nombre_completo: document.getElementById('nombre_completo').value.trim(),
+        telefono: document.getElementById('telefono').value.trim(),
+        mascota_nombre: document.getElementById('mascota_nombre').value.trim(),
+        mascota_especie: document.getElementById('mascota_especie').value,
+        mascota_raza: document.getElementById('mascota_raza').value.trim() || null,
+        mascota_peso: document.getElementById('mascota_peso').value ? parseFloat(document.getElementById('mascota_peso').value) : null,
+        mascota_alergias: document.getElementById('mascota_alergias').value.trim() || null
+    };
+
+    try {
+        const resp = await fetch('/api/clinic/paciente-rapido', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            // Redirigir a la ficha recién creada
+            window.location.href = `/pacientes/${data.mascota.id}`;
+        } else {
+            const err = await resp.json();
+            alert("Error al registrar: " + (err.detail || "Revise los campos"));
+            btn.disabled = false;
+            btn.textContent = "✓ Guardar Paciente y Crear Ficha Clínica";
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al guardar paciente.");
+        btn.disabled = false;
+        btn.textContent = "✓ Guardar Paciente y Crear Ficha Clínica";
+    }
+});
+</script>
+{% endblock %}

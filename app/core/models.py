@@ -41,7 +41,7 @@ class TimestampMixin:
 
 class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     """Modelo Tenant Principal: Clínica Veterinaria."""
-    __tablename__ = "clinicas"
+    __tablename__ = "sp_clinicas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)

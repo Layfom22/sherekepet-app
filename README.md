@@ -1,21 +1,23 @@
-# SherekePet - SaaS Veterinario (Sprint 1 - Modo Solo)
+# SherekePet - SaaS Veterinario (Sprint 1 & Sprint 2 - Modo Solo)
 
-Backend API desarrollado en **FastAPI** y **SQLAlchemy** para el SaaS Veterinario SherekePet.
+Backend y Frontend Web desarrollado en **FastAPI**, **SQLAlchemy**, **Jinja2** y **Tailwind CSS** para el SaaS Veterinario SherekePet.
 
 ---
 
 ## 🏛️ Reglas de Arquitectura
 
 1. **Multi-tenant**:
-   - Toda tabla operativa (`veterinarios`, `clientes`, `mascotas`) incluye de forma obligatoria la clave foránea e índice `clinica_id`.
+   - Toda tabla operativa (`sp_veterinarios`, `sp_clientes`, `sp_mascotas`, `sp_atenciones`, `sp_vacunas`, `sp_seguimientos`) incluye de forma obligatoria la clave foránea e índice `clinica_id`.
 2. **Zona Horaria Estricta**:
-   - Obligatoriamente `'America/Lima'` (`UTC-5`) para todos los registros de auditoría y timestamps (`created_at`, `updated_at`, `deleted_at`) mediante `datetime.now(ZoneInfo('America/Lima'))`.
-   - Incluye soporte universal con paquete `tzdata` compatible en Linux, macOS y Windows.
+   - Obligatoriamente `'America/Lima'` (`UTC-5`) para todos los registros de auditoría y timestamps (`created_at`, `updated_at`, `deleted_at`) mediante `get_lima_now()` (`datetime.now(ZoneInfo('America/Lima'))`).
+   - Soporte universal garantizado con `tzdata`.
 3. **Soft Delete**:
    - Todas las tablas implementan `is_deleted = Column(Boolean, default=False)` y `deleted_at = Column(DateTime, nullable=True)`.
    - Las consultas operativas omiten los registros marcados como eliminados (`is_deleted == False`).
 4. **Inicialización Segura**:
-   - `app/database.py` inicializa las tablas con sentencias idempotentes `CREATE TABLE IF NOT EXISTS` garantizando cero bloqueos o errores de colisión.
+   - `app/database.py` inicializa las tablas con sentencias idempotentes `CREATE TABLE IF NOT EXISTS` garantizando cero bloqueos o errores de colisión en despliegues con SQLite local o PostgreSQL en Render.
+5. **Mobile-First & Cero Fricción**:
+   - UI adaptada para celulares y laptops con Tailwind CSS, botones con área táctil mínima de 44px (`min-h-[44px]`), consulta asíncrona a RENIEC y canal de contacto 1-Clic por WhatsApp.
 
 ---
 
@@ -25,24 +27,36 @@ Backend API desarrollado en **FastAPI** y **SQLAlchemy** para el SaaS Veterinari
 SHEREKEPET/
 ├── app/
 │   ├── core/
-│   │   ├── config.py           # Configuración con Pydantic Settings
+│   │   ├── config.py           # Configuración con Pydantic Settings (.env)
 │   │   ├── timezone.py         # Helper de hora para America/Lima
 │   │   ├── security.py         # Hash de PIN (bcrypt) y tokens JWT (PyJWT)
-│   │   └── models.py           # Base, SoftDeleteMixin, TimestampMixin, Clinica
+│   │   └── models.py           # Base, SoftDeleteMixin, TimestampMixin, Clinica (sp_clinicas)
 │   ├── clinic/
-│   │   └── models.py           # Modelos Veterinario, Cliente, Mascota
+│   │   ├── models.py           # sp_veterinarios, sp_clientes, sp_mascotas, sp_atenciones, sp_vacunas, sp_seguimientos
+│   │   ├── schemas.py          # Schemas Pydantic (Paciente rápido, Atenciones, RENIEC)
+│   │   ├── routes.py           # Endpoints API REST y vistas web Jinja2
+│   │   └── services/
+│   │       ├── reniec_service.py   # Consulta asíncrona a apis.net.pe
+│   │       └── whatsapp_service.py # Normalizador de teléfonos peruanos (+51) y enlaces wa.me
 │   ├── auth/
-│   │   ├── schemas.py          # Schemas Pydantic con tipado estricto
-│   │   ├── service.py          # Lógica de negocio (Google Auth & PIN 4 dígitos)
-│   │   └── routes.py           # Endpoints POST /api/auth/vet/login y client/login
+│   │   ├── schemas.py          # Schemas Pydantic para Auth
+│   │   ├── service.py          # Lógica de negocio de Auth
+│   │   └── routes.py           # POST /api/auth/vet/login y client/login
+│   ├── templates/
+│   │   ├── base.html           # Layout base Tailwind CSS responsivo
+│   │   └── clinic/
+│   │       ├── dashboard.html      # Panel Veterinario con KPIs, buscador y WhatsApp 1-clic
+│   │       ├── paciente_form.html  # Registro Cero Fricción con autocompletado RENIEC en vivo
+│   │       └── ficha_mascota.html  # Ficha clínica, carnet de vacunas y registro de atenciones
 │   ├── database.py             # Engine, sessionmaker, get_db e init_db seguro
 │   └── main.py                 # FastAPI app, CORS, lifespan & healthcheck
 ├── tests/
 │   ├── conftest.py             # Fixtures de SQLite en memoria y TestClient
 │   ├── test_models.py          # Tests de multi-tenant, soft delete y timezone
-│   └── test_auth.py            # Tests de autenticación para vet y cliente
-├── .env.example                # Variables de entorno de referencia
-├── requirements.txt            # Dependencias del proyecto
+│   ├── test_auth.py            # Tests de autenticación para vet y cliente
+│   └── test_clinic_sprint2.py  # Tests de RENIEC, WhatsApp, paciente rápido y atenciones con vacunas
+├── .env.example
+├── requirements.txt
 └── README.md
 ```
 
@@ -78,80 +92,34 @@ copy .env.example .env
 uvicorn app.main:app --reload --port 8000
 ```
 
-La documentación interactiva estará disponible en:
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-- Healthcheck: `http://localhost:8000/api/health`
+Navega a:
+- **Panel Veterinario (Dashboard)**: `http://localhost:8000/dashboard`
+- **Registro Rápido de Pacientes**: `http://localhost:8000/pacientes/nuevo`
+- **Swagger UI**: `http://localhost:8000/docs`
 
 ---
 
-## 🔐 Endpoints de Autenticación
+## 🩺 Módulos del Sprint 2
 
-### 1. `POST /api/auth/vet/login`
-Autenticación de personal veterinario mediante credenciales / Google OAuth.
-- **Request**:
-  ```json
-  {
-    "email": "doctor@veterinaria.pe",
-    "google_id": "google_12345678",
-    "clinica_id": 1
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "access_token": "eyJhbGciOi...",
-    "token_type": "bearer",
-    "veterinario": {
-      "id": 1,
-      "email": "doctor@veterinaria.pe",
-      "rol": "veterinario",
-      "clinica_id": 1,
-      "is_active": true
-    }
-  }
-  ```
+### 1. Integración RENIEC (`apis.net.pe`)
+- Endpoint: `GET /api/reniec/dni/{dni}`
+- Servicio: `app/clinic/services/reniec_service.py`
+- Lee token Bearer desde `APIS_NET_PE_TOKEN`.
 
-### 2. `POST /api/auth/client/login`
-Autenticación para dueños de mascotas mediante DNI y PIN.
+### 2. Registro Cero Fricción
+- Endpoint: `POST /api/clinic/paciente-rapido`
+- Registra al Cliente y a su Mascota en una sola transacción atómica.
 
-- **Caso 1: Primer ingreso (`pin_hash` es NULL)**
-  - Request inicial:
-    ```json
-    {
-      "clinica_id": 1,
-      "dni": "72345678"
-    }
-    ```
-  - Response:
-    ```json
-    {
-      "access_token": null,
-      "token_type": "bearer",
-      "requires_pin_setup": true,
-      "message": "Primer ingreso detectado: Es obligatorio crear un PIN numérico de 4 dígitos."
-    }
-    ```
-  - Establecimiento de PIN (envío con `nuevo_pin`):
-    ```json
-    {
-      "clinica_id": 1,
-      "dni": "72345678",
-      "nuevo_pin": "4521"
-    }
-    ```
-  - Response: Retorna `access_token` JWT inmediatamente.
+### 3. Atenciones y Cálculo Automático de Vacunas y Notificaciones
+- Endpoint: `POST /api/clinic/atenciones`
+- Al registrar una atención con `tipo_atencion = 'VACUNACION'`, el sistema genera automáticamente:
+  - Fila en `sp_vacunas` con la fecha del próximo refuerzo.
+  - Fila en `sp_seguimientos` con fecha programada, plantilla de recordatorio y enlace directo a WhatsApp.
 
-- **Caso 2: Cliente con PIN configurado**
-  - Request:
-    ```json
-    {
-      "clinica_id": 1,
-      "dni": "72345678",
-      "pin": "4521"
-    }
-    ```
-  - Response: Retorna `access_token` JWT con claims del cliente y `clinica_id`.
+### 4. Canal WhatsApp 1-Clic
+- Utilidad: `app/clinic/services/whatsapp_service.py`
+- Normaliza números celulares de Perú a formato internacional `519XXXXXXXX` y genera el enlace directo `https://wa.me/51...` con mensaje codificado.
+- Endpoint: `PATCH /api/clinic/seguimientos/{id}/marcar-enviado`.
 
 ---
 

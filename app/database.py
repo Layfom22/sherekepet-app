@@ -5,7 +5,14 @@ from sqlalchemy.engine import Engine
 
 from app.core.config import settings
 from app.core.models import Base, Clinica
-from app.clinic.models import Veterinario, Cliente, Mascota
+from app.clinic.models import (
+    Veterinario,
+    Cliente,
+    Mascota,
+    AtencionClinica,
+    RegistroVacuna,
+    SeguimientoNotificacion
+)
 
 # Configuración del Engine de Base de Datos
 connect_args = {}

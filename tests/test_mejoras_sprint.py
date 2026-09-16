@@ -280,3 +280,112 @@ def test_actualizar_perfil_mascota_dni(client, test_clinica, db_session):
     assert m.rasgos_distintivos == "Mancha marrón en la pata trasera"
 
 
+def test_auth_veterinario_registro_login_logout(client, db_session):
+    """Verifica registro, login con contraseña y logout del veterinario."""
+    # 1. Registro
+    reg_payload = {
+        "nombre": "Dr. Martin San Martin",
+        "nombre_clinica": "Clínica Veterinaria Los Sauces",
+        "email": "martin@saucesvet.com",
+        "password": "miPasswordSeguro123"
+    }
+    resp_reg = client.post("/registro", data=reg_payload, follow_redirects=False)
+    assert resp_reg.status_code == 303
+    assert resp_reg.headers["location"] == "/dashboard"
+    assert "vet_token" in resp_reg.cookies
+
+    # 2. Login con contraseña correcta
+    client.cookies.clear()
+    login_payload = {
+        "email": "martin@saucesvet.com",
+        "password": "miPasswordSeguro123"
+    }
+    resp_login = client.post("/login", data=login_payload, follow_redirects=False)
+    assert resp_login.status_code == 303
+    assert resp_login.headers["location"] == "/dashboard"
+    assert "vet_token" in resp_login.cookies
+
+    # 3. Login con contraseña errónea
+    client.cookies.clear()
+    bad_login = {
+        "email": "martin@saucesvet.com",
+        "password": "passwordIncorrecto"
+    }
+    resp_bad = client.post("/login", data=bad_login)
+    assert resp_bad.status_code == 200
+    assert "Contraseña incorrecta" in resp_bad.text
+
+    # 4. Logout
+    resp_logout = client.get("/logout", follow_redirects=False)
+    assert resp_logout.status_code == 303
+    assert resp_logout.headers["location"] == "/login"
+
+
+def test_resetear_pin_cliente(client, test_clinica, db_session):
+    """Verifica el endpoint PATCH /api/clinic/clientes/{id}/reset-pin."""
+    from app.core.security import hash_pin
+    c = Cliente(
+        clinica_id=test_clinica.id,
+        dni="88776655",
+        nombre_completo="Juan Perez",
+        pin_hash=hash_pin("1234")
+    )
+    db_session.add(c)
+    db_session.commit()
+
+    assert c.pin_hash is not None
+
+    resp = client.patch(f"/api/clinic/clientes/{c.id}/reset-pin")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["pin_hash"] is None
+
+    db_session.refresh(c)
+    assert c.pin_hash is None
+
+
+def test_multi_clinica_selector(client, db_session):
+    """Verifica el paso intermedio cuando un DNI está registrado en múltiples clínicas."""
+    from app.core.models import Clinica
+    clinica1 = Clinica(nombre="Veterinaria Norte", zona_horaria="America/Lima", plan_activo="solo")
+    clinica2 = Clinica(nombre="Veterinaria Sur", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([clinica1, clinica2])
+    db_session.commit()
+
+    c1 = Cliente(clinica_id=clinica1.id, dni="99887766", nombre_completo="Pedro Castillo")
+    c2 = Cliente(clinica_id=clinica2.id, dni="99887766", nombre_completo="Pedro Castillo")
+    db_session.add_all([c1, c2])
+    db_session.commit()
+
+    # Intento de login sin indicar clinica_seleccionada
+    resp = client.post("/portal/login", data={"dni": "99887766", "pin": "1234"})
+    assert resp.status_code == 200
+    assert "Elige tu Clínica" in resp.text
+    assert "Veterinaria Norte" in resp.text
+    assert "Veterinaria Sur" in resp.text
+
+
+def test_catalogo_extendido_con_especies_y_razas(client, db_session):
+    """Verifica que el catálogo tenga las 6 especies principales y gran variedad de razas."""
+    from seed_catalogos import seed_catalogos
+    seed_catalogos(db_session)
+
+    resp = client.get("/api/clinic/catalogo")
+    assert resp.status_code == 200
+    catalog = resp.json()
+    nombres_especies = [item["nombre"] for item in catalog]
+    assert "Canino (Perro)" in nombres_especies
+    assert "Felino (Gato)" in nombres_especies
+    assert "Ave" in nombres_especies
+    assert "Roedor" in nombres_especies
+    assert "Reptil" in nombres_especies
+    assert "Exótico" in nombres_especies
+
+    canino = next(e for e in catalog if e["nombre"] == "Canino (Perro)")
+    felino = next(e for e in catalog if e["nombre"] == "Felino (Gato)")
+    assert len(canino["razas"]) >= 50
+    assert len(felino["razas"]) >= 20
+
+
+

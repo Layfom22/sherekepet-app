@@ -24,6 +24,23 @@ def verify_pin(plain_pin: str, hashed_pin: str) -> bool:
         return False
 
 
+def hash_password(password: str) -> str:
+    """Genera hash seguro para la contraseña del veterinario utilizando bcrypt."""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verifica si la contraseña plana coincide con el hash almacenado."""
+    if not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
+
+
 def create_access_token(
     data: Dict[str, Any],
     expires_delta: Optional[timedelta] = None

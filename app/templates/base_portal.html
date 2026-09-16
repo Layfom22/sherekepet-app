@@ -48,22 +48,34 @@
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white pb-12 sm:pb-0">
 
-    <!-- Header Portal del Dueño (Mobile-First Indigo Theme) -->
+    <!-- Header Portal del Dueño (White-Label Dynamic Header) -->
     <header class="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md">
         <div class="max-w-md md:max-w-4xl mx-auto px-4 sm:px-6">
             <div class="flex justify-between items-center h-16">
                 
-                <!-- Logo & Brand Dueños -->
+                <!-- Logo & Brand Dinámico (Marca Blanca) -->
                 <a href="/portal/dashboard" class="flex items-center space-x-2.5 group">
+                    {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
+                    <img 
+                        src="{{ clinica.logo_url or clinica.logo_b64 }}" 
+                        alt="{{ clinica.nombre }}" 
+                        class="w-10 h-10 rounded-2xl object-cover bg-white/20 backdrop-blur-xs border border-white/30 group-hover:scale-105 transition-transform"
+                        onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');"
+                    >
+                    <div class="hidden w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-xl shadow-xs border border-white/20">
+                        🐾
+                    </div>
+                    {% else %}
                     <div class="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition-transform border border-white/20">
                         🐾
                     </div>
-                    <div>
+                    {% endif %}
+                    <div class="min-w-0">
                         <div class="flex items-center space-x-1.5">
-                            <span class="text-base sm:text-lg font-black tracking-tight text-white">
-                                SherekePet
+                            <span class="text-sm sm:text-base font-black tracking-tight text-white truncate max-w-[180px] sm:max-w-xs">
+                                {{ clinica.nombre if clinica else 'Portal de Mascotas' }}
                             </span>
-                            <span class="px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-white/20 text-white rounded-full">
+                            <span class="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-white/20 text-white rounded-full flex-shrink-0">
                                 Dueños
                             </span>
                         </div>

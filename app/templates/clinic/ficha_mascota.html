@@ -37,7 +37,7 @@
                         {% endif %}
                     </div>
                     
-                    <div class="flex items-center space-x-4 mt-2 text-xs text-slate-600 flex-wrap gap-y-1">
+                    <div class="flex items-center space-x-3 mt-2 text-xs text-slate-600 flex-wrap gap-y-1">
                         <span><strong>Peso:</strong> <span class="font-mono">{{ mascota.peso or '--' }} kg</span></span>
                         <span><strong>Dueño:</strong> {{ cliente.nombre_completo or cliente.dni }} (DNI: {{ cliente.dni }})</span>
                         {% if cliente.telefono %}
@@ -49,6 +49,16 @@
                             💬 {{ cliente.telefono }}
                         </a>
                         {% endif %}
+                        <button 
+                            type="button" 
+                            id="btnResetPin"
+                            onclick="resetearPinCliente({{ cliente.id }})" 
+                            class="btn-touch px-2 py-0.5 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-200 rounded-lg transition-colors inline-flex items-center space-x-1"
+                            title="Borrar PIN actual del cliente para exigirle crear uno nuevo al ingresar"
+                        >
+                            <span>🔑</span>
+                            <span>Restablecer PIN</span>
+                        </button>
                     </div>
 
                     {% if mascota.alergias %}
@@ -513,6 +523,19 @@ async function subirFotoMascota(input, mascotaId) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
 
+    // Preview inmediato reactivo con URL.createObjectURL
+    const objectUrl = URL.createObjectURL(file);
+    const container = document.getElementById("petAvatarContainer");
+    if (container) {
+        container.innerHTML = `
+            <img id="petAvatarImg" src="${objectUrl}" alt="Foto" class="w-full h-full object-cover">
+            <div id="fotoUploadLoader" class="absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
+                <span class="animate-spin text-xs mb-0.5">⏳</span>
+                <span>Subiendo foto...</span>
+            </div>
+        `;
+    }
+
     const loader = document.getElementById("fotoUploadLoader");
     const label = document.getElementById("lblFotoMascotaInput");
     if (loader) loader.classList.remove("hidden");
@@ -570,6 +593,39 @@ function invitarDuenoPortal() {
     const numFinal = telefono.startsWith('51') ? telefono : `51${telefono}`;
     const enlace = `https://wa.me/${numFinal}?text=${encodeURIComponent(mensaje)}`;
     window.open(enlace, '_blank');
+}
+
+async function resetearPinCliente(clienteId) {
+    if (!confirm("¿Seguro que deseas restablecer el PIN de este propietario? Se le pedirá crear un PIN nuevo al ingresar.")) {
+        return;
+    }
+
+    const btn = document.getElementById("btnResetPin");
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add("opacity-50");
+    }
+
+    try {
+        const resp = await fetch(`/api/clinic/clientes/${clienteId}/reset-pin`, {
+            method: "PATCH"
+        });
+
+        if (resp.ok) {
+            alert("El PIN del dueño ha sido borrado. Se le pedirá crear uno nuevo en su próximo ingreso al portal.");
+        } else {
+            const err = await resp.json();
+            alert("Error al restablecer PIN: " + (err.detail || "No se pudo completar la acción."));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al restablecer PIN.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("opacity-50");
+        }
+    }
 }
 </script>
 {% endblock %}

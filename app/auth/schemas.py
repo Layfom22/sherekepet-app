@@ -12,15 +12,24 @@ class TokenData(BaseModel):
 
 class VetLoginRequest(BaseModel):
     email: EmailStr = Field(..., description="Correo electrónico del veterinario")
+    password: Optional[str] = Field(None, min_length=4, description="Contraseña de acceso")
     google_id: Optional[str] = Field(None, description="Identificador único proporcionado por Google")
     google_token: Optional[str] = Field(None, description="Token de autenticación / id_token de Google")
     clinica_id: Optional[int] = Field(None, description="ID de la clínica asignada (opcional si ya existe)")
+
+
+class VetRegisterRequest(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=150, description="Nombre del profesional")
+    email: EmailStr = Field(..., description="Correo electrónico del veterinario")
+    password: str = Field(..., min_length=4, description="Contraseña de acceso")
+    nombre_clinica: str = Field(..., min_length=2, max_length=200, description="Nombre de la clínica veterinaria")
 
 
 class VetInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    nombre: Optional[str] = None
     email: str
     rol: str
     clinica_id: int

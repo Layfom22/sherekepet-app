@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token
 from app.database import get_db
+from app.core.models import Clinica
 from app.clinic.models import Cliente, Mascota, RegistroVacuna
 from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
 from app.follow_up.schemas import (
@@ -233,11 +234,43 @@ def obtener_cliente_autenticado(request: Request, db: Session) -> Optional[Clien
 
 
 @router.get("/portal/login", response_class=HTMLResponse, summary="Vista Login Cliente PWA")
-def portal_login_view(request: Request):
+def portal_login_view(request: Request, db: Session = Depends(get_db)):
+    clinica = db.query(Clinica).filter(Clinica.is_deleted == False).first()
     return templates.TemplateResponse(
         request=request,
         name="client/login.html",
-        context={"error": None}
+        context={"error": None, "clinica": clinica}
+    )
+
+
+@router.get("/portal/seleccionar-clinica", response_class=HTMLResponse, summary="Seleccionar Clínica Multi-Tenant")
+def portal_seleccionar_clinica(request: Request, dni: str, pin: Optional[str] = None, db: Session = Depends(get_db)):
+    clientes = db.query(Cliente).filter(
+        Cliente.dni == dni.strip(),
+        Cliente.is_deleted == False
+    ).all()
+
+    if not clientes:
+        return RedirectResponse(url="/portal/login")
+
+    registros = []
+    for c in clientes:
+        total_mascotas = db.query(Mascota).filter(Mascota.cliente_id == c.id, Mascota.is_deleted == False).count()
+        registros.append({
+            "cliente": c,
+            "clinica": c.clinica,
+            "total_mascotas": total_mascotas
+        })
+
+    return templates.TemplateResponse(
+        request=request,
+        name="client/seleccionar_clinica.html",
+        context={
+            "dni": dni,
+            "pin": pin or "",
+            "registros": registros,
+            "clinica": clientes[0].clinica if clientes else None
+        }
     )
 
 
@@ -246,7 +279,43 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     dni = str(form.get("dni", "")).strip()
     pin = str(form.get("pin", "")).strip()
-    clinica_id = int(form.get("clinica_id", 1))
+    form_clinica_id = form.get("clinica_id")
+
+    # Si no se pasó clinica_id específica o viene la default 1, verificar si el DNI existe en múltiples clínicas
+    clientes_con_dni = db.query(Cliente).filter(
+        Cliente.dni == dni,
+        Cliente.is_deleted == False
+    ).all()
+
+    if len(clientes_con_dni) > 1 and not form.get("clinica_seleccionada"):
+        # Redirigir al selector intermedio
+        registros = []
+        for c in clientes_con_dni:
+            total_mascotas = db.query(Mascota).filter(Mascota.cliente_id == c.id, Mascota.is_deleted == False).count()
+            registros.append({
+                "cliente": c,
+                "clinica": c.clinica,
+                "total_mascotas": total_mascotas
+            })
+        return templates.TemplateResponse(
+            request=request,
+            name="client/seleccionar_clinica.html",
+            context={
+                "dni": dni,
+                "pin": pin,
+                "registros": registros,
+                "clinica": clientes_con_dni[0].clinica
+            }
+        )
+
+    if form_clinica_id:
+        clinica_id = int(form_clinica_id)
+    elif clientes_con_dni:
+        clinica_id = clientes_con_dni[0].clinica_id
+    else:
+        clinica_id = 1
+
+    clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
 
     try:
         req = ClientLoginRequest(clinica_id=clinica_id, dni=dni, pin=pin if pin else None)
@@ -258,7 +327,8 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
                 name="client/login.html",
                 context={
                     "error": "Primer ingreso detectado: Por favor establece tu PIN primero en la clínica.",
-                    "dni": dni
+                    "dni": dni,
+                    "clinica": clinica
                 }
             )
 
@@ -277,7 +347,7 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
         return templates.TemplateResponse(
             request=request,
             name="client/login.html",
-            context={"error": ex.detail, "dni": dni}
+            context={"error": ex.detail, "dni": dni, "clinica": clinica}
         )
 
 
@@ -335,6 +405,7 @@ def portal_dashboard(
         name="client/dashboard.html",
         context={
             "cliente": cliente,
+            "clinica": cliente.clinica,
             "mascotas": mascotas,
             "dosis_pendientes": dosis_pendientes,
             "ahora": get_lima_now()
@@ -393,6 +464,7 @@ def portal_carnet_mascota(
         context={
             "mascota": mascota,
             "cliente": mascota.cliente,
+            "clinica": mascota.clinica or mascota.cliente.clinica,
             "vacunas": vacunas,
             "planes": planes_info,
             "ahora": get_lima_now()

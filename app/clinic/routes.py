@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import json
 from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session
 from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token
 from app.database import get_db
+from app.auth.service import AuthService
+from app.auth.schemas import VetLoginRequest, VetRegisterRequest
 from app.core.models import Clinica
 from app.clinic.models import (
     Especie,
@@ -427,8 +429,137 @@ def marcar_seguimiento_enviado(
     )
 
 
+@router.patch(
+    "/api/clinic/clientes/{cliente_id}/reset-pin",
+    status_code=status.HTTP_200_OK,
+    summary="Restablecer PIN de Cliente / Dueño",
+    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def resetear_pin_cliente(
+    cliente_id: int,
+    db: Session = Depends(get_db)
+):
+    cliente = db.query(Cliente).filter(
+        Cliente.id == cliente_id,
+        Cliente.is_deleted == False
+    ).first()
+
+    if not cliente:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado."
+        )
+
+    cliente.pin_hash = None
+    db.commit()
+    db.refresh(cliente)
+
+    return {
+        "status": "ok",
+        "mensaje": "El PIN del cliente ha sido restablecido a None exitosamente.",
+        "cliente_id": cliente.id,
+        "pin_hash": cliente.pin_hash
+    }
+
+
 # ==========================================
-# 2. VISTAS HTML JINJA2 (PANEL VETERINARIO)
+# 2. VISTAS HTML PÚBLICAS Y DE SESIÓN (VETERINARIO)
+# ==========================================
+
+@router.get("/login", response_class=HTMLResponse, summary="Vista Login Veterinario")
+def vista_login_veterinario(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/login.html",
+        context={"error": None, "email": ""}
+    )
+
+
+@router.post("/login", response_class=HTMLResponse)
+async def procesar_login_veterinario(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", "")).strip()
+
+    try:
+        req = VetLoginRequest(email=email, password=password)
+        auth_resp = AuthService.login_veterinario(db, req)
+
+        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            key="vet_token",
+            value=auth_resp.access_token,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7
+        )
+        return response
+    except HTTPException as ex:
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/login.html",
+            context={"error": ex.detail, "email": email}
+        )
+
+
+@router.get("/registro", response_class=HTMLResponse, summary="Vista Registro Veterinario")
+def vista_registro_veterinario(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/registro.html",
+        context={"error": None}
+    )
+
+
+@router.post("/registro", response_class=HTMLResponse)
+async def procesar_registro_veterinario(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    nombre = str(form.get("nombre", "")).strip()
+    nombre_clinica = str(form.get("nombre_clinica", "")).strip()
+    email = str(form.get("email", "")).strip().lower()
+    password = str(form.get("password", "")).strip()
+
+    try:
+        req = VetRegisterRequest(
+            nombre=nombre,
+            nombre_clinica=nombre_clinica,
+            email=email,
+            password=password
+        )
+        auth_resp = AuthService.register_veterinario(db, req)
+
+        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            key="vet_token",
+            value=auth_resp.access_token,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7
+        )
+        return response
+    except HTTPException as ex:
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/registro.html",
+            context={
+                "error": ex.detail,
+                "nombre": nombre,
+                "nombre_clinica": nombre_clinica,
+                "email": email
+            }
+        )
+
+
+@router.get("/logout", summary="Cerrar Sesión Veterinario")
+def logout_veterinario():
+    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    response.delete_cookie("vet_token")
+    return response
+
+
+# ==========================================
+# 3. VISTAS HTML JINJA2 (PANEL VETERINARIO)
 # ==========================================
 
 @router.get("/dashboard", response_class=HTMLResponse, summary="Vista Dashboard Veterinario")

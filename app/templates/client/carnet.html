@@ -26,7 +26,7 @@
                 <span class="text-xl">🐾</span>
                 <div>
                     <p class="text-[9px] font-black uppercase tracking-widest text-indigo-300">DOCUMENTO NACIONAL DE IDENTIDAD ANIMAL</p>
-                    <p class="text-xs font-black tracking-tight text-white">REPÚBLICA DE LAS MASCOTAS &bull; SHEREKEPET</p>
+                    <p class="text-xs font-black tracking-tight text-white uppercase">{{ clinica.nombre if clinica else 'REPÚBLICA DE LAS MASCOTAS' }}</p>
                 </div>
             </div>
             <div class="text-right">
@@ -452,6 +452,19 @@ function comprimirImagenWebP(file, maxWidth = 1600, quality = 0.8) {
 async function subirFotoMascota(input, mascotaId) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
+
+    // Preview inmediato reactivo con URL.createObjectURL
+    const objectUrl = URL.createObjectURL(file);
+    const container = document.getElementById("petAvatarContainer");
+    if (container) {
+        container.innerHTML = `
+            <img id="petAvatarImg" src="${objectUrl}" alt="Foto" class="w-full h-full object-cover">
+            <div id="fotoUploadLoader" class="absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
+                <span class="animate-spin text-xs mb-0.5">⏳</span>
+                <span>Subiendo foto...</span>
+            </div>
+        `;
+    }
 
     const loader = document.getElementById("fotoUploadLoader");
     const label = document.getElementById("lblFotoMascotaInput");

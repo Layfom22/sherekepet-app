@@ -54,6 +54,8 @@ class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
         index=True
     )
     email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    nombre: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     rol: Mapped[str] = mapped_column(String(50), default="veterinario", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

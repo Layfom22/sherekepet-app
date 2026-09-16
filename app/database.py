@@ -114,6 +114,15 @@ def run_auto_migrations(target_engine) -> None:
                 if "enfermedades_cubiertas" not in cols:
                     conn.execute(text("ALTER TABLE sp_vacunas ADD COLUMN enfermedades_cubiertas TEXT;"))
 
+        # 4. sp_veterinarios
+        if "sp_veterinarios" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_veterinarios")}
+            with target_engine.begin() as conn:
+                if "password_hash" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN password_hash VARCHAR(255);"))
+                if "nombre" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN nombre VARCHAR(255);"))
+
     except Exception as e:
         print(f"[WARN] Error durante auto-migraciones: {e}")
 

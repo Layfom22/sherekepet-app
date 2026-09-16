@@ -2,6 +2,30 @@
 
 {% block title %}Nuevo Paciente (Registro Cero Fricción) - SherekePet{% endblock %}
 
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<style>
+.ts-control {
+    border-radius: 0.75rem !important;
+    padding: 0.75rem 1rem !important;
+    border-color: rgb(203 213 225) !important;
+    background-color: rgb(248 250 252) !important;
+    font-size: 0.875rem !important;
+}
+.ts-control:focus {
+    background-color: #fff !important;
+    border-color: rgb(20 184 166) !important;
+    box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2) !important;
+}
+.ts-dropdown {
+    border-radius: 0.75rem !important;
+    font-size: 0.875rem !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+    border-color: rgb(226 232 240) !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-3xl mx-auto space-y-6">
 
@@ -215,28 +239,46 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 let catalogoEspecies = [];
+let tsEspecie = null;
+let tsRaza = null;
 
 // Cargar catálogo de especies y razas al iniciar
 window.addEventListener('DOMContentLoaded', async () => {
+    // Inicializar TomSelect en Especie
+    tsEspecie = new TomSelect('#especie_id', {
+        create: false,
+        placeholder: '-- Seleccionar o buscar especie --',
+        maxItems: 1,
+        onChange: (val) => {
+            actualizarRazasPorEspecie(parseInt(val));
+        }
+    });
+
+    // Inicializar TomSelect en Raza
+    tsRaza = new TomSelect('#raza_id', {
+        create: false,
+        placeholder: '-- Seleccione una especie primero --',
+        maxItems: 1
+    });
+
     try {
         const resp = await fetch('/api/clinic/catalogo');
         if (resp.ok) {
             catalogoEspecies = await resp.json();
-            const selectEsp = document.getElementById('especie_id');
-            selectEsp.innerHTML = '<option value="">-- Seleccionar Especie --</option>';
+            
+            tsEspecie.clear();
+            tsEspecie.clearOptions();
+
             catalogoEspecies.forEach(esp => {
-                const opt = document.createElement('option');
-                opt.value = esp.id;
-                opt.textContent = esp.nombre;
-                selectEsp.appendChild(opt);
+                tsEspecie.addOption({ value: esp.id, text: esp.nombre });
             });
 
             // Seleccionar Canino por defecto si existe
             if (catalogoEspecies.length > 0) {
-                selectEsp.value = catalogoEspecies[0].id;
-                actualizarRazasPorEspecie();
+                tsEspecie.setValue(catalogoEspecies[0].id);
             }
         }
     } catch (e) {
@@ -244,24 +286,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-function actualizarRazasPorEspecie() {
-    const espId = parseInt(document.getElementById('especie_id').value);
-    const selectRaza = document.getElementById('raza_id');
-    selectRaza.innerHTML = '';
+function actualizarRazasPorEspecie(espId) {
+    if (!tsRaza) return;
+
+    tsRaza.clear();
+    tsRaza.clearOptions();
 
     const especieEncontrada = catalogoEspecies.find(e => e.id === espId);
     if (especieEncontrada && especieEncontrada.razas && especieEncontrada.razas.length > 0) {
-        selectRaza.innerHTML = '<option value="">-- Seleccionar Raza --</option>';
         especieEncontrada.razas.forEach(raza => {
-            const opt = document.createElement('option');
-            opt.value = raza.id;
-            opt.textContent = raza.nombre;
-            selectRaza.appendChild(opt);
+            tsRaza.addOption({ value: raza.id, text: raza.nombre });
         });
-        selectRaza.disabled = false;
+        tsRaza.enable();
+        tsRaza.settings.placeholder = '-- Buscar o seleccionar raza --';
+        tsRaza.inputState();
     } else {
-        selectRaza.innerHTML = '<option value="">-- Sin razas registradas --</option>';
-        selectRaza.disabled = true;
+        tsRaza.settings.placeholder = '-- Sin razas registradas --';
+        tsRaza.disable();
     }
 }
 

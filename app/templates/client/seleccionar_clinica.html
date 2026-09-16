@@ -1,0 +1,63 @@
+{% extends "base_portal.html" %}
+
+{% block title %}Seleccionar Clínica - Portal de Dueños{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-8 px-4 space-y-6">
+
+    <div class="text-center space-y-2">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/20">
+            🏥
+        </div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Elige tu Clínica</h1>
+        <p class="text-xs text-slate-500">
+            Tu DNI cuenta con registros de mascotas en más de una veterinaria. Selecciona a cuál deseas acceder.
+        </p>
+    </div>
+
+    <div class="space-y-3">
+        {% for reg in registros %}
+        <form method="POST" action="/portal/login" class="w-full">
+            <input type="hidden" name="dni" value="{{ dni }}">
+            <input type="hidden" name="pin" value="{{ pin }}">
+            <input type="hidden" name="clinica_id" value="{{ reg.clinica.id }}">
+
+            <button 
+                type="submit" 
+                class="btn-touch w-full p-4 rounded-2xl bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-md transition-all flex items-center justify-between text-left group"
+            >
+                <div class="flex items-center space-x-3 min-w-0">
+                    {% if reg.clinica.logo_url or reg.clinica.logo_b64 %}
+                    <img 
+                        src="{{ reg.clinica.logo_url or reg.clinica.logo_b64 }}" 
+                        alt="{{ reg.clinica.nombre }}" 
+                        class="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0"
+                    >
+                    {% else %}
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-2xl font-bold flex-shrink-0">
+                        🏥
+                    </div>
+                    {% endif %}
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 truncate">
+                            {{ reg.clinica.nombre }}
+                        </h3>
+                        <p class="text-xs text-slate-400">
+                            {{ reg.total_mascotas }} mascota(s) registrada(s)
+                        </p>
+                    </div>
+                </div>
+                <span class="text-indigo-600 font-bold text-sm ml-2">➜</span>
+            </button>
+        </form>
+        {% endfor %}
+    </div>
+
+    <div class="text-center pt-2">
+        <a href="/portal/login" class="text-xs text-indigo-600 hover:underline font-semibold">
+            ← Volver a ingresar DNI
+        </a>
+    </div>
+
+</div>
+{% endblock %}

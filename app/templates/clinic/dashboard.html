@@ -276,6 +276,18 @@ async function subirLogoClinica(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
 
+    // Preview inmediato reactivo con URL.createObjectURL
+    const objectUrl = URL.createObjectURL(file);
+    const imgEl = document.getElementById("clinicLogoImg");
+    const placeholderEl = document.getElementById("clinicLogoPlaceholder");
+    if (imgEl) {
+        imgEl.src = objectUrl;
+        imgEl.style.display = "block";
+    }
+    if (placeholderEl) {
+        placeholderEl.classList.add("hidden");
+    }
+
     const loader = document.getElementById("logoUploadLoader");
     const label = document.getElementById("lblLogoFileInput");
     if (loader) loader.classList.remove("hidden");

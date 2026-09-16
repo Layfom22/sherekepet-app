@@ -142,6 +142,9 @@ class Mascota(Base, SoftDeleteMixin, TimestampMixin):
     detalle_alergias: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     condiciones_previas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Multimedia / Cloudflare R2
+    foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     # Relaciones
     clinica = relationship("Clinica", back_populates="mascotas")
     cliente = relationship("Cliente", back_populates="mascotas")

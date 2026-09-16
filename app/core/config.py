@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     # RENIEC API
     APIS_NET_PE_TOKEN: str = "apis-token-13012.n93cG7Vp3E9tcRGXgvH8Hw0UWH31aBRQ"
 
+    # Cloudflare R2 Storage (S3-compatible)
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY: str = ""
+    R2_SECRET_KEY: str = ""
+    R2_BUCKET_NAME: str = "sherekepet"
+    R2_PUBLIC_URL: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

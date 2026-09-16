@@ -30,25 +30,52 @@ def test_catalogo_especies_y_razas(client, db_session):
 
 
 def test_subir_logo_clinica(client, test_clinica, db_session):
-    """Verifica la subida y conversión de logo a Base64 data URI."""
-    # Archivo PNG simulado válido
-    fake_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-    files = {"file": ("logo.png", io.BytesIO(fake_png), "image/png")}
+    """Verifica la subida de logo a Cloudflare R2 y actualización de logo_url."""
+    fake_webp = b"RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00"
+    files = {"file": ("logo.webp", io.BytesIO(fake_webp), "image/webp")}
     data = {"clinica_id": str(test_clinica.id)}
 
     resp = client.post("/api/clinic/logo", files=files, data=data)
     assert resp.status_code == 200
     res_json = resp.json()
-    assert "data:image/png;base64," in res_json["logo_b64"]
+    assert "logos/" in res_json["logo_url"]
 
     # Verificar en BD
     db_session.refresh(test_clinica)
-    assert test_clinica.logo_b64 == res_json["logo_b64"]
+    assert test_clinica.logo_url == res_json["logo_url"]
 
     # Rechazo de formato no admitido
     files_invalid = {"file": ("test.txt", io.BytesIO(b"texto plano"), "text/plain")}
     resp_invalid = client.post("/api/clinic/logo", files=files_invalid, data=data)
     assert resp_invalid.status_code == 400
+
+
+def test_subir_foto_mascota(client, test_clinica, db_session):
+    """Verifica la subida de foto de mascota a Cloudflare R2 y actualización de foto_url."""
+    cliente = Cliente(clinica_id=test_clinica.id, dni="99887766", nombre_completo="Ana Lopez")
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=test_clinica.id,
+        cliente_id=cliente.id,
+        nombre="Boby",
+        especie="Canino"
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    fake_webp = b"RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00"
+    files = {"file": ("mascota.webp", io.BytesIO(fake_webp), "image/webp")}
+
+    resp = client.post(f"/api/mascotas/{mascota.id}/foto", files=files)
+    assert resp.status_code == 200
+    res_json = resp.json()
+    assert "mascotas/" in res_json["foto_url"]
+
+    # Verificar en BD
+    db_session.refresh(mascota)
+    assert mascota.foto_url == res_json["foto_url"]
 
 
 def test_paciente_rapido_con_nuevos_campos(client, test_clinica, db_session):
@@ -166,3 +193,29 @@ def test_muro_de_contencion_bloqueo_rol_cliente(client, test_clinica, db_session
     client.cookies.clear()
     resp_dash_ok = client.get("/dashboard")
     assert resp_dash_ok.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_r2_storage_upload_direct():
+    """Verifica directamente upload_image_to_r2 con mock de S3 boto3."""
+    from unittest.mock import patch, MagicMock
+    from app.core.storage import upload_image_to_r2
+
+    mock_s3 = MagicMock()
+    with patch("app.core.storage.get_r2_client", return_value=mock_s3), \
+         patch("app.core.storage.settings.R2_BUCKET_NAME", "test-bucket"), \
+         patch("app.core.storage.settings.R2_PUBLIC_URL", "https://cdn.sherekepet.com"):
+
+        url = await upload_image_to_r2(
+            file_bytes=b"fake-image-data",
+            filename="foto_paciente.webp",
+            folder="mascotas",
+            content_type="image/webp"
+        )
+        assert url.startswith("https://cdn.sherekepet.com/mascotas/")
+        assert url.endswith("foto_paciente.webp")
+        mock_s3.put_object.assert_called_once()
+        call_kwargs = mock_s3.put_object.call_args[1]
+        assert call_kwargs["Bucket"] == "test-bucket"
+        assert call_kwargs["ContentType"] == "image/webp"
+

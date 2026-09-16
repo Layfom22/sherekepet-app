@@ -138,4 +138,11 @@ class SeguimientoUpdateResponse(BaseModel):
 
 class LogoUploadResponse(BaseModel):
     mensaje: str
-    logo_b64: str
+    logo_url: str
+    logo_b64: Optional[str] = None
+
+
+class MascotaFotoResponse(BaseModel):
+    mensaje: str
+    mascota_id: int
+    foto_url: str

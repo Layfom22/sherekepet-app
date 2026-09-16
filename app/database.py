@@ -62,17 +62,67 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+def run_auto_migrations(target_engine) -> None:
+    """
+    Verifica y agrega columnas faltantes en tablas existentes sin romper la base de datos.
+    Indispensable para entornos de producción como Render (PostgreSQL) donde create_all()
+    no modifica tablas ya existentes.
+    """
+    from sqlalchemy import text, inspect
+    try:
+        inspector = inspect(target_engine)
+        tables = inspector.get_table_names()
+
+        # 1. sp_clinicas
+        if "sp_clinicas" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_clinicas")}
+            with target_engine.begin() as conn:
+                if "logo_url" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN logo_url VARCHAR(500);"))
+                if "logo_b64" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN logo_b64 TEXT;"))
+
+        # 2. sp_mascotas
+        if "sp_mascotas" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_mascotas")}
+            with target_engine.begin() as conn:
+                if "foto_url" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN foto_url VARCHAR(500);"))
+                if "especie_id" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN especie_id INTEGER;"))
+                if "raza_id" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN raza_id INTEGER;"))
+                if "tiene_alergias" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN tiene_alergias BOOLEAN DEFAULT FALSE;"))
+                if "detalle_alergias" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN detalle_alergias VARCHAR(255);"))
+                if "condiciones_previas" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN condiciones_previas TEXT;"))
+
+        # 3. sp_vacunas
+        if "sp_vacunas" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_vacunas")}
+            with target_engine.begin() as conn:
+                if "enfermedades_cubiertas" not in cols:
+                    conn.execute(text("ALTER TABLE sp_vacunas ADD COLUMN enfermedades_cubiertas TEXT;"))
+
+    except Exception as e:
+        print(f"[WARN] Error durante auto-migraciones: {e}")
+
+
 def init_db() -> None:
     """
     Inicialización segura de la base de datos.
     Crea las tablas asegurando sentencias 'IF NOT EXISTS' para evitar bloqueos
     e inconsistencias en ejecuciones concurrentes o reinicios de la aplicación.
     """
-    # Base.metadata.create_all ejecuta DDL con validación previa de existencia (checkfirst=True)
-    # y sentencias seguras compatibles con SQLite y PostgreSQL.
+    # 1. Crear tablas nuevas si no existen
     Base.metadata.create_all(bind=engine, checkfirst=True)
 
-    # Inicializar datos de catálogos si no existen
+    # 2. Auto-migrar columnas faltantes en tablas existentes (ej. en Render PostgreSQL)
+    run_auto_migrations(engine)
+
+    # 3. Inicializar datos de catálogos si no existen
     from seed_catalogos import seed_catalogos
     db = SessionLocal()
     try:

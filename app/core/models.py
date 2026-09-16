@@ -47,7 +47,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     zona_horaria: Mapped[str] = mapped_column(String(50), default="America/Lima", nullable=False)
     plan_activo: Mapped[str] = mapped_column(String(50), default="solo", nullable=False)
-    logo_b64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Relaciones operativas
     veterinarios = relationship("Veterinario", back_populates="clinica", cascade="all, delete-orphan")

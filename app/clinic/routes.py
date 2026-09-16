@@ -22,6 +22,7 @@ from app.clinic.models import (
     RegistroVacuna,
     SeguimientoNotificacion
 )
+from app.core.storage import upload_image_to_r2
 from app.clinic.schemas import (
     ReniecResponse,
     EspecieConRazas,
@@ -32,7 +33,8 @@ from app.clinic.schemas import (
     AtencionCreateRequest,
     AtencionResponse,
     SeguimientoUpdateResponse,
-    LogoUploadResponse
+    LogoUploadResponse,
+    MascotaFotoResponse
 )
 from app.clinic.services.reniec_service import consultar_dni_reniec
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
@@ -97,8 +99,8 @@ def get_catalogo_especies(db: Session = Depends(get_db)):
 @router.post(
     "/api/clinic/logo",
     response_model=LogoUploadResponse,
-    summary="Subir Logo de la Clínica (Base64)",
-    description="Carga imagen del logo, la convierte a Base64 con data URI y la guarda en la clínica.",
+    summary="Subir Logo de la Clínica (Cloudflare R2)",
+    description="Carga imagen del logo, la sube a Cloudflare R2 y actualiza Clinica.logo_url.",
     dependencies=[Depends(verificar_acceso_veterinario)]
 )
 async def upload_logo_clinica(
@@ -111,7 +113,7 @@ async def upload_logo_clinica(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
 
     tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/png"
+    content_type = file.content_type or "image/webp"
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -119,22 +121,75 @@ async def upload_logo_clinica(
         )
 
     contenido = await file.read()
-    if len(contenido) > 5 * 1024 * 1024:
+    if len(contenido) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El archivo excede el tamaño máximo permitido (5MB)."
+            detail="El archivo excede el tamaño máximo permitido (10MB)."
         )
 
-    b64_encoded = base64.b64encode(contenido).decode("utf-8")
-    data_uri = f"data:{content_type};base64,{b64_encoded}"
+    logo_url = await upload_image_to_r2(
+        file_bytes=contenido,
+        filename=file.filename or "logo.webp",
+        folder="logos",
+        content_type=content_type
+    )
 
-    clinica.logo_b64 = data_uri
+    clinica.logo_url = logo_url
     db.commit()
 
     return LogoUploadResponse(
         mensaje="Logo de la clínica actualizado correctamente.",
-        logo_b64=data_uri
+        logo_url=logo_url,
+        logo_b64=logo_url
     )
+
+
+@router.post(
+    "/api/mascotas/{mascota_id}/foto",
+    response_model=MascotaFotoResponse,
+    summary="Subir Foto de la Mascota (Cloudflare R2)",
+    description="Sube la foto de la mascota a Cloudflare R2 y actualiza Mascota.foto_url."
+)
+async def upload_foto_mascota(
+    mascota_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    mascota = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False).first()
+    if not mascota:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada.")
+
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
+    content_type = file.content_type or "image/webp"
+    if content_type not in tipos_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+        )
+
+    contenido = await file.read()
+    if len(contenido) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo permitido (10MB)."
+        )
+
+    foto_url = await upload_image_to_r2(
+        file_bytes=contenido,
+        filename=file.filename or f"mascota_{mascota_id}.webp",
+        folder="mascotas",
+        content_type=content_type
+    )
+
+    mascota.foto_url = foto_url
+    db.commit()
+
+    return MascotaFotoResponse(
+        mensaje="Foto de la mascota actualizada correctamente.",
+        mascota_id=mascota.id,
+        foto_url=foto_url
+    )
+
 
 
 @router.post(

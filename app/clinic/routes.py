@@ -1,15 +1,20 @@
+import base64
 from datetime import date, timedelta
+import json
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.core.timezone import get_lima_now
+from app.core.security import decode_access_token
 from app.database import get_db
 from app.core.models import Clinica
 from app.clinic.models import (
+    Especie,
+    Raza,
     Cliente,
     Mascota,
     Veterinario,
@@ -19,13 +24,15 @@ from app.clinic.models import (
 )
 from app.clinic.schemas import (
     ReniecResponse,
+    EspecieConRazas,
     PacienteRapidoRequest,
     PacienteRapidoResponse,
     ClienteSummary,
     MascotaSummary,
     AtencionCreateRequest,
     AtencionResponse,
-    SeguimientoUpdateResponse
+    SeguimientoUpdateResponse,
+    LogoUploadResponse
 )
 from app.clinic.services.reniec_service import consultar_dni_reniec
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
@@ -33,6 +40,30 @@ from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
 templates = Jinja2Templates(directory="app/templates")
 
 router = APIRouter(tags=["Clínica"])
+
+
+# ==========================================
+# 0. MURO DE CONTENCIÓN: SEGURIDAD POR ROLES
+# ==========================================
+
+def verificar_acceso_veterinario(request: Request) -> None:
+    """
+    Muro de Contención: Impide que usuarios con rol 'client' accedan
+    al panel operativo o APIs administrativas de la clínica.
+    """
+    token = request.cookies.get("client_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if token:
+        payload = decode_access_token(token)
+        if payload and payload.get("role") == "client":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acceso denegado: Los clientes solo tienen autorización para acceder a su portal de mascotas (/portal)."
+            )
 
 
 # ==========================================
@@ -44,11 +75,66 @@ router = APIRouter(tags=["Clínica"])
     response_model=ReniecResponse,
     status_code=status.HTTP_200_OK,
     summary="Consulta de DNI en RENIEC",
-    description="Proxy seguro hacia apis.net.pe con Bearer token y validación de 8 dígitos."
+    description="Proxy seguro hacia apis.net.pe con Bearer token y validación de 8 dígitos.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
 )
 async def get_reniec_dni(dni: str):
     datos = await consultar_dni_reniec(dni)
     return ReniecResponse(**datos)
+
+
+@router.get(
+    "/api/clinic/catalogo",
+    response_model=List[EspecieConRazas],
+    summary="Catálogo de Especies y Razas",
+    description="Retorna las especies con sus respectivas razas para autocompletado reactivo.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def get_catalogo_especies(db: Session = Depends(get_db)):
+    return db.query(Especie).order_by(Especie.nombre.asc()).all()
+
+
+@router.post(
+    "/api/clinic/logo",
+    response_model=LogoUploadResponse,
+    summary="Subir Logo de la Clínica (Base64)",
+    description="Carga imagen del logo, la convierte a Base64 con data URI y la guarda en la clínica.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+async def upload_logo_clinica(
+    file: UploadFile = File(...),
+    clinica_id: int = Form(1),
+    db: Session = Depends(get_db)
+):
+    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
+    content_type = file.content_type or "image/png"
+    if content_type not in tipos_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y SVG."
+        )
+
+    contenido = await file.read()
+    if len(contenido) > 5 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo permitido (5MB)."
+        )
+
+    b64_encoded = base64.b64encode(contenido).decode("utf-8")
+    data_uri = f"data:{content_type};base64,{b64_encoded}"
+
+    clinica.logo_b64 = data_uri
+    db.commit()
+
+    return LogoUploadResponse(
+        mensaje="Logo de la clínica actualizado correctamente.",
+        logo_b64=data_uri
+    )
 
 
 @router.post(
@@ -56,7 +142,8 @@ async def get_reniec_dni(dni: str):
     response_model=PacienteRapidoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registro rápido de Paciente y Dueño (Cero Fricción)",
-    description="Crea o actualiza el Cliente (con datos de RENIEC o manuales) y registra su Mascota en una sola transacción."
+    description="Crea o actualiza el Cliente y registra su Mascota con catálogos y ficha médica en una sola transacción.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
 )
 def registrar_paciente_rapido(
     payload: PacienteRapidoRequest,
@@ -94,27 +181,46 @@ def registrar_paciente_rapido(
             apellido_materno=payload.apellido_materno,
             nombre_completo=nombre_completo,
             telefono=payload.telefono,
-            pin_hash=None  # Podrá configurar PIN en su primer ingreso
+            pin_hash=None
         )
         db.add(cliente)
         db.flush()
     else:
-        # Actualizar datos si venían vacíos
         if not cliente.nombre_completo and nombre_completo:
             cliente.nombre_completo = nombre_completo
         if not cliente.telefono and payload.telefono:
             cliente.telefono = payload.telefono
         db.flush()
 
-    # 3. Registrar Mascota
+    # 3. Resolver nombres de Especie y Raza desde Catálogo si se enviaron IDs
+    nombre_especie = payload.mascota_especie or "Canino"
+    if payload.especie_id:
+        esp_obj = db.query(Especie).filter(Especie.id == payload.especie_id).first()
+        if esp_obj:
+            nombre_especie = esp_obj.nombre
+
+    nombre_raza = payload.mascota_raza
+    if payload.raza_id:
+        raza_obj = db.query(Raza).filter(Raza.id == payload.raza_id).first()
+        if raza_obj:
+            nombre_raza = raza_obj.nombre
+
+    alergias_legado = payload.detalle_alergias if payload.tiene_alergias else payload.mascota_alergias
+
+    # 4. Registrar Mascota
     mascota = Mascota(
         clinica_id=payload.clinica_id,
         cliente_id=cliente.id,
+        especie_id=payload.especie_id,
+        raza_id=payload.raza_id,
         nombre=payload.mascota_nombre.strip(),
-        especie=payload.mascota_especie.strip(),
-        raza=payload.mascota_raza.strip() if payload.mascota_raza else None,
+        especie=nombre_especie,
+        raza=nombre_raza,
         peso=payload.mascota_peso,
-        alergias=payload.mascota_alergias.strip() if payload.mascota_alergias else None
+        tiene_alergias=payload.tiene_alergias,
+        detalle_alergias=payload.detalle_alergias if payload.tiene_alergias else None,
+        condiciones_previas=payload.condiciones_previas.strip() if payload.condiciones_previas else None,
+        alergias=alergias_legado
     )
     db.add(mascota)
     db.commit()
@@ -132,8 +238,9 @@ def registrar_paciente_rapido(
     "/api/clinic/atenciones",
     response_model=AtencionResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Registrar Atención Clínica",
-    description="Guarda la atención médica. Si es 'VACUNACION', genera el registro de vacuna y la notificación de refuerzo automática."
+    summary="Registrar Atención Clínica y Digitalización de Vacunas",
+    description="Guarda la atención médica. Si es 'VACUNACION', guarda la vacuna con sus enfermedades cubiertas y genera el seguimiento.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
 )
 def registrar_atencion(
     payload: AtencionCreateRequest,
@@ -170,12 +277,15 @@ def registrar_atencion(
 
     vacuna_id = None
     seguimiento_id = None
+    enfermedades_lista = payload.enfermedades_cubiertas
 
     # Lógica para VACUNACION
     if payload.tipo_atencion == "VACUNACION":
         tipo_vacuna = payload.tipo_vacuna or "Vacuna General"
         fecha_aplicacion = payload.fecha_aplicacion or get_lima_now().date()
         fecha_refuerzo = payload.fecha_proximo_refuerzo or (fecha_aplicacion + timedelta(days=365))
+
+        enfermedades_json = json.dumps(enfermedades_lista, ensure_ascii=False) if enfermedades_lista else None
 
         vacuna = RegistroVacuna(
             clinica_id=payload.clinica_id,
@@ -185,7 +295,8 @@ def registrar_atencion(
             marca_lote=payload.marca_lote,
             fecha_aplicacion=fecha_aplicacion,
             fecha_proximo_refuerzo=fecha_refuerzo,
-            estado="VIGENTE"
+            estado="VIGENTE",
+            enfermedades_cubiertas=enfermedades_json
         )
         db.add(vacuna)
         db.flush()
@@ -223,6 +334,7 @@ def registrar_atencion(
         mascota_id=atencion.mascota_id,
         vacuna_id=vacuna_id,
         seguimiento_id=seguimiento_id,
+        enfermedades_cubiertas=enfermedades_lista,
         mensaje="Atención registrada correctamente."
     )
 
@@ -232,7 +344,8 @@ def registrar_atencion(
     response_model=SeguimientoUpdateResponse,
     status_code=status.HTTP_200_OK,
     summary="Marcar recordatorio como ENVIADO",
-    description="Actualiza el estado de la notificación a 'ENVIADO'."
+    description="Actualiza el estado de la notificación a 'ENVIADO'.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
 )
 def marcar_seguimiento_enviado(
     id: int,
@@ -270,7 +383,8 @@ def vista_dashboard(
     clinica_id: int = 1,
     db: Session = Depends(get_db)
 ):
-    # Asegurar clínica activa para demo / modo solo
+    verificar_acceso_veterinario(request)
+
     clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
         clinica = Clinica(
@@ -306,14 +420,13 @@ def vista_dashboard(
         Mascota.is_deleted == False
     ).count()
 
-    # Lista de seguimientos pendientes para contactar (próximos 7 días o pendientes de hoy)
+    # Lista de seguimientos pendientes
     seguimientos_query = db.query(SeguimientoNotificacion).filter(
         SeguimientoNotificacion.clinica_id == clinica_id,
         SeguimientoNotificacion.is_deleted == False,
         SeguimientoNotificacion.estado == "PENDIENTE"
     ).order_by(SeguimientoNotificacion.fecha_programada.asc()).limit(15).all()
 
-    # Enriquecer lista con enlace de WhatsApp
     seguimientos_con_wa = []
     for s in seguimientos_query:
         telefono = s.cliente.telefono or ""
@@ -335,7 +448,7 @@ def vista_dashboard(
     resultados_busqueda = []
     if q and q.strip():
         termino = f"%{q.strip()}%"
-        mascotas_encontradas = db.query(Mascota).join(Cliente).filter(
+        resultados_busqueda = db.query(Mascota).join(Cliente).filter(
             Mascota.clinica_id == clinica_id,
             Mascota.is_deleted == False,
             or_(
@@ -345,7 +458,6 @@ def vista_dashboard(
                 Cliente.telefono.ilike(termino)
             )
         ).limit(10).all()
-        resultados_busqueda = mascotas_encontradas
 
     return templates.TemplateResponse(
         request=request,
@@ -369,13 +481,17 @@ def vista_nuevo_paciente(
     clinica_id: int = 1,
     db: Session = Depends(get_db)
 ):
+    verificar_acceso_veterinario(request)
     clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
+    especies = db.query(Especie).order_by(Especie.nombre.asc()).all()
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/paciente_form.html",
         context={
             "clinica": clinica,
-            "clinica_id": clinica_id
+            "clinica_id": clinica_id,
+            "especies": especies
         }
     )
 
@@ -386,6 +502,8 @@ def vista_ficha_mascota(
     mascota_id: int,
     db: Session = Depends(get_db)
 ):
+    verificar_acceso_veterinario(request)
+
     mascota = db.query(Mascota).filter(
         Mascota.id == mascota_id,
         Mascota.is_deleted == False
@@ -406,10 +524,17 @@ def vista_ficha_mascota(
         RegistroVacuna.is_deleted == False
     ).order_by(RegistroVacuna.fecha_aplicacion.desc()).all()
 
-    # Enlaces de WhatsApp para refuerzo de vacunas
+    # Deserializar enfermedades cubiertas y preparar WhatsApp
     vacunas_con_wa = []
     hoy = get_lima_now().date()
     for v in vacunas:
+        enfermedades = []
+        if v.enfermedades_cubiertas:
+            try:
+                enfermedades = json.loads(v.enfermedades_cubiertas)
+            except Exception:
+                enfermedades = [v.enfermedades_cubiertas]
+
         mensaje_refuerzo = (
             f"Hola {mascota.cliente.nombre_completo or 'Estimado(a)'}, te escribimos de SherekePet. "
             f"A tu mascota {mascota.nombre} le corresponde su refuerzo de {v.tipo_vacuna} el {v.fecha_proximo_refuerzo.strftime('%d/%m/%Y')}."
@@ -417,6 +542,7 @@ def vista_ficha_mascota(
         enlace_wa = generar_enlace_whatsapp(mascota.cliente.telefono or "", mensaje_refuerzo)
         vacunas_con_wa.append({
             "vacuna": v,
+            "enfermedades": enfermedades,
             "enlace_whatsapp": enlace_wa,
             "esta_vencida": v.fecha_proximo_refuerzo < hoy
         })

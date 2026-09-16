@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column, relationship
 
 from app.core.timezone import get_lima_now
@@ -47,6 +47,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     zona_horaria: Mapped[str] = mapped_column(String(50), default="America/Lima", nullable=False)
     plan_activo: Mapped[str] = mapped_column(String(50), default="solo", nullable=False)
+    logo_b64: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relaciones operativas
     veterinarios = relationship("Veterinario", back_populates="clinica", cascade="all, delete-orphan")

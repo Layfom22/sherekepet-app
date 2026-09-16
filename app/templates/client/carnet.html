@@ -160,6 +160,15 @@
                     <p class="text-xs text-teal-700 font-medium">
                         Próx. Refuerzo: {{ v.fecha_proximo_refuerzo.strftime('%d/%m/%Y') }}
                     </p>
+                    {% if v.lista_enfermedades %}
+                    <div class="mt-2 pt-1.5 flex flex-wrap gap-1">
+                        {% for enf in v.lista_enfermedades %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-200">
+                            🛡️ {{ enf }}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center text-lg">
                     ✓

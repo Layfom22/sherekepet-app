@@ -6,6 +6,8 @@ from sqlalchemy.engine import Engine
 from app.core.config import settings
 from app.core.models import Base, Clinica
 from app.clinic.models import (
+    Especie,
+    Raza,
     Veterinario,
     Cliente,
     Mascota,
@@ -69,3 +71,13 @@ def init_db() -> None:
     # Base.metadata.create_all ejecuta DDL con validación previa de existencia (checkfirst=True)
     # y sentencias seguras compatibles con SQLite y PostgreSQL.
     Base.metadata.create_all(bind=engine, checkfirst=True)
+
+    # Inicializar datos de catálogos si no existen
+    from seed_catalogos import seed_catalogos
+    db = SessionLocal()
+    try:
+        seed_catalogos(db)
+    except Exception as e:
+        db.rollback()
+    finally:
+        db.close()

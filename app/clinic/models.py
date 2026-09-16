@@ -6,6 +6,42 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.models import Base, SoftDeleteMixin, TimestampMixin
 
 
+class Especie(Base, TimestampMixin):
+    """Catálogo de Especies animales (Canino, Felino, etc.)."""
+    __tablename__ = "sp_especies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+
+    # Relaciones
+    razas: Mapped[List["Raza"]] = relationship("Raza", back_populates="especie", cascade="all, delete-orphan")
+    mascotas: Mapped[List["Mascota"]] = relationship("Mascota", back_populates="especie_rel")
+
+    def __repr__(self) -> str:
+        return f"<Especie(id={self.id}, nombre='{self.nombre}')>"
+
+
+class Raza(Base, TimestampMixin):
+    """Catálogo de Razas dependientes de una Especie."""
+    __tablename__ = "sp_razas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    especie_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_especies.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+
+    # Relaciones
+    especie = relationship("Especie", back_populates="razas")
+    mascotas: Mapped[List["Mascota"]] = relationship("Mascota", back_populates="raza_rel")
+
+    def __repr__(self) -> str:
+        return f"<Raza(id={self.id}, nombre='{self.nombre}', especie_id={self.especie_id})>"
+
+
 class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
     """Modelo de Autenticación y Perfil de Veterinario."""
     __tablename__ = "sp_veterinarios"
@@ -67,7 +103,7 @@ class Cliente(Base, SoftDeleteMixin, TimestampMixin):
 
 
 class Mascota(Base, SoftDeleteMixin, TimestampMixin):
-    """Modelo Operativo de Mascota / Paciente."""
+    """Modelo Operativo de Mascota / Paciente con catálogos y ficha de salud extendida."""
     __tablename__ = "sp_mascotas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -83,15 +119,34 @@ class Mascota(Base, SoftDeleteMixin, TimestampMixin):
         nullable=False,
         index=True
     )
+    especie_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("sp_especies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    raza_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("sp_razas.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     nombre: Mapped[str] = mapped_column(String(100), nullable=False)
-    especie: Mapped[str] = mapped_column(String(50), nullable=False)
+    especie: Mapped[str] = mapped_column(String(50), default="Canino", nullable=False)
     raza: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     peso: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    
+    # Salud y alergias
     alergias: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    tiene_alergias: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    detalle_alergias: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    condiciones_previas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relaciones
     clinica = relationship("Clinica", back_populates="mascotas")
     cliente = relationship("Cliente", back_populates="mascotas")
+    especie_rel = relationship("Especie", back_populates="mascotas")
+    raza_rel = relationship("Raza", back_populates="mascotas")
     atenciones: Mapped[List["AtencionClinica"]] = relationship(
         "AtencionClinica",
         back_populates="mascota",
@@ -154,7 +209,7 @@ class AtencionClinica(Base, SoftDeleteMixin, TimestampMixin):
 
 
 class RegistroVacuna(Base, SoftDeleteMixin, TimestampMixin):
-    """Modelo de Registro de Vacunas y Fármacos."""
+    """Modelo de Registro de Vacunas con enfermedades cubiertas."""
     __tablename__ = "sp_vacunas"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -181,10 +236,26 @@ class RegistroVacuna(Base, SoftDeleteMixin, TimestampMixin):
     fecha_aplicacion: Mapped[date] = mapped_column(Date, nullable=False)
     fecha_proximo_refuerzo: Mapped[date] = mapped_column(Date, nullable=False)
     estado: Mapped[str] = mapped_column(String(30), default="VIGENTE", nullable=False)  # 'VIGENTE', 'POR_VENCER', 'VENCIDO'
+    
+    # Digitalización inteligente: lista JSON de enfermedades cubiertas
+    enfermedades_cubiertas: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relaciones
     mascota = relationship("Mascota", back_populates="vacunas")
     atencion = relationship("AtencionClinica", back_populates="vacunas")
+
+    @property
+    def lista_enfermedades(self) -> list:
+        if not self.enfermedades_cubiertas:
+            return []
+        try:
+            import json
+            data = json.loads(self.enfermedades_cubiertas)
+            if isinstance(data, list):
+                return data
+            return [str(data)]
+        except Exception:
+            return [self.enfermedades_cubiertas]
 
     def __repr__(self) -> str:
         return f"<RegistroVacuna(id={self.id}, tipo='{self.tipo_vacuna}', refuerzo={self.fecha_proximo_refuerzo})>"

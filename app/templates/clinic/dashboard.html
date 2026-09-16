@@ -5,14 +5,30 @@
 {% block content %}
 <div class="space-y-6">
 
-    <!-- Top Bar: Saludo y Búsqueda Rápida -->
+    <!-- Top Bar: Saludo, Logo Dinámico y Búsqueda Rápida -->
     <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Panel del Veterinario</h1>
-                <p class="text-sm text-slate-500 mt-0.5">
-                    {{ clinica.nombre }} &bull; <span class="text-teal-700 font-medium">{{ hoy.strftime('%d/%m/%Y') }}</span>
-                </p>
+            <div class="flex items-center space-x-4">
+                <!-- Área Dinámica de Logo -->
+                <div class="relative group">
+                    <div id="clinicLogoContainer" class="w-16 h-16 rounded-2xl bg-teal-50 border-2 border-teal-100 flex items-center justify-center overflow-hidden shadow-xs">
+                        {% if clinica.logo_b64 %}
+                        <img id="clinicLogoImg" src="{{ clinica.logo_b64 }}" alt="{{ clinica.nombre }}" class="w-full h-full object-cover">
+                        {% else %}
+                        <span id="clinicLogoPlaceholder" class="text-3xl">🏥</span>
+                        {% endif %}
+                    </div>
+                    <label for="logoFileInput" class="absolute -bottom-1 -right-1 w-7 h-7 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-xs shadow cursor-pointer transition-transform group-hover:scale-110" title="Cambiar logo de la clínica">
+                        📷
+                    </label>
+                    <input type="file" id="logoFileInput" accept="image/*" class="hidden" onchange="subirLogoClinica(this)">
+                </div>
+                <div>
+                    <h1 class="text-2xl font-black text-slate-900 tracking-tight">{{ clinica.nombre }}</h1>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Panel del Veterinario &bull; <span class="text-teal-700 font-medium">{{ hoy.strftime('%d/%m/%Y') }}</span>
+                    </p>
+                </div>
             </div>
 
             <!-- Buscador Rápido -->
@@ -204,6 +220,31 @@ async function marcarEnviado(seguimientoId) {
     } catch (e) {
         console.error(e);
         alert("Error de conexión al marcar seguimiento.");
+    }
+}
+
+async function subirLogoClinica(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("clinica_id", "{{ clinica.id }}");
+
+    try {
+        const resp = await fetch("/api/clinic/logo", {
+            method: "POST",
+            body: formData
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            const container = document.getElementById("clinicLogoContainer");
+            container.innerHTML = `<img src="${data.logo_b64}" alt="Logo" class="w-full h-full object-cover">`;
+        } else {
+            const err = await resp.json();
+            alert("Error al subir logo: " + (err.detail || "Revise la imagen"));
+        }
+    } catch (e) {
+        alert("Error de conexión al subir logo.");
     }
 }
 </script>

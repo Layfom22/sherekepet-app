@@ -98,6 +98,14 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN detalle_alergias VARCHAR(255);"))
                 if "condiciones_previas" not in cols:
                     conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN condiciones_previas TEXT;"))
+                if "fecha_nacimiento" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN fecha_nacimiento DATE;"))
+                if "sexo" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN sexo VARCHAR(20);"))
+                if "rasgos_distintivos" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN rasgos_distintivos VARCHAR(255);"))
+                if "microchip" not in cols:
+                    conn.execute(text("ALTER TABLE sp_mascotas ADD COLUMN microchip VARCHAR(50);"))
 
         # 3. sp_vacunas
         if "sp_vacunas" in tables:

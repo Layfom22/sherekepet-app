@@ -1,33 +1,28 @@
-{% extends "base.html" %}
+{% extends "base_portal.html" %}
 
-{% block title %}Mis Mascotas - SherekePet PWA{% endblock %}
-
-{% block extra_head %}
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#0d9488">
-{% endblock %}
+{% block title %}Mis Mascotas - SherekePet Portal Dueños{% endblock %}
 
 {% block content %}
 <!-- Contenedor 1 Columna Estilo App Nativa Móvil -->
 <div class="max-w-md mx-auto space-y-5 pb-12">
 
     <!-- Card Saludo Dueño -->
-    <div class="bg-gradient-to-br from-teal-700 to-emerald-600 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
+    <div class="bg-gradient-to-br from-indigo-700 to-violet-600 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
         <div class="relative z-10 flex items-center justify-between">
             <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-teal-200">Portal del Dueño</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-indigo-200">📱 Portal del Dueño</p>
                 <h1 class="text-2xl font-black mt-0.5 tracking-tight">
                     ¡Hola, {{ cliente.nombre_completo.split()[0] if cliente.nombre_completo else 'Amigo' }}!
                 </h1>
-                <p class="text-xs text-teal-100 mt-1">DNI: {{ cliente.dni }}</p>
+                <p class="text-xs text-indigo-100 mt-1">DNI: {{ cliente.dni }}</p>
             </div>
             <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-3xl border border-white/20">
                 🐶
             </div>
         </div>
         <div class="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs">
-            <span class="text-teal-100">Mascotas registradas: <strong>{{ mascotas|length }}</strong></span>
-            <a href="/portal/logout" class="text-xs text-teal-200 hover:text-white underline">Cerrar sesión</a>
+            <span class="text-indigo-100">Mascotas registradas: <strong>{{ mascotas|length }}</strong></span>
+            <a href="/portal/logout" class="text-xs text-indigo-200 hover:text-white underline">Cerrar sesión</a>
         </div>
     </div>
 
@@ -69,25 +64,30 @@
             {% for m in mascotas %}
             <a 
                 href="/portal/carnet/{{ m.id }}" 
-                class="block bg-white rounded-3xl p-5 border border-slate-200 hover:border-teal-500 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
+                class="block bg-white rounded-3xl p-5 border border-slate-200 hover:border-indigo-500 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
             >
                 <div class="flex items-center space-x-4">
                     <!-- Avatar Mascota Grande -->
-                    <div class="w-16 h-16 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center text-3xl shadow-xs flex-shrink-0">
-                        {% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-3xl shadow-xs flex-shrink-0 overflow-hidden">
+                        {% if m.foto_url %}
+                        <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                        <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                        {% else %}
+                        <span>{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                        {% endif %}
                     </div>
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between">
                             <h3 class="text-xl font-black text-slate-900 truncate">{{ m.nombre }}</h3>
-                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                                 {{ m.especie }}
                             </span>
                         </div>
                         <p class="text-xs text-slate-500 mt-1">
                             Raza: {{ m.raza or 'Mestizo' }} &bull; Peso: {{ m.peso or '--' }} kg
                         </p>
-                        <div class="mt-2 flex items-center space-x-2 text-xs font-bold text-teal-700">
+                        <div class="mt-2 flex items-center space-x-2 text-xs font-bold text-indigo-600">
                             <span>Ver Carnet & Medicinas</span>
                             <span>➜</span>
                         </div>

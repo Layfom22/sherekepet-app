@@ -145,6 +145,12 @@ class Mascota(Base, SoftDeleteMixin, TimestampMixin):
     # Multimedia / Cloudflare R2
     foto_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    # Perfil / DNI de Mascota (Datos no clínicos editables por el dueño)
+    fecha_nacimiento: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    sexo: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # 'Macho', 'Hembra'
+    rasgos_distintivos: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    microchip: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     # Relaciones
     clinica = relationship("Clinica", back_populates="mascotas")
     cliente = relationship("Cliente", back_populates="mascotas")

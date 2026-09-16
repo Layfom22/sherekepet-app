@@ -1,5 +1,7 @@
 import json
+from datetime import date
 from typing import Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -396,3 +398,43 @@ def portal_carnet_mascota(
             "ahora": get_lima_now()
         }
     )
+
+
+class MascotaPerfilUpdateRequest(BaseModel):
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    rasgos_distintivos: Optional[str] = None
+    microchip: Optional[str] = None
+
+
+@router.post("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos No Clínicos de la Mascota")
+def actualizar_perfil_mascota(
+    mascota_id: int,
+    payload: MascotaPerfilUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    mascota = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False).first()
+    if not mascota:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada.")
+
+    if payload.sexo is not None:
+        mascota.sexo = payload.sexo
+    if payload.fecha_nacimiento is not None:
+        mascota.fecha_nacimiento = payload.fecha_nacimiento
+    if payload.rasgos_distintivos is not None:
+        mascota.rasgos_distintivos = payload.rasgos_distintivos
+    if payload.microchip is not None:
+        mascota.microchip = payload.microchip
+
+    db.commit()
+    db.refresh(mascota)
+
+    return {
+        "mensaje": "Perfil de la mascota actualizado correctamente.",
+        "mascota_id": mascota.id,
+        "sexo": mascota.sexo,
+        "fecha_nacimiento": mascota.fecha_nacimiento.isoformat() if mascota.fecha_nacimiento else None,
+        "rasgos_distintivos": mascota.rasgos_distintivos,
+        "microchip": mascota.microchip
+    }
+

@@ -59,15 +59,27 @@
                 </div>
             </div>
 
-            <!-- Botón Acción: Nueva Atención -->
-            <button 
-                type="button" 
-                onclick="abrirModalAtencion()"
-                class="btn-touch px-5 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center space-x-2 self-start md:self-center"
-            >
-                <span class="text-base font-black">+</span>
-                <span>Registrar Atención</span>
-            </button>
+            <!-- Botones Acción: Invitar al Portal & Nueva Atención -->
+            <div class="flex items-center space-x-2.5 self-start md:self-center flex-wrap gap-y-2">
+                <button 
+                    type="button" 
+                    onclick="invitarDuenoPortal()"
+                    class="btn-touch px-4 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+                    title="Enviar invitación por WhatsApp para ingresar al Portal del Dueño"
+                >
+                    <span class="text-base">📱</span>
+                    <span>Invitar al Portal</span>
+                </button>
+
+                <button 
+                    type="button" 
+                    onclick="abrirModalAtencion()"
+                    class="btn-touch px-5 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center space-x-2"
+                >
+                    <span class="text-base font-black">+</span>
+                    <span>Registrar Atención</span>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -540,6 +552,24 @@ async function subirFotoMascota(input, mascotaId) {
         if (label) label.classList.remove("pointer-events-none", "opacity-50");
         input.value = "";
     }
+}
+
+function invitarDuenoPortal() {
+    const telefonoRaw = "{{ cliente.telefono or '' }}";
+    const telefono = telefonoRaw.replace(/\D/g, '');
+    const dueno = "{{ cliente.nombre_completo or cliente.dni or 'Estimado(a)' }}";
+    const mascota = "{{ mascota.nombre }}";
+    const urlBase = window.location.origin;
+
+    if (!telefono) {
+        alert("El propietario no tiene un número telefónico registrado para enviar la invitación.");
+        return;
+    }
+
+    const mensaje = `Hola ${dueno}, ya creamos el Carnet Digital de ${mascota} 🐾. Ingresa a este link: ${urlBase}/portal/login con tu DNI para ver sus vacunas, próximas citas y subir su foto de perfil.`;
+    const numFinal = telefono.startsWith('51') ? telefono : `51${telefono}`;
+    const enlace = `https://wa.me/${numFinal}?text=${encodeURIComponent(mensaje)}`;
+    window.open(enlace, '_blank');
 }
 </script>
 {% endblock %}

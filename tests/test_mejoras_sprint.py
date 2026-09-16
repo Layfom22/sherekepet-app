@@ -219,3 +219,64 @@ async def test_r2_storage_upload_direct():
         assert call_kwargs["Bucket"] == "test-bucket"
         assert call_kwargs["ContentType"] == "image/webp"
 
+
+def test_directorio_pacientes_list(client, test_clinica, db_session):
+    """Verifica el endpoint GET /pacientes y su buscador."""
+    # Crear cliente y mascotas
+    c1 = Cliente(clinica_id=test_clinica.id, dni="44556677", nombre_completo="Carlos Alcantara", telefono="+51987654321")
+    db_session.add(c1)
+    db_session.commit()
+
+    m1 = Mascota(clinica_id=test_clinica.id, cliente_id=c1.id, nombre="Rocky", especie="Canino", raza="Boxer")
+    m2 = Mascota(clinica_id=test_clinica.id, cliente_id=c1.id, nombre="Michi", especie="Felino", raza="Siames")
+    db_session.add_all([m1, m2])
+    db_session.commit()
+
+    # 1. Listado completo
+    resp = client.get("/pacientes")
+    assert resp.status_code == 200
+    assert "Directorio de Pacientes" in resp.text
+    assert "Rocky" in resp.text
+    assert "Michi" in resp.text
+    assert "Carlos Alcantara" in resp.text
+
+    # 2. Búsqueda con filtro
+    resp_busqueda = client.get("/pacientes?q=Rocky")
+    assert resp_busqueda.status_code == 200
+    assert "Rocky" in resp_busqueda.text
+    assert "Michi" not in resp_busqueda.text
+
+
+def test_actualizar_perfil_mascota_dni(client, test_clinica, db_session):
+    """Verifica la actualización de datos no clínicos del DNI de la mascota."""
+    c = Cliente(clinica_id=test_clinica.id, dni="12345678", nombre_completo="Maria Gomez")
+    db_session.add(c)
+    db_session.commit()
+
+    m = Mascota(clinica_id=test_clinica.id, cliente_id=c.id, nombre="Luna", especie="Canino")
+    db_session.add(m)
+    db_session.commit()
+
+    payload = {
+        "sexo": "Hembra",
+        "fecha_nacimiento": "2022-05-15",
+        "microchip": "900215000987654",
+        "rasgos_distintivos": "Mancha marrón en la pata trasera"
+    }
+
+    resp = client.post(f"/api/portal/mascotas/{m.id}", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sexo"] == "Hembra"
+    assert data["fecha_nacimiento"] == "2022-05-15"
+    assert data["microchip"] == "900215000987654"
+    assert data["rasgos_distintivos"] == "Mancha marrón en la pata trasera"
+
+    # Verificar persistencia en base de datos
+    db_session.refresh(m)
+    assert m.sexo == "Hembra"
+    assert str(m.fecha_nacimiento) == "2022-05-15"
+    assert m.microchip == "900215000987654"
+    assert m.rasgos_distintivos == "Mancha marrón en la pata trasera"
+
+

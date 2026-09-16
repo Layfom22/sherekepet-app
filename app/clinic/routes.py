@@ -530,6 +530,49 @@ def vista_dashboard(
     )
 
 
+@router.get("/pacientes", response_class=HTMLResponse, summary="Directorio de Pacientes de la Clínica")
+def vista_lista_pacientes(
+    request: Request,
+    q: Optional[str] = None,
+    clinica_id: int = 1,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+
+    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+
+    query = db.query(Mascota).join(Cliente).filter(
+        Mascota.clinica_id == clinica_id,
+        Mascota.is_deleted == False
+    )
+
+    if q and q.strip():
+        termino = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Mascota.nombre.ilike(termino),
+                Mascota.especie.ilike(termino),
+                Mascota.raza.ilike(termino),
+                Cliente.dni.ilike(termino),
+                Cliente.nombre_completo.ilike(termino),
+                Cliente.telefono.ilike(termino)
+            )
+        )
+
+    pacientes = query.order_by(Mascota.created_at.desc()).all()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/pacientes_list.html",
+        context={
+            "clinica": clinica,
+            "pacientes": pacientes,
+            "busqueda": q or "",
+            "total_pacientes": len(pacientes)
+        }
+    )
+
+
 @router.get("/pacientes/nuevo", response_class=HTMLResponse, summary="Formulario Registro Rápido")
 def vista_nuevo_paciente(
     request: Request,

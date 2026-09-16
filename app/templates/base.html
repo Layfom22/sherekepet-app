@@ -44,34 +44,45 @@
     <!-- Header / Navbar Mobile-First -->
     <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Brand -->
-                    <a href="/dashboard" class="flex items-center space-x-2 group">
-                        {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
-                        <img src="{{ clinica.logo_url or clinica.logo_b64 }}" alt="Logo" class="w-10 h-10 rounded-xl object-cover bg-white shadow-md border border-slate-200 group-hover:scale-105 transition-transform">
-                        {% else %}
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-md group-hover:scale-105 transition-transform">
-                            🐾
-                        </div>
-                        {% endif %}
-                        <div>
-                            <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
-                                SherekePet
-                            </span>
-                            <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
-                                Modo Solo
-                            </span>
-                        </div>
-                    </a>
-                </div>
+            <div class="flex justify-between items-center h-16 gap-4">
+                <!-- Brand / Logo con fallback seguro contra imágenes rotas -->
+                <a href="/dashboard" class="flex items-center space-x-2.5 group flex-shrink-0">
+                    {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
+                    <img 
+                        src="{{ clinica.logo_url or clinica.logo_b64 }}" 
+                        alt="{{ clinica.nombre }}" 
+                        class="w-10 h-10 rounded-xl object-cover bg-white shadow-xs border border-slate-200 group-hover:scale-105 transition-transform"
+                        onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');"
+                    >
+                    <div class="hidden w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-xs group-hover:scale-105 transition-transform">
+                        🏥
+                    </div>
+                    {% else %}
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-xs group-hover:scale-105 transition-transform">
+                        🏥
+                    </div>
+                    {% endif %}
+                    <div>
+                        <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                            SherekePet
+                        </span>
+                        <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
+                            Veterinaria
+                        </span>
+                    </div>
+                </a>
 
                 <!-- Navigation Links & Quick Actions -->
-                <nav class="flex items-center space-x-2 sm:space-x-4">
-                    <a href="/dashboard" class="btn-touch px-3.5 py-2 text-sm font-medium text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-lg transition-colors">
-                        📊 <span class="hidden md:inline ml-1.5">Dashboard</span>
+                <nav class="flex items-center space-x-2 sm:space-x-3 ml-auto">
+                    <a href="/dashboard" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors">
+                        📊 <span class="hidden sm:inline ml-1">Dashboard</span>
                     </a>
-                    <a href="/pacientes/nuevo" class="btn-touch px-4 py-2 text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-lg shadow-sm hover:shadow transition-all flex items-center">
-                        <span class="text-base mr-1.5 font-bold">+</span> Nuevo Paciente
+                    <a href="/pacientes" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors">
+                        🐾 <span class="hidden sm:inline ml-1">Pacientes</span>
+                    </a>
+                    <a href="/pacientes/nuevo" class="btn-touch ml-1 sm:ml-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center">
+                        <span class="text-base mr-1 font-bold">+</span>
+                        <span class="whitespace-nowrap">Nuevo Paciente</span>
                     </a>
                 </nav>
             </div>

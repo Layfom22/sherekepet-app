@@ -13,7 +13,14 @@
                 <div class="relative group">
                     <div id="clinicLogoContainer" class="w-16 h-16 rounded-2xl bg-teal-50 border-2 border-teal-100 flex items-center justify-center overflow-hidden shadow-xs relative">
                         {% if clinica.logo_url or clinica.logo_b64 %}
-                        <img id="clinicLogoImg" src="{{ clinica.logo_url or clinica.logo_b64 }}" alt="{{ clinica.nombre }}" class="w-full h-full object-cover">
+                        <img 
+                            id="clinicLogoImg" 
+                            src="{{ clinica.logo_url or clinica.logo_b64 }}" 
+                            alt="{{ clinica.nombre }}" 
+                            class="w-full h-full object-cover"
+                            onerror="this.style.display='none'; document.getElementById('clinicLogoPlaceholder')?.classList.remove('hidden');"
+                        >
+                        <span id="clinicLogoPlaceholder" class="hidden text-3xl">🏥</span>
                         {% else %}
                         <span id="clinicLogoPlaceholder" class="text-3xl">🏥</span>
                         {% endif %}
@@ -292,19 +299,24 @@ async function subirLogoClinica(input) {
             const container = document.getElementById("clinicLogoContainer");
             const logoUrl = data.logo_url || data.logo_b64;
             container.innerHTML = `
-                <img id="clinicLogoImg" src="${logoUrl}" alt="Logo" class="w-full h-full object-cover">
+                <img id="clinicLogoImg" src="${logoUrl}" alt="Logo" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('clinicLogoPlaceholder')?.classList.remove('hidden');">
+                <span id="clinicLogoPlaceholder" class="hidden text-3xl">🏥</span>
                 <div id="logoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold p-1 text-center">
                     <span class="animate-spin text-sm mb-0.5">⏳</span>
                     <span>Subiendo logo...</span>
                 </div>
             `;
         } else {
-            const err = await resp.json();
-            alert("Error al subir logo: " + (err.detail || "Revise la imagen"));
+            let errorMsg = "Revise el formato o tamaño de la imagen.";
+            try {
+                const err = await resp.json();
+                if (err.detail) errorMsg = err.detail;
+            } catch (e) {}
+            alert("Error al subir el logo: " + errorMsg);
         }
     } catch (e) {
         console.error(e);
-        alert("Error de compresión o conexión al subir logo.");
+        alert("Error al subir el logo. Verifique su conexión.");
     } finally {
         if (loader) loader.classList.add("hidden");
         if (label) label.classList.remove("pointer-events-none", "opacity-50");

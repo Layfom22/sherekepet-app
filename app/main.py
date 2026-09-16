@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.database import init_db
-from app.auth.routes import router as auth_router
+from app.auth.routes import router as auth_router, google_router
 from app.clinic.routes import router as clinic_router
 from app.follow_up.routes import router as follow_up_router
 from fastapi.responses import RedirectResponse
@@ -33,7 +33,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Asegurar y montar directorio para archivos subidos localmente
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Registrar rutas
+app.include_router(google_router)
 app.include_router(auth_router)
 app.include_router(clinic_router)
 app.include_router(follow_up_router)

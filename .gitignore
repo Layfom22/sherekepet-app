@@ -41,3 +41,7 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
+
+# Uploads
+uploads/*
+!uploads/.gitkeep

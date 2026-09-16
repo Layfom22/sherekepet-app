@@ -83,6 +83,18 @@ async def upload_image_to_r2(
         base_public_url = (settings.R2_PUBLIC_URL or f"https://{settings.R2_BUCKET_NAME}.r2.dev").rstrip('/')
         return f"{base_public_url}/{unique_key}"
 
-    # Fallback para desarrollo / pruebas locales sin credenciales de Cloudflare R2 configuradas
-    base_public_url = (settings.R2_PUBLIC_URL or "https://pub-r2.sherekepet.com").rstrip('/')
-    return f"{base_public_url}/{unique_key}"
+    # Fallback para desarrollo / producción sin credenciales de Cloudflare R2 configuradas:
+    # Guarda el archivo localmente en la carpeta 'uploads/' y retorna la URL web accesible
+    clean_folder = folder.strip('/')
+    upload_dir = os.path.join("uploads", clean_folder)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    file_name_with_uuid = f"{uuid.uuid4().hex[:10]}_{clean_name}"
+    local_file_path = os.path.join(upload_dir, file_name_with_uuid)
+
+    def _write_local():
+        with open(local_file_path, "wb") as f:
+            f.write(file_bytes)
+
+    await anyio.to_thread.run_sync(_write_local)
+    return f"/uploads/{clean_folder}/{file_name_with_uuid}"

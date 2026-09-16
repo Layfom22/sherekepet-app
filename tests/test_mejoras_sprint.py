@@ -388,4 +388,101 @@ def test_catalogo_extendido_con_especies_y_razas(client, db_session):
     assert len(felino["razas"]) >= 20
 
 
+@pytest.mark.anyio
+async def test_subida_imagen_local_fallback_y_serving(client, test_clinica):
+    """Verifica que sin R2 configurado, la imagen se guarde en uploads/ y se sirva estáticamente."""
+    from unittest.mock import patch
+    import io
+
+    with patch("app.core.storage.get_r2_client", return_value=None):
+        fake_png = b"RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00"
+        resp = client.post(
+            "/api/clinic/logo",
+            files={"file": ("logo_test.webp", io.BytesIO(fake_png), "image/webp")},
+            data={"clinica_id": str(test_clinica.id)}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        logo_url = data["logo_url"]
+        assert logo_url.startswith("/uploads/logos/")
+
+        # Verificar que el servidor estático sirva el archivo correctamente
+        resp_img = client.get(logo_url)
+        assert resp_img.status_code == 200
+        assert resp_img.content == fake_png
+
+
+def test_registro_veterinario_validacion_sin_500(client):
+    """Verifica que un registro con datos inválidos muestre error amigable y nunca 500."""
+    # 1. Contraseña demasiado corta (< 4 caracteres)
+    resp = client.post("/registro", data={
+        "nombre": "Dr. House",
+        "nombre_clinica": "Princeton Plainsboro",
+        "email": "house@princeton.com",
+        "password": "12"
+    })
+    assert resp.status_code == 200
+    assert "Internal Server Error" not in resp.text
+    assert "password" in resp.text.lower() or "error" in resp.text.lower() or "caracteres" in resp.text.lower()
+
+    # 2. Email con formato inválido
+    resp2 = client.post("/registro", data={
+        "nombre": "Dr. Wilson",
+        "nombre_clinica": "Oncology Dept",
+        "email": "not-an-email",
+        "password": "secretpassword"
+    })
+    assert resp2.status_code == 200
+    assert "Internal Server Error" not in resp2.text
+
+
+def test_google_oauth_redirect_and_callback(client, db_session):
+    """Verifica la redirección hacia Google y el callback exitoso que registra al veterinario."""
+    from unittest.mock import patch, MagicMock
+
+    with patch("app.auth.routes.settings.GOOGLE_CLIENT_ID", "mock-google-client-id"), \
+         patch("app.auth.routes.settings.GOOGLE_CLIENT_SECRET", "mock-secret"):
+        # 1. Endpoint de inicio de Google OAuth
+        resp_login = client.get("/auth/google/login", follow_redirects=False)
+        assert resp_login.status_code in (302, 307)
+        assert "accounts.google.com" in resp_login.headers["location"]
+        assert "client_id=mock-google-client-id" in resp_login.headers["location"]
+
+        # 2. Callback exitoso con mock de httpx
+        mock_token_resp = MagicMock()
+        mock_token_resp.status_code = 200
+        mock_token_resp.json.return_value = {"access_token": "mock_google_access_token"}
+
+    mock_userinfo_resp = MagicMock()
+    mock_userinfo_resp.status_code = 200
+    mock_userinfo_resp.json.return_value = {
+        "email": "vet.google@example.com",
+        "sub": "google-user-id-9988",
+        "name": "Dra. Google"
+    }
+
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def post(self, url, **kwargs):
+            return mock_token_resp
+        async def get(self, url, **kwargs):
+            return mock_userinfo_resp
+
+    with patch("httpx.AsyncClient", return_value=MockAsyncClient()):
+        resp_cb = client.get("/auth/google/callback?code=mock_oauth_code", follow_redirects=False)
+        assert resp_cb.status_code == 303
+        assert resp_cb.headers["location"] == "/dashboard"
+        assert "vet_token" in resp_cb.cookies
+
+        # Comprobar que se creó en base de datos
+        from app.clinic.models import Veterinario
+        vet = db_session.query(Veterinario).filter(Veterinario.email == "vet.google@example.com").first()
+        assert vet is not None
+        assert vet.nombre == "Dra. Google"
+        assert vet.google_id == "google-user-id-9988"
+
+
 

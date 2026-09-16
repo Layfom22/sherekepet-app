@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: str = "sherekepet"
     R2_PUBLIC_URL: str = ""
 
+    # Google OAuth (Leído de variables de entorno o .env)
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

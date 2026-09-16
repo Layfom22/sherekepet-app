@@ -122,6 +122,17 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN password_hash VARCHAR(255);"))
                 if "nombre" not in cols:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN nombre VARCHAR(255);"))
+                if "google_id" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN google_id VARCHAR(255);"))
+
+        # Ampliar a TEXT en motores que lo soportan (PostgreSQL) para evitar truncamientos
+        if not target_engine.url.drivername.startswith("sqlite"):
+            with target_engine.begin() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE sp_clinicas ALTER COLUMN logo_url TYPE TEXT;"))
+                    conn.execute(text("ALTER TABLE sp_mascotas ALTER COLUMN foto_url TYPE TEXT;"))
+                except Exception:
+                    pass
 
     except Exception as e:
         print(f"[WARN] Error durante auto-migraciones: {e}")

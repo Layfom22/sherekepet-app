@@ -468,11 +468,11 @@ def resetear_pin_cliente(
 # ==========================================
 
 @router.get("/login", response_class=HTMLResponse, summary="Vista Login Veterinario")
-def vista_login_veterinario(request: Request):
+def vista_login_veterinario(request: Request, error: Optional[str] = None):
     return templates.TemplateResponse(
         request=request,
         name="clinic/login.html",
-        context={"error": None, "email": ""}
+        context={"error": error, "email": ""}
     )
 
 
@@ -501,14 +501,29 @@ async def procesar_login_veterinario(request: Request, db: Session = Depends(get
             name="clinic/login.html",
             context={"error": ex.detail, "email": email}
         )
+    except Exception as ex:
+        db.rollback()
+        error_msg = "Error al iniciar sesión."
+        if hasattr(ex, "errors"):
+            try:
+                error_msg = ex.errors()[0].get("msg", str(ex))
+            except Exception:
+                error_msg = str(ex)
+        else:
+            error_msg = str(ex)
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/login.html",
+            context={"error": error_msg, "email": email}
+        )
 
 
 @router.get("/registro", response_class=HTMLResponse, summary="Vista Registro Veterinario")
-def vista_registro_veterinario(request: Request):
+def vista_registro_veterinario(request: Request, error: Optional[str] = None):
     return templates.TemplateResponse(
         request=request,
         name="clinic/registro.html",
-        context={"error": None}
+        context={"error": error}
     )
 
 
@@ -544,6 +559,30 @@ async def procesar_registro_veterinario(request: Request, db: Session = Depends(
             name="clinic/registro.html",
             context={
                 "error": ex.detail,
+                "nombre": nombre,
+                "nombre_clinica": nombre_clinica,
+                "email": email
+            }
+        )
+    except Exception as ex:
+        db.rollback()
+        error_msg = "Error al registrar la cuenta."
+        if hasattr(ex, "errors"):
+            try:
+                first_err = ex.errors()[0]
+                loc = " -> ".join([str(l) for l in first_err.get("loc", [])])
+                msg = first_err.get("msg", "")
+                error_msg = f"{loc}: {msg}" if loc else msg
+            except Exception:
+                error_msg = str(ex)
+        else:
+            error_msg = str(ex)
+
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/registro.html",
+            context={
+                "error": error_msg,
                 "nombre": nombre,
                 "nombre_clinica": nombre_clinica,
                 "email": email

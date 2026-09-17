@@ -48,57 +48,58 @@
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white pb-12 sm:pb-0">
 
-    <!-- Header Portal del Dueño (White-Label Dynamic Header) -->
-    <header class="sticky top-0 z-40 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md">
+    <!-- Header Portal del Dueño (Minimalista, Centrado y Limpio) -->
+    <header class="sticky top-0 z-40 bg-gradient-to-r from-indigo-700 via-indigo-600 to-violet-700 text-white shadow-md">
         <div class="max-w-md md:max-w-4xl mx-auto px-4 sm:px-6">
-            <div class="flex justify-between items-center h-16">
+            <div class="flex items-center justify-between h-16">
                 
-                <!-- Logo & Brand Dinámico (Marca Blanca) -->
-                <a href="/portal/dashboard" class="flex items-center space-x-2.5 group">
-                    {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
-                    <img 
-                        src="{{ clinica.logo_url or clinica.logo_b64 }}" 
-                        alt="{{ clinica.nombre_comercial or clinica.nombre }}" 
-                        class="w-10 h-10 rounded-2xl object-cover bg-white/20 backdrop-blur-xs border border-white/30 group-hover:scale-105 transition-transform"
-                        onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');"
-                    >
-                    <div class="hidden w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-xl shadow-xs border border-white/20">
-                        🐾
-                    </div>
-                    {% else %}
-                    <div class="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition-transform border border-white/20">
-                        🐾
-                    </div>
-                    {% endif %}
-                    <div class="min-w-0">
-                        <div class="flex items-center space-x-1.5">
-                            <span class="text-sm sm:text-base font-black tracking-tight text-white truncate max-w-[180px] sm:max-w-xs">
-                                {{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'Portal de Mascotas' }}
-                            </span>
-                            <span class="px-2 py-0.5 text-[9px] font-black uppercase tracking-wider bg-white/20 text-white rounded-full flex-shrink-0">
-                                Dueños
-                            </span>
-                        </div>
-                        <p class="text-[11px] text-indigo-100 font-medium">
-                            📱 Portal del Dueño
-                        </p>
-                    </div>
-                </a>
-
-                <!-- Navegación Dueño -->
-                <div class="flex items-center space-x-2">
+                <!-- Izquierda: Botón Menú / Volver al Dashboard -->
+                <div class="flex items-center w-20">
                     <a 
                         href="/portal/dashboard" 
-                        class="btn-touch px-3 py-1.5 text-xs font-bold text-white/90 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                        class="btn-touch px-2.5 py-1.5 rounded-xl text-white hover:bg-white/10 transition-colors flex items-center space-x-1"
+                        title="Ir a Mis Mascotas"
                     >
-                        Mis Mascotas
+                        <span class="text-base sm:text-lg">🐾</span>
+                        <span class="text-xs font-bold hidden sm:inline">Inicio</span>
+                        <span class="sr-only">Mis Mascotas</span>
+                    </a>
+                </div>
+
+                <!-- Centro: Nombre de la Veterinaria Centrado -->
+                <div class="flex-1 flex items-center justify-center min-w-0 px-2 text-center">
+                    <a href="/portal/dashboard" class="inline-flex items-center justify-center space-x-2 max-w-full truncate group" title="{{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'Portal de Mascotas' }}">
+                        {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
+                        <img 
+                            src="{{ clinica.logo_url or clinica.logo_b64 }}" 
+                            alt="{{ clinica.nombre_comercial or clinica.nombre }}" 
+                            class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover bg-white/20 border border-white/30 shrink-0"
+                            onerror="this.style.display='none';"
+                        >
+                        {% endif %}
+                        <span class="text-sm sm:text-base font-black tracking-tight text-white truncate">
+                            {{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'Portal de Mascotas' }}
+                        </span>
+                    </a>
+                </div>
+
+                <!-- Derecha: Icono de Perfil y Salir -->
+                <div class="flex items-center justify-end space-x-1.5 w-20">
+                    <a 
+                        href="/portal/dashboard#seccionPerfil" 
+                        class="btn-touch p-2 rounded-xl text-white/90 hover:text-white hover:bg-white/10 transition-colors" 
+                        title="Mi Perfil de Dueño"
+                    >
+                        <span class="text-lg">👤</span>
+                        <span class="sr-only">Mi Perfil</span>
                     </a>
                     <a 
                         href="/portal/logout" 
-                        class="btn-touch px-2.5 py-1.5 text-xs font-semibold text-indigo-200 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                        class="btn-touch p-2 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 transition-colors"
                         title="Cerrar sesión"
                     >
-                        Salir
+                        <span class="text-base">🚪</span>
+                        <span class="sr-only">Cerrar sesión</span>
                     </a>
                 </div>
 

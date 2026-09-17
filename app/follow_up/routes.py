@@ -1,14 +1,16 @@
 import json
+import uuid
 from datetime import date
 from typing import Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token
+from app.core.storage import upload_image_to_r2
 from app.database import get_db
 from app.core.models import Clinica
 from app.clinic.models import Cliente, Mascota, RegistroVacuna
@@ -512,13 +514,16 @@ def portal_carnet_mascota(
 
 
 class MascotaPerfilUpdateRequest(BaseModel):
+    nombre: Optional[str] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
     rasgos_distintivos: Optional[str] = None
     microchip: Optional[str] = None
+    foto_url: Optional[str] = None
+    raza: Optional[str] = None
 
 
-@router.post("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos No Clínicos de la Mascota")
+@router.post("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos de la Mascota")
 def actualizar_perfil_mascota(
     mascota_id: int,
     payload: MascotaPerfilUpdateRequest,
@@ -528,6 +533,8 @@ def actualizar_perfil_mascota(
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
 
+    if payload.nombre is not None and payload.nombre.strip():
+        mascota.nombre = payload.nombre.strip()
     if payload.sexo is not None:
         mascota.sexo = payload.sexo
     if payload.fecha_nacimiento is not None:
@@ -536,6 +543,10 @@ def actualizar_perfil_mascota(
         mascota.rasgos_distintivos = payload.rasgos_distintivos
     if payload.microchip is not None:
         mascota.microchip = payload.microchip
+    if payload.foto_url is not None:
+        mascota.foto_url = payload.foto_url
+    if payload.raza is not None:
+        mascota.raza = payload.raza.strip() if payload.raza.strip() else None
 
     db.commit()
     db.refresh(mascota)
@@ -543,9 +554,134 @@ def actualizar_perfil_mascota(
     return {
         "mensaje": "Perfil de la mascota actualizado correctamente.",
         "mascota_id": mascota.id,
+        "nombre": mascota.nombre,
         "sexo": mascota.sexo,
         "fecha_nacimiento": mascota.fecha_nacimiento.isoformat() if mascota.fecha_nacimiento else None,
         "rasgos_distintivos": mascota.rasgos_distintivos,
-        "microchip": mascota.microchip
+        "microchip": mascota.microchip,
+        "foto_url": mascota.foto_url
     }
+
+
+class ClientePerfilUpdateRequest(BaseModel):
+    nombre_completo: Optional[str] = None
+    telefono: Optional[str] = None
+
+
+@router.put("/api/portal/perfil", summary="Actualizar Perfil del Dueño de Mascota")
+def actualizar_perfil_cliente(
+    request: Request,
+    payload: ClientePerfilUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    if payload.nombre_completo is not None:
+        cliente.nombre_completo = payload.nombre_completo.strip()
+    if payload.telefono is not None:
+        cliente.telefono = payload.telefono.strip()
+
+    db.commit()
+    db.refresh(cliente)
+
+    return {
+        "mensaje": "Perfil del dueño actualizado correctamente.",
+        "cliente_id": cliente.id,
+        "nombre_completo": cliente.nombre_completo,
+        "telefono": cliente.telefono,
+        "dni": cliente.dni
+    }
+
+
+class MascotaCreatePortalRequest(BaseModel):
+    nombre: str
+    especie: str = "Canino"
+    raza: Optional[str] = None
+    sexo: Optional[str] = None
+    fecha_nacimiento: Optional[date] = None
+    foto_url: Optional[str] = None
+    rasgos_distintivos: Optional[str] = None
+
+
+@router.post("/api/portal/mascotas", status_code=status.HTTP_201_CREATED, summary="Registrar Nueva Mascota por el Dueño")
+def portal_crear_mascota(
+    request: Request,
+    payload: MascotaCreatePortalRequest,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    if not payload.nombre or not payload.nombre.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El nombre de la mascota es obligatorio.")
+
+    mascota = Mascota(
+        clinica_id=cliente.clinica_id,
+        cliente_id=cliente.id,
+        nombre=payload.nombre.strip(),
+        especie=payload.especie.strip() if payload.especie else "Canino",
+        raza=payload.raza.strip() if payload.raza else None,
+        sexo=payload.sexo.strip() if payload.sexo else None,
+        fecha_nacimiento=payload.fecha_nacimiento,
+        foto_url=payload.foto_url,
+        rasgos_distintivos=payload.rasgos_distintivos.strip() if payload.rasgos_distintivos else None
+    )
+    db.add(mascota)
+    db.commit()
+    db.refresh(mascota)
+
+    return {
+        "mensaje": "Mascota registrada exitosamente.",
+        "mascota_id": mascota.id,
+        "nombre": mascota.nombre,
+        "especie": mascota.especie,
+        "raza": mascota.raza,
+        "clinica_id": mascota.clinica_id,
+        "cliente_id": mascota.cliente_id
+    }
+
+
+@router.post("/api/portal/upload-foto", summary="Subir Foto de Mascota desde el Portal")
+async def portal_upload_foto(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
+    content_type = file.content_type or "image/webp"
+    if content_type not in tipos_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato inválido. Solo se admiten PNG, JPEG y WEBP."
+        )
+
+    contenido = await file.read()
+    if len(contenido) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo (10MB)."
+        )
+
+    foto_url = await upload_image_to_r2(
+        file_bytes=contenido,
+        filename=file.filename or f"mascota_portal_{uuid.uuid4().hex[:8]}.webp",
+        folder="mascotas",
+        content_type=content_type
+    )
+
+    return {"foto_url": foto_url}
+
 

@@ -289,7 +289,7 @@ def test_dni_mascota_ui_features(client, db_session):
     Verifica los requerimientos de UI/UX del DNI de Mascota:
     1. Header limpio con 'Veterinaria:' y 'Portal de mi Mascota'.
     2. Badge ID con whitespace-nowrap y shrink-0.
-    3. Modo privacidad de DNI con data-dni y función toggle.
+    3. Botón 'Editar Perfil' de la mascota sin bloque de titular redundante.
     4. Alternador de Tema Claro / Oscuro con botones y transición.
     """
     clinica = Clinica(
@@ -342,11 +342,10 @@ def test_dni_mascota_ui_features(client, db_session):
     assert "whitespace-nowrap" in html
     assert "shrink-0" in html
 
-    # 3. Modo Privacidad DNI
-    assert 'id="btnTogglePrivacidad"' in html
-    assert 'onclick="togglePrivacidadDni()"' in html
-    assert 'data-dni="87654321"' in html
-    assert "togglePrivacidadDni" in html
+    # 3. Separación de entidades: Botón Editar Perfil de mascota sin bloque 'Titular'
+    assert 'id="btnEditarPerfil"' in html
+    assert "Editar Perfil" in html
+    assert "Titular:" not in html
 
     # 4. Selector de tema claro / oscuro y clases dinámicas
     assert 'id="btnTemaOscuro"' in html
@@ -355,5 +354,174 @@ def test_dni_mascota_ui_features(client, db_session):
     assert "cambiarTemaDni('claro')" in html
     assert 'id="dni-card"' in html
     assert "transition-colors duration-300" in html
-    assert "cambiarTemaDni" in html
+
+
+def test_alergias_accesibles_en_carnet(client, db_session):
+    """Verifica accesibilidad de la alerta de alergias en carnet."""
+    clinica = Clinica(nombre="Vet Alergias", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    cliente = Cliente(clinica_id=clinica.id, dni="11223344", pin_hash=hash_pin("1111"))
+    db_session.add(cliente)
+    db_session.flush()
+
+    # Mascota CON alergias
+    m1 = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Alergico",
+        especie="Canino",
+        tiene_alergias=True,
+        detalle_alergias="Penicilina y polen"
+    )
+    # Mascota SIN alergias
+    m2 = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Sano",
+        especie="Felino",
+        tiene_alergias=False,
+        detalle_alergias=None
+    )
+    db_session.add_all([m1, m2])
+    db_session.commit()
+
+    token = create_access_token({"sub": str(cliente.id), "clinica_id": clinica.id, "role": "client", "dni": cliente.dni})
+    client.cookies.set("client_token", token)
+
+    # 1. Con alergias: clases de accesibilidad aplicadas
+    resp1 = client.get(f"/portal/carnet/{m1.id}")
+    assert resp1.status_code == 200
+    assert "bg-rose-50 text-rose-700 border border-rose-200" in resp1.text
+    assert "Penicilina y polen" in resp1.text
+
+    # 2. Sin alergias: la alerta está oculta
+    resp2 = client.get(f"/portal/carnet/{m2.id}")
+    assert resp2.status_code == 200
+    assert "bg-rose-50 text-rose-700" not in resp2.text
+
+
+def test_portal_perfil_dueno_update(client, db_session):
+    """Verifica la edición del perfil del dueño mediante PUT /api/portal/perfil."""
+    clinica = Clinica(nombre="Vet Centro", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="77665544",
+        nombre_completo="Carlos Dueño Original",
+        telefono="999888777",
+        pin_hash=hash_pin("4321")
+    )
+    db_session.add(cliente)
+    db_session.commit()
+
+    token = create_access_token({"sub": str(cliente.id), "clinica_id": clinica.id, "role": "client", "dni": cliente.dni})
+    client.cookies.set("client_token", token)
+
+    # Editar datos
+    resp = client.put("/api/portal/perfil", json={
+        "nombre_completo": "Carlos Alberto Modificado",
+        "telefono": "911222333"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["nombre_completo"] == "Carlos Alberto Modificado"
+    assert data["telefono"] == "911222333"
+
+    # Verificar reflejo en dashboard
+    resp_dash = client.get("/portal/dashboard")
+    assert resp_dash.status_code == 200
+    assert "Carlos Alberto Modificado" in resp_dash.text
+    assert "911222333" in resp_dash.text
+    assert "77665544" in resp_dash.text
+    assert "Mi Perfil" in resp_dash.text
+
+
+def test_autonomia_registro_y_busqueda_veterinario(client, db_session):
+    """
+    Regla de Negocio:
+    1. El dueño registra una nueva mascota de forma autónoma (POST /api/portal/mascotas).
+    2. El dueño puede editar el nombre y señas de su mascota (POST /api/portal/mascotas/{id}).
+    3. Cuando el veterinario busca el DNI en /pacientes, devuelve TODAS las mascotas y permite abrir la ficha clínica.
+    """
+    clinica = Clinica(nombre="Vet San Miguel", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    # Veterinario de la clínica
+    vet = Veterinario(
+        clinica_id=clinica.id,
+        email="vet.sanmiguel@example.com",
+        password_hash=hash_password("VetPass123!"),
+        rol="ADMIN",
+        nombre="Dr. Miguel"
+    )
+    db_session.add(vet)
+    db_session.flush()
+
+    # Dueño con 1 mascota registrada en clínica
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="12345099",
+        nombre_completo="María Elena Fuentes",
+        pin_hash=hash_pin("1234")
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    m_clinica = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Bobby Clínico",
+        especie="Canino"
+    )
+    db_session.add(m_clinica)
+    db_session.commit()
+
+    # 1. Dueño se autentica y registra una segunda mascota autónomamente
+    token_cliente = create_access_token({"sub": str(cliente.id), "clinica_id": clinica.id, "role": "client", "dni": cliente.dni})
+    client.cookies.set("client_token", token_cliente)
+
+    resp_crear = client.post("/api/portal/mascotas", json={
+        "nombre": "Michi Autónomo",
+        "especie": "Felino",
+        "raza": "Angora",
+        "sexo": "Hembra",
+        "rasgos_distintivos": "Mancha en la patita"
+    })
+    assert resp_crear.status_code == 201
+    nueva_m_data = resp_crear.json()
+    nueva_m_id = nueva_m_data["mascota_id"]
+    assert nueva_m_data["nombre"] == "Michi Autónomo"
+    assert nueva_m_data["especie"] == "Felino"
+
+    # 2. Dueño edita los datos de Michi Autónomo
+    resp_edit = client.post(f"/api/portal/mascotas/{nueva_m_id}", json={
+        "nombre": "Michi Estrella",
+        "sexo": "Hembra",
+        "rasgos_distintivos": "Mancha en la patita y collar violeta"
+    })
+    assert resp_edit.status_code == 200
+    assert resp_edit.json()["nombre"] == "Michi Estrella"
+
+    # 3. El veterinario ingresa y busca al dueño por DNI en /pacientes
+    client.cookies.clear()
+    token_vet = create_access_token({"sub": str(vet.id), "clinica_id": clinica.id, "rol": "ADMIN", "email": vet.email})
+    client.cookies.set("vet_token", token_vet)
+
+    resp_busqueda = client.get("/pacientes?q=12345099")
+    assert resp_busqueda.status_code == 200
+    # Ambas mascotas (la de clínica y la creada autónomamente por el dueño) deben figurar
+    assert "Bobby Clínico" in resp_busqueda.text
+    assert "Michi Estrella" in resp_busqueda.text
+
+    # 4. El veterinario abre la ficha clínica de la nueva mascota para registrar atenciones
+    resp_ficha = client.get(f"/pacientes/{nueva_m_id}")
+    assert resp_ficha.status_code == 200
+    assert "Michi Estrella" in resp_ficha.text
+    assert "María Elena Fuentes" in resp_ficha.text
+
 

@@ -3,26 +3,45 @@
 {% block title %}Mis Mascotas - SherekePet Portal Dueños{% endblock %}
 
 {% block content %}
-<!-- Contenedor 1 Columna Estilo App Nativa Móvil -->
-<div class="max-w-md mx-auto space-y-5 pb-12">
+<!-- Contenedor Estilo App Móvil con Espaciado -->
+<div class="max-w-md md:max-w-3xl mx-auto space-y-6 pb-16">
 
-    <!-- Card Saludo Dueño -->
-    <div class="bg-gradient-to-br from-indigo-700 to-violet-600 rounded-3xl p-6 text-white shadow-md relative overflow-hidden">
-        <div class="relative z-10 flex items-center justify-between">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wider text-indigo-200">📱 Portal del Dueño</p>
-                <h1 class="text-2xl font-black mt-0.5 tracking-tight">
-                    ¡Hola, {{ cliente.nombre_completo.split()[0] if cliente.nombre_completo else 'Amigo' }}!
-                </h1>
-                <p class="text-xs text-indigo-100 mt-1">DNI: {{ cliente.dni }}</p>
+    <!-- Tarjeta Mi Perfil del Dueño -->
+    <div id="seccionPerfil" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm relative overflow-hidden transition-all">
+        <div class="flex items-start justify-between">
+            <div class="flex items-start space-x-4 min-w-0">
+                <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center text-2xl shadow-sm shrink-0">
+                    👤
+                </div>
+                <div class="min-w-0">
+                    <span class="text-[10px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100 inline-block mb-1">
+                        📱 Portal del Dueño
+                    </span>
+                    <h1 id="perfilNombre" class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight truncate">
+                        {{ cliente.nombre_completo or 'Dueño de Mascota' }}
+                    </h1>
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-1">
+                        <span class="inline-flex items-center space-x-1">
+                            <span>🪪</span>
+                            <span><strong>DNI:</strong> <span id="perfilDni" class="font-mono font-bold text-slate-700">{{ cliente.dni }}</span></span>
+                        </span>
+                        <span class="inline-flex items-center space-x-1">
+                            <span>📞</span>
+                            <span><strong>Tel:</strong> <span id="perfilTelefono" class="text-slate-700">{{ cliente.telefono or 'No registrado' }}</span></span>
+                        </span>
+                    </div>
+                </div>
             </div>
-            <div class="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-3xl border border-white/20">
-                🐶
-            </div>
-        </div>
-        <div class="mt-4 pt-3 border-t border-white/15 flex justify-between items-center text-xs">
-            <span class="text-indigo-100">Mascotas registradas: <strong>{{ mascotas|length }}</strong></span>
-            <a href="/portal/logout" class="text-xs text-indigo-200 hover:text-white underline">Cerrar sesión</a>
+
+            <button 
+                type="button" 
+                onclick="abrirModalEditarPerfilDueño()"
+                class="btn-touch px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 border border-indigo-200 rounded-xl transition-colors flex items-center space-x-1 shrink-0 ml-2"
+                title="Editar mis datos de contacto"
+            >
+                <span>✏️</span>
+                <span>Editar</span>
+            </button>
         </div>
     </div>
 
@@ -53,22 +72,40 @@
     </div>
     {% endif %}
 
-    <!-- Sección: Mis Mascotas (Tarjetas Grandes 1 Columna) -->
-    <div class="space-y-3">
-        <h2 class="text-xs font-black uppercase tracking-wider text-slate-500 px-1">
-            Mis Mascotas
-        </h2>
+    <!-- Sección: Mis Mascotas con Botón de Alta Autónoma -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between px-1">
+            <div>
+                <h2 class="text-base font-black text-slate-900 flex items-center space-x-1.5 tracking-tight">
+                    <span>🐾</span>
+                    <span>Mis Mascotas</span>
+                </h2>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">
+                    {{ mascotas|length }} mascota{{ 's' if mascotas|length != 1 else '' }} registrada{{ 's' if mascotas|length != 1 else '' }}
+                </p>
+            </div>
+
+            <!-- Botón Destacado + Agregar Nueva Mascota -->
+            <button 
+                type="button" 
+                onclick="abrirModalNuevaMascota()"
+                class="btn-touch px-4 py-2 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-sm hover:shadow transition-all flex items-center space-x-1.5 shrink-0"
+            >
+                <span>➕</span>
+                <span>Agregar Nueva Mascota</span>
+            </button>
+        </div>
 
         {% if mascotas %}
-        <div class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {% for m in mascotas %}
             <a 
                 href="/portal/carnet/{{ m.id }}" 
-                class="block bg-white rounded-3xl p-5 border border-slate-200 hover:border-indigo-500 shadow-xs hover:shadow-md transition-all active:scale-[0.98]"
+                class="block bg-white rounded-3xl p-5 border border-slate-200 hover:border-indigo-500 shadow-xs hover:shadow-md transition-all active:scale-[0.98] group"
             >
                 <div class="flex items-center space-x-4">
                     <!-- Avatar Mascota Grande -->
-                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-3xl shadow-xs flex-shrink-0 overflow-hidden">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-3xl shadow-xs shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
                         {% if m.foto_url %}
                         <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
                         <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
@@ -79,15 +116,15 @@
 
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center justify-between">
-                            <h3 class="text-xl font-black text-slate-900 truncate">{{ m.nombre }}</h3>
-                            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            <h3 class="text-lg font-black text-slate-900 truncate">{{ m.nombre }}</h3>
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
                                 {{ m.especie }}
                             </span>
                         </div>
-                        <p class="text-xs text-slate-500 mt-1">
-                            Raza: {{ m.raza or 'Mestizo' }} &bull; Peso: {{ m.peso or '--' }} kg
+                        <p class="text-xs text-slate-500 mt-1 truncate">
+                            {{ m.raza or 'Mestizo' }} &bull; {{ m.sexo or 'No especificado' }}
                         </p>
-                        <div class="mt-2 flex items-center space-x-2 text-xs font-bold text-indigo-600">
+                        <div class="mt-2.5 flex items-center space-x-1.5 text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
                             <span>Ver Carnet & Medicinas</span>
                             <span>➜</span>
                         </div>
@@ -97,15 +134,28 @@
             {% endfor %}
         </div>
         {% else %}
-        <div class="bg-white p-8 rounded-3xl text-center border border-slate-200 text-slate-500">
-            <p class="text-3xl mb-2">🐾</p>
-            <p class="text-sm font-bold text-slate-700">No tienes mascotas registradas todavía</p>
-            <p class="text-xs text-slate-400 mt-1">Acércate a la veterinaria para registrar a tu engreído.</p>
+        <div class="bg-white p-8 sm:p-10 rounded-3xl text-center border border-slate-200 text-slate-500 shadow-xs space-y-3">
+            <div class="w-16 h-16 mx-auto rounded-full bg-indigo-50 flex items-center justify-center text-3xl">
+                🐾
+            </div>
+            <div>
+                <h3 class="text-base font-black text-slate-800">Aún no tienes mascotas registradas</h3>
+                <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    ¡Registra a tu consentido ahora mismo de manera autónoma o con ayuda de tu veterinaria!
+                </p>
+            </div>
+            <button 
+                type="button" 
+                onclick="abrirModalNuevaMascota()"
+                class="btn-touch mt-2 px-5 py-2.5 text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
+            >
+                ➕ Registrar mi Primera Mascota
+            </button>
         </div>
         {% endif %}
     </div>
 
-    <!-- Botón Instalar App PWA -->
+    <!-- Banner PWA -->
     <div id="pwaInstallBanner" class="hidden bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-lg">
         <div class="flex items-center space-x-3">
             <span class="text-2xl">📲</span>
@@ -123,37 +173,407 @@
     </div>
 
 </div>
+
+<!-- MODAL 1: EDITAR PERFIL DEL DUEÑO -->
+<div id="modalEditarPerfilDueno" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-100">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-black text-slate-900 flex items-center space-x-2">
+                <span>👤</span>
+                <span>Editar Mi Perfil</span>
+            </h3>
+            <button type="button" onclick="cerrarModalEditarPerfilDueño()" class="text-slate-400 hover:text-slate-600 text-lg font-bold p-1">
+                ✕
+            </button>
+        </div>
+
+        <form id="formPerfilDueno" onsubmit="guardarPerfilDueno(event)" class="space-y-3.5 text-xs">
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Nombre Completo *</label>
+                <input 
+                    type="text" 
+                    id="inputDuenoNombre" 
+                    name="nombre_completo" 
+                    value="{{ cliente.nombre_completo or '' }}" 
+                    required 
+                    placeholder="Ej. Juan Pérez Quispe"
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-semibold text-slate-800"
+                >
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Teléfono / WhatsApp</label>
+                <input 
+                    type="tel" 
+                    id="inputDuenoTelefono" 
+                    name="telefono" 
+                    value="{{ cliente.telefono or '' }}" 
+                    placeholder="Ej. +51 987654321" 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
+                >
+            </div>
+
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-500">
+                <span>🪪 <strong>DNI de Identidad:</strong> {{ cliente.dni }} (no editable por seguridad).</span>
+            </div>
+
+            <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalEditarPerfilDueño()" 
+                    class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnGuardarPerfilDueno"
+                    class="btn-touch px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-100 transition-all"
+                >
+                    Guardar Cambios
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL 2: AGREGAR NUEVA MASCOTA AUTÓNOMA -->
+<div id="modalNuevaMascota" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100 my-8">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-black text-slate-900 flex items-center space-x-2">
+                <span>🐾</span>
+                <span>Registrar Nueva Mascota</span>
+            </h3>
+            <button type="button" onclick="cerrarModalNuevaMascota()" class="text-slate-400 hover:text-slate-600 text-lg font-bold p-1">
+                ✕
+            </button>
+        </div>
+
+        <p class="text-xs text-slate-500">
+            Ingresa los datos de tu mascota. Estará disponible de inmediato en tu portal y tu veterinario podrá abrir su historial clínico.
+        </p>
+
+        <form id="formNuevaMascota" onsubmit="registrarNuevaMascota(event)" class="space-y-3.5 text-xs">
+            
+            <!-- Foto con Preview y Compresión WebP -->
+            <div class="flex items-center space-x-4 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <div class="w-16 h-16 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-3xl shrink-0 overflow-hidden relative shadow-inner">
+                    <img id="previewNuevaFoto" src="" class="hidden w-full h-full object-cover">
+                    <span id="previewEmojiNuevaFoto">🐶</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <label class="block font-bold text-slate-700 mb-1">Foto de la Mascota</label>
+                    <input 
+                        type="file" 
+                        id="inputNuevaFoto" 
+                        accept="image/*" 
+                        class="text-xs text-slate-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                        onchange="previsualizarFotoNueva(this)"
+                    >
+                    <p class="text-[10px] text-slate-400 mt-0.5">Se optimizará automáticamente a WebP.</p>
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Nombre de la Mascota *</label>
+                <input 
+                    type="text" 
+                    id="nuevoNombre" 
+                    name="nombre" 
+                    required 
+                    placeholder="Ej. Rocky, Luna, Michi..." 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-bold text-slate-900"
+                >
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Especie *</label>
+                    <select id="nuevaEspecie" name="especie" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white" onchange="actualizarEmojiEspecie(this.value)">
+                        <option value="Canino" selected>Canino (Perro)</option>
+                        <option value="Felino">Felino (Gato)</option>
+                        <option value="Ave">Ave</option>
+                        <option value="Conejo">Conejo</option>
+                        <option value="Roedor">Roedor</option>
+                        <option value="Otro">Otro</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Sexo</label>
+                    <select id="nuevoSexo" name="sexo" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                        <option value="" selected>No especificado</option>
+                        <option value="Macho">Macho</option>
+                        <option value="Hembra">Hembra</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Raza</label>
+                    <input 
+                        type="text" 
+                        id="nuevaRaza" 
+                        name="raza" 
+                        placeholder="Ej. Golden, Mestizo..." 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
+                    >
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Fecha de Nacimiento</label>
+                    <input 
+                        type="date" 
+                        id="nuevaFechaNacimiento" 
+                        name="fecha_nacimiento" 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
+                    >
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Señas o Rasgos Distintivos</label>
+                <input 
+                    type="text" 
+                    id="nuevosRasgos" 
+                    name="rasgos_distintivos" 
+                    placeholder="Ej. Mancha negra en el ojo, oreja doblada..." 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
+                >
+            </div>
+
+            <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalNuevaMascota()" 
+                    class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnCrearMascota"
+                    class="btn-touch px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md shadow-indigo-100 transition-all flex items-center space-x-1.5"
+                >
+                    <span>Guardar Mascota</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Toast Flotante -->
+<div id="toastDashboard" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-2.5 text-xs font-bold transition-all">
+    <span class="text-base text-emerald-400">✔</span>
+    <span id="toastMsg">Acción exitosa</span>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Registro del Service Worker PWA
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(reg => console.log('PWA ServiceWorker registrado con éxito.'))
-            .catch(err => console.log('Error registrando ServiceWorker:', err));
+// Manejo del Toast
+function mostrarToast(mensaje) {
+    const toast = document.getElementById("toastDashboard");
+    const msg = document.getElementById("toastMsg");
+    if (toast && msg) {
+        msg.textContent = mensaje;
+        toast.classList.remove("hidden");
+        setTimeout(() => toast.classList.add("hidden"), 3000);
+    }
+}
+
+// Modales
+function abrirModalEditarPerfilDueño() {
+    document.getElementById("modalEditarPerfilDueno")?.classList.remove("hidden");
+}
+function cerrarModalEditarPerfilDueño() {
+    document.getElementById("modalEditarPerfilDueno")?.classList.add("hidden");
+}
+
+function abrirModalNuevaMascota() {
+    document.getElementById("modalNuevaMascota")?.classList.remove("hidden");
+}
+function cerrarModalNuevaMascota() {
+    document.getElementById("modalNuevaMascota")?.classList.add("hidden");
+}
+
+function actualizarEmojiEspecie(esp) {
+    const el = document.getElementById("previewEmojiNuevaFoto");
+    if (!el) return;
+    if (esp === "Felino") el.textContent = "🐱";
+    else if (esp === "Canino") el.textContent = "🐶";
+    else if (esp === "Ave") el.textContent = "🦜";
+    else if (esp === "Conejo") el.textContent = "🐰";
+    else if (esp === "Roedor") el.textContent = "🐹";
+    else el.textContent = "🐾";
+}
+
+// Guardar Perfil del Dueño
+async function guardarPerfilDueno(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnGuardarPerfilDueno");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Guardando...";
+    }
+
+    const payload = {
+        nombre_completo: document.getElementById("inputDuenoNombre")?.value.trim() || undefined,
+        telefono: document.getElementById("inputDuenoTelefono")?.value.trim() || undefined
+    };
+
+    try {
+        const resp = await fetch("/api/portal/perfil", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.nombre_completo) {
+                const elNom = document.getElementById("perfilNombre");
+                if (elNom) elNom.textContent = data.nombre_completo;
+            }
+            if (data.telefono !== undefined) {
+                const elTel = document.getElementById("perfilTelefono");
+                if (elTel) elTel.textContent = data.telefono || "No registrado";
+            }
+            cerrarModalEditarPerfilDueño();
+            mostrarToast("¡Perfil actualizado con éxito!");
+        } else {
+            const err = await resp.json();
+            alert("Error: " + (err.detail || "No se pudo actualizar el perfil."));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al actualizar perfil.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Guardar Cambios";
+        }
+    }
+}
+
+// Optimización y Compresión de Imagen WebP (Cliente)
+function comprimirImagenWebP(file, maxAncho = 1200, calidad = 0.8) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                let ancho = img.width;
+                let alto = img.height;
+                if (ancho > maxAncho) {
+                    alto = Math.round((alto * maxAncho) / ancho);
+                    ancho = maxAncho;
+                }
+                canvas.width = ancho;
+                canvas.height = alto;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, ancho, alto);
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error("Fallo en la conversión a Blob WebP"));
+                }, "image/webp", calidad);
+            };
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
     });
 }
 
-// Banner de Instalación PWA
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.classList.remove('hidden');
-});
-
-document.getElementById('btnInstallPwa')?.addEventListener('click', async () => {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        if (outcome === 'accepted') {
-            document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+let fotoNuevaBlob = null;
+async function previsualizarFotoNueva(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    try {
+        fotoNuevaBlob = await comprimirImagenWebP(file);
+        const previewImg = document.getElementById("previewNuevaFoto");
+        const previewEmoji = document.getElementById("previewEmojiNuevaFoto");
+        if (previewImg && previewEmoji) {
+            previewImg.src = URL.createObjectURL(fotoNuevaBlob);
+            previewImg.classList.remove("hidden");
+            previewEmoji.classList.add("hidden");
         }
-        deferredPrompt = null;
+    } catch (e) {
+        console.error("Error optimizando imagen:", e);
     }
-});
+}
+
+// Registrar Nueva Mascota
+async function registrarNuevaMascota(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnCrearMascota");
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span>⏳</span><span>Registrando...</span>`;
+    }
+
+    try {
+        let foto_url = null;
+        if (fotoNuevaBlob) {
+            const formData = new FormData();
+            formData.append("file", fotoNuevaBlob, "mascota_nueva.webp");
+            const uploadResp = await fetch("/api/portal/upload-foto", {
+                method: "POST",
+                body: formData
+            });
+            if (uploadResp.ok) {
+                const uploadData = await uploadResp.json();
+                foto_url = uploadData.foto_url;
+            }
+        }
+
+        const payload = {
+            nombre: document.getElementById("nuevoNombre")?.value.trim(),
+            especie: document.getElementById("nuevaEspecie")?.value || "Canino",
+            raza: document.getElementById("nuevaRaza")?.value.trim() || null,
+            sexo: document.getElementById("nuevoSexo")?.value || null,
+            fecha_nacimiento: document.getElementById("nuevaFechaNacimiento")?.value || null,
+            rasgos_distintivos: document.getElementById("nuevosRasgos")?.value.trim() || null,
+            foto_url: foto_url
+        };
+
+        const resp = await fetch("/api/portal/mascotas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            mostrarToast("¡Mascota registrada exitosamente!");
+            setTimeout(() => {
+                window.location.href = `/portal/carnet/${data.mascota_id}`;
+            }, 700);
+        } else {
+            const err = await resp.json();
+            alert("Error al registrar mascota: " + (err.detail || "Verifique los datos"));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<span>Guardar Mascota</span>`;
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al registrar mascota.");
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<span>Guardar Mascota</span>`;
+        }
+    }
+}
+
+// Service Worker PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .catch(err => console.log('SW error:', err));
+    });
+}
 </script>
 {% endblock %}

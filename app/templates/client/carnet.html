@@ -89,7 +89,7 @@
             <div class="flex-1 min-w-0 space-y-1 text-xs">
                 <div>
                     <span class="dni-subtext text-[9px] font-bold uppercase tracking-wider text-indigo-300 block">Nombre del Paciente:</span>
-                    <h1 class="dni-maintext text-xl font-black text-white tracking-tight leading-tight">{{ mascota.nombre }}</h1>
+                    <h1 id="dniNombre" class="dni-maintext text-xl font-black text-white tracking-tight leading-tight">{{ mascota.nombre }}</h1>
                 </div>
 
                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] pt-1">
@@ -119,33 +119,29 @@
 
         </div>
 
-        <!-- Alergias si existen -->
-        {% if mascota.tiene_alergias or mascota.detalle_alergias or mascota.alergias %}
-        <div class="bg-rose-500/20 border border-rose-400/30 rounded-xl px-3 py-1.5 text-[11px] text-rose-200">
-            ⚠️ <strong>Alergias Clínicas:</strong> {{ mascota.detalle_alergias or mascota.alergias }}
+        <!-- Alerta de Alergias (Accesible y legible) -->
+        {% if (mascota.tiene_alergias or mascota.detalle_alergias or mascota.alergias) and (mascota.detalle_alergias or mascota.alergias) %}
+        <div class="bg-rose-50 text-rose-700 border border-rose-200 p-2 rounded-lg text-sm flex items-start space-x-2">
+            <span class="text-base shrink-0">⚠️</span>
+            <div class="min-w-0">
+                <strong class="font-bold">Alergias Clínicas:</strong>
+                <span>{{ mascota.detalle_alergias or mascota.alergias }}</span>
+            </div>
         </div>
         {% endif %}
 
-        <!-- Barra Inferior del DNI: Titular y Botón Editar Perfil -->
-        <div id="dniBottomBar" class="dni-divider pt-3 border-t border-indigo-700/60 flex items-center justify-between text-xs">
-            <div class="text-[11px] flex items-center flex-wrap gap-1">
-                <span class="dni-subtext text-indigo-300">Titular: <strong class="dni-titular-nombre text-white">{{ cliente.nombre_completo or cliente.dni }}</strong></span>
-                <div class="inline-flex items-center space-x-1">
-                    <span class="dni-subtext text-indigo-300">(DNI: <span id="dniNumero" data-dni="{{ cliente.dni }}">{{ cliente.dni }}</span>)</span>
-                    <button type="button" id="btnTogglePrivacidad" onclick="togglePrivacidadDni()" class="text-xs hover:opacity-80 transition-transform active:scale-90 p-0.5" title="Ocultar/Mostrar DNI para capturas de pantalla">
-                        👁️
-                    </button>
-                </div>
-            </div>
+        <!-- Barra Inferior del DNI: Autogestión de la Mascota -->
+        <div class="dni-divider pt-3 border-t border-indigo-700/60 flex items-center justify-between text-xs">
+            <span class="dni-subtext text-[11px] text-indigo-300">🐾 Ficha de Mascota</span>
 
             <button 
                 type="button" 
-                id="btnEditarDni"
+                id="btnEditarPerfil"
                 onclick="abrirModalEditarPerfil()"
-                class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-indigo-700/80 hover:bg-indigo-600 active:bg-indigo-500 rounded-xl border border-indigo-400/40 shadow-xs transition-all flex items-center space-x-1 shrink-0 ml-2"
+                class="btn-touch px-3.5 py-1.5 text-xs font-bold text-white bg-indigo-700/80 hover:bg-indigo-600 active:bg-indigo-500 rounded-xl border border-indigo-400/40 shadow-xs transition-all flex items-center space-x-1.5 shrink-0"
             >
                 <span>✏️</span>
-                <span>Editar DNI</span>
+                <span>Editar Perfil</span>
             </button>
         </div>
 
@@ -318,6 +314,18 @@
         </p>
 
         <form id="formEditarPerfil" onsubmit="guardarPerfilMascota(event)" class="space-y-3 text-xs">
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Nombre de la Mascota *</label>
+                <input 
+                    type="text" 
+                    id="editNombre" 
+                    name="nombre" 
+                    value="{{ mascota.nombre }}" 
+                    required 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-bold text-slate-900 bg-white"
+                >
+            </div>
+
             <div>
                 <label class="block font-bold text-slate-700 mb-1">Sexo</label>
                 <select id="editSexo" name="sexo" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
@@ -559,6 +567,7 @@ async function guardarPerfilMascota(e) {
     }
 
     const payload = {
+        nombre: document.getElementById("editNombre") ? document.getElementById("editNombre").value.trim() : undefined,
         sexo: document.getElementById("editSexo").value || null,
         fecha_nacimiento: document.getElementById("editFechaNacimiento").value || null,
         microchip: document.getElementById("editMicrochip").value || null,
@@ -575,11 +584,13 @@ async function guardarPerfilMascota(e) {
         if (resp.ok) {
             const data = await resp.json();
             // Actualizar campos en el DNI en vivo sin recargar
+            const elNom = document.getElementById("dniNombre");
             const elSexo = document.getElementById("dniSexo");
             const elNac = document.getElementById("dniNacimiento");
             const elChip = document.getElementById("dniMicrochip");
             const elRasgos = document.getElementById("dniRasgos");
 
+            if (elNom && data.nombre) elNom.textContent = data.nombre;
             if (elSexo) elSexo.textContent = payload.sexo || "No registrado";
             if (elNac) {
                 if (payload.fecha_nacimiento) {
@@ -650,7 +661,7 @@ function cambiarTemaDni(tema) {
     const dividers = card.querySelectorAll(".dni-divider");
     const badge = document.getElementById("dniIdBadge");
     const avatar = document.getElementById("petAvatarContainer");
-    const btnEdit = document.getElementById("btnEditarDni");
+    const btnEdit = document.getElementById("btnEditarPerfil") || document.getElementById("btnEditarDni");
     const titularNom = card.querySelector(".dni-titular-nombre");
 
     if (tema === 'claro') {

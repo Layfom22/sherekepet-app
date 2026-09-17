@@ -11,7 +11,7 @@ class TokenData(BaseModel):
 
 
 class VetLoginRequest(BaseModel):
-    email: EmailStr = Field(..., description="Correo electrónico del veterinario")
+    email: str = Field(..., min_length=3, description="Correo electrónico o nombre de usuario (ej. recepcion_fido)")
     password: Optional[str] = Field(None, min_length=4, description="Contraseña de acceso")
     google_id: Optional[str] = Field(None, description="Identificador único proporcionado por Google")
     google_token: Optional[str] = Field(None, description="Token de autenticación / id_token de Google")
@@ -25,15 +25,40 @@ class VetRegisterRequest(BaseModel):
     nombre_clinica: str = Field(..., min_length=2, max_length=200, description="Nombre de la clínica veterinaria")
 
 
+class VerificarOtpRequest(BaseModel):
+    email: EmailStr = Field(..., description="Correo electrónico de la cuenta a verificar")
+    otp_code: str = Field(..., min_length=6, max_length=6, description="Código de 6 dígitos numéricos")
+
+
+class ReenviarOtpRequest(BaseModel):
+    email: EmailStr = Field(..., description="Correo electrónico para reenviar código OTP")
+
+
+class AsistenteCreateRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50, description="Nombre de usuario del asistente (ej. recepcion_fido)")
+    password: str = Field(..., min_length=4, description="Contraseña de acceso")
+    nombre: Optional[str] = Field(None, max_length=150, description="Nombre descriptivo del asistente")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if not re.fullmatch(r"^[a-z0-9_\.-]+$", clean):
+            raise ValueError("El nombre de usuario solo puede contener letras minúsculas, números, guiones y puntos.")
+        return clean
+
+
 class VetInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     nombre: Optional[str] = None
-    email: str
+    email: Optional[str] = None
+    username: Optional[str] = None
     rol: str
     clinica_id: int
     is_active: bool
+    is_verified: bool = False
 
 
 class VetLoginResponse(BaseModel):

@@ -1,6 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
-from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.models import Base, SoftDeleteMixin, TimestampMixin
@@ -53,12 +53,16 @@ class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
         nullable=False,
         index=True
     )
-    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    username: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     nombre: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
-    rol: Mapped[str] = mapped_column(String(50), default="veterinario", nullable=False)
+    rol: Mapped[str] = mapped_column(String(50), default="ADMIN", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    otp_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relaciones
     clinica = relationship("Clinica", back_populates="veterinarios")

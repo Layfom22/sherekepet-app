@@ -15,6 +15,8 @@ from app.auth.schemas import (
     VetLoginResponse,
     ClientLoginRequest,
     ClientLoginResponse,
+    VerificarOtpRequest,
+    ReenviarOtpRequest,
 )
 from app.auth.service import AuthService
 
@@ -124,8 +126,9 @@ async def handle_google_callback_process(
             email=email,
             nombre=nombre,
             google_id=google_id,
-            rol="veterinario",
-            is_active=True
+            rol="ADMIN",
+            is_active=True,
+            is_verified=True
         )
         db.add(vet)
         db.commit()
@@ -137,6 +140,7 @@ async def handle_google_callback_process(
             vet.google_id = google_id
         if not vet.nombre and nombre:
             vet.nombre = nombre
+        vet.is_verified = True
         db.commit()
         db.refresh(vet)
 
@@ -144,9 +148,11 @@ async def handle_google_callback_process(
     token_payload = {
         "sub": str(vet.id),
         "clinica_id": vet.clinica_id,
-        "role": "vet",
+        "role": vet.rol,
         "email": vet.email,
-        "nombre": vet.nombre
+        "username": vet.username,
+        "nombre": vet.nombre,
+        "is_verified": True
     }
     jwt_token = create_access_token(data=token_payload)
 
@@ -190,6 +196,33 @@ def login_vet(
     db: Session = Depends(get_db)
 ) -> VetLoginResponse:
     return AuthService.login_veterinario(db, payload)
+
+
+@router.post(
+    "/verificar",
+    response_model=VetLoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verificar código OTP y activar cuenta",
+    description="Valida el código de 6 dígitos enviado por correo para activar la cuenta de la clínica."
+)
+def verificar_otp_api(
+    payload: VerificarOtpRequest,
+    db: Session = Depends(get_db)
+) -> VetLoginResponse:
+    return AuthService.verificar_otp(db, payload.email, payload.otp_code)
+
+
+@router.post(
+    "/reenviar-otp",
+    status_code=status.HTTP_200_OK,
+    summary="Reenviar código OTP de verificación",
+    description="Genera un nuevo código OTP y lo envía al correo registrado."
+)
+def reenviar_otp_api(
+    payload: ReenviarOtpRequest,
+    db: Session = Depends(get_db)
+):
+    return AuthService.reenviar_otp(db, payload.email)
 
 
 @router.post(

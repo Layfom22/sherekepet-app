@@ -1,4 +1,5 @@
 import base64
+import urllib.parse
 from datetime import date, timedelta
 import json
 from typing import List, Optional
@@ -9,10 +10,10 @@ from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from app.core.timezone import get_lima_now
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, hash_password
 from app.database import get_db
 from app.auth.service import AuthService
-from app.auth.schemas import VetLoginRequest, VetRegisterRequest
+from app.auth.schemas import VetLoginRequest, VetRegisterRequest, AsistenteCreateRequest
 from app.core.models import Clinica
 from app.clinic.models import (
     Especie,
@@ -70,6 +71,38 @@ def verificar_acceso_veterinario(request: Request) -> None:
             )
 
 
+def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veterinario]:
+    """
+    Obtiene el usuario en sesión (Veterinario ADMIN o ASISTENTE) a partir de la cookie vet_token
+    o del header Authorization Bearer.
+    """
+    token = request.cookies.get("vet_token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
+    if not payload or payload.get("role") == "client":
+        return None
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return None
+
+    try:
+        vet = db.query(Veterinario).filter(
+            Veterinario.id == int(user_id),
+            Veterinario.is_deleted == False
+        ).first()
+        return vet
+    except Exception:
+        return None
+
+
 # ==========================================
 # 1. ENDPOINTS DE API REST
 # ==========================================
@@ -106,11 +139,20 @@ def get_catalogo_especies(db: Session = Depends(get_db)):
     dependencies=[Depends(verificar_acceso_veterinario)]
 )
 async def upload_logo_clinica(
+    request: Request,
     file: UploadFile = File(...),
     clinica_id: int = Form(1),
     db: Session = Depends(get_db)
 ):
-    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+    current_user = obtener_veterinario_actual(request, db)
+    if current_user and current_user.rol != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Administrador puede cambiar el logo de la clínica."
+        )
+
+    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
 
@@ -204,11 +246,15 @@ async def upload_foto_mascota(
 )
 def registrar_paciente_rapido(
     payload: PacienteRapidoRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else payload.clinica_id
+
     # 1. Verificar si la clínica existe
     clinica = db.query(Clinica).filter(
-        Clinica.id == payload.clinica_id,
+        Clinica.id == target_clinica_id,
         Clinica.is_deleted == False
     ).first()
     if not clinica:
@@ -219,7 +265,7 @@ def registrar_paciente_rapido(
 
     # 2. Buscar o crear Cliente
     cliente = db.query(Cliente).filter(
-        Cliente.clinica_id == payload.clinica_id,
+        Cliente.clinica_id == target_clinica_id,
         Cliente.dni == payload.dni,
         Cliente.is_deleted == False
     ).first()
@@ -231,7 +277,7 @@ def registrar_paciente_rapido(
 
     if not cliente:
         cliente = Cliente(
-            clinica_id=payload.clinica_id,
+            clinica_id=target_clinica_id,
             dni=payload.dni,
             nombres=payload.nombres,
             apellido_paterno=payload.apellido_paterno,
@@ -266,7 +312,7 @@ def registrar_paciente_rapido(
 
     # 4. Registrar Mascota
     mascota = Mascota(
-        clinica_id=payload.clinica_id,
+        clinica_id=target_clinica_id,
         cliente_id=cliente.id,
         especie_id=payload.especie_id,
         raza_id=payload.raza_id,
@@ -496,6 +542,12 @@ async def procesar_login_veterinario(request: Request, db: Session = Depends(get
         )
         return response
     except HTTPException as ex:
+        # Si la cuenta no está verificada, redirigir a la pantalla de verificación OTP
+        if ex.status_code == 403 and ("verificada" in str(ex.detail).lower() or "otp" in str(ex.detail).lower()):
+            return RedirectResponse(
+                url=f"/verificar?email={urllib.parse.quote(email)}&error={urllib.parse.quote(ex.detail)}",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
         return templates.TemplateResponse(
             request=request,
             name="clinic/login.html",
@@ -544,7 +596,11 @@ async def procesar_registro_veterinario(request: Request, db: Session = Depends(
         )
         auth_resp = AuthService.register_veterinario(db, req)
 
-        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        # Redirigir a pantalla de verificación OTP indicando que revise su bandeja
+        response = RedirectResponse(
+            url=f"/verificar?email={urllib.parse.quote(email)}&mensaje=Cuenta+creada.+Ingresa+el+código+de+6+dígitos+enviado+a+tu+correo.",
+            status_code=status.HTTP_303_SEE_OTHER
+        )
         response.set_cookie(
             key="vet_token",
             value=auth_resp.access_token,
@@ -590,6 +646,159 @@ async def procesar_registro_veterinario(request: Request, db: Session = Depends(
         )
 
 
+@router.get("/verificar", response_class=HTMLResponse, summary="Vista Verificación OTP")
+def vista_verificar_otp(
+    request: Request,
+    email: Optional[str] = None,
+    error: Optional[str] = None,
+    mensaje: Optional[str] = None
+):
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/verificar.html",
+        context={
+            "email": email or "",
+            "error": error,
+            "mensaje": mensaje
+        }
+    )
+
+
+@router.post("/verificar", response_class=HTMLResponse)
+async def procesar_verificar_otp(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    email = str(form.get("email", "")).strip().lower()
+    otp_code = str(form.get("otp_code", "")).strip()
+
+    try:
+        auth_resp = AuthService.verificar_otp(db, email=email, otp_code=otp_code)
+        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        response.set_cookie(
+            key="vet_token",
+            value=auth_resp.access_token,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 24 * 7
+        )
+        return response
+    except HTTPException as ex:
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/verificar.html",
+            context={
+                "email": email,
+                "error": ex.detail,
+                "mensaje": None
+            }
+        )
+    except Exception as ex:
+        db.rollback()
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/verificar.html",
+            context={
+                "email": email,
+                "error": str(ex),
+                "mensaje": None
+            }
+        )
+
+
+@router.post(
+    "/api/clinic/asistentes",
+    summary="Crear Usuario de Asistente (1 por clínica)",
+    description="Permite al Administrador de la clínica crear un usuario con rol ASISTENTE vinculado a su misma clínica."
+)
+def crear_asistente_clinica(
+    payload: AsistenteCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+    if current_user.rol != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el Administrador de la clínica puede gestionar el equipo.")
+
+    # 1. Validar límite de 1 asistente por clínica
+    asistentes_actuales = db.query(Veterinario).filter(
+        Veterinario.clinica_id == current_user.clinica_id,
+        Veterinario.rol == "ASISTENTE",
+        Veterinario.is_deleted == False
+    ).count()
+
+    if asistentes_actuales >= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu clínica ya cuenta con el límite de 1 asistente permitido en este plan."
+        )
+
+    # 2. Validar que el username no esté en uso
+    clean_username = payload.username.strip().lower()
+    existente = db.query(Veterinario).filter(
+        (Veterinario.username == clean_username) | (Veterinario.email == clean_username),
+        Veterinario.is_deleted == False
+    ).first()
+    if existente:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El nombre de usuario ya está registrado en la plataforma. Elige otro."
+        )
+
+    # 3. Crear asistente sin requerir correo ni OTP
+    nuevo_asistente = Veterinario(
+        clinica_id=current_user.clinica_id,
+        username=clean_username,
+        nombre=payload.nombre.strip() if payload.nombre else clean_username,
+        password_hash=hash_password(payload.password),
+        rol="ASISTENTE",
+        is_active=True,
+        is_verified=True
+    )
+    db.add(nuevo_asistente)
+    db.commit()
+    db.refresh(nuevo_asistente)
+
+    return {
+        "mensaje": "Asistente creado exitosamente.",
+        "asistente": {
+            "id": nuevo_asistente.id,
+            "username": nuevo_asistente.username,
+            "nombre": nuevo_asistente.nombre,
+            "rol": nuevo_asistente.rol
+        }
+    }
+
+
+@router.delete(
+    "/api/clinic/asistentes/{asistente_id}",
+    summary="Eliminar Asistente de la Clínica"
+)
+def eliminar_asistente_clinica(
+    asistente_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user or current_user.rol != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acción no autorizada. Requiere rol ADMIN.")
+
+    asistente = db.query(Veterinario).filter(
+        Veterinario.id == asistente_id,
+        Veterinario.clinica_id == current_user.clinica_id,
+        Veterinario.rol == "ASISTENTE",
+        Veterinario.is_deleted == False
+    ).first()
+
+    if not asistente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Asistente no encontrado.")
+
+    asistente.soft_delete()
+    db.commit()
+
+    return {"mensaje": "Cuenta de asistente eliminada correctamente."}
+
+
 @router.get("/logout", summary="Cerrar Sesión Veterinario")
 def logout_veterinario():
     response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
@@ -609,11 +818,14 @@ def vista_dashboard(
     db: Session = Depends(get_db)
 ):
     verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
 
-    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
         clinica = Clinica(
-            id=1,
+            id=target_clinica_id,
             nombre="Clínica Veterinaria SherekePet",
             zona_horaria="America/Lima",
             plan_activo="solo"
@@ -624,16 +836,27 @@ def vista_dashboard(
 
     hoy = get_lima_now().date()
 
+    # Cálculo dinámico de periodo de prueba (14 días desde clinica.created_at)
+    dias_transcurridos = (hoy - clinica.created_at.date()).days if clinica.created_at else 0
+    dias_restantes_prueba = max(0, 14 - dias_transcurridos)
+
+    # Asistente de la clínica (si existe)
+    asistente = db.query(Veterinario).filter(
+        Veterinario.clinica_id == target_clinica_id,
+        Veterinario.rol == "ASISTENTE",
+        Veterinario.is_deleted == False
+    ).first()
+
     # KPI 1: Atenciones de hoy
     citas_hoy = db.query(AtencionClinica).filter(
-        AtencionClinica.clinica_id == clinica_id,
+        AtencionClinica.clinica_id == target_clinica_id,
         AtencionClinica.is_deleted == False,
         func.date(AtencionClinica.created_at) == hoy
     ).count()
 
     # KPI 2: Refuerzos pendientes para hoy o vencidos
     refuerzos_pendientes_hoy = db.query(SeguimientoNotificacion).filter(
-        SeguimientoNotificacion.clinica_id == clinica_id,
+        SeguimientoNotificacion.clinica_id == target_clinica_id,
         SeguimientoNotificacion.is_deleted == False,
         SeguimientoNotificacion.estado == "PENDIENTE",
         SeguimientoNotificacion.fecha_programada <= hoy
@@ -641,13 +864,13 @@ def vista_dashboard(
 
     # KPI 3: Total pacientes registrados
     total_pacientes = db.query(Mascota).filter(
-        Mascota.clinica_id == clinica_id,
+        Mascota.clinica_id == target_clinica_id,
         Mascota.is_deleted == False
     ).count()
 
     # Lista de seguimientos pendientes
     seguimientos_query = db.query(SeguimientoNotificacion).filter(
-        SeguimientoNotificacion.clinica_id == clinica_id,
+        SeguimientoNotificacion.clinica_id == target_clinica_id,
         SeguimientoNotificacion.is_deleted == False,
         SeguimientoNotificacion.estado == "PENDIENTE"
     ).order_by(SeguimientoNotificacion.fecha_programada.asc()).limit(15).all()
@@ -674,7 +897,7 @@ def vista_dashboard(
     if q and q.strip():
         termino = f"%{q.strip()}%"
         resultados_busqueda = db.query(Mascota).join(Cliente).filter(
-            Mascota.clinica_id == clinica_id,
+            Mascota.clinica_id == target_clinica_id,
             Mascota.is_deleted == False,
             or_(
                 Mascota.nombre.ilike(termino),
@@ -689,6 +912,9 @@ def vista_dashboard(
         name="clinic/dashboard.html",
         context={
             "clinica": clinica,
+            "current_user": current_user,
+            "dias_restantes_prueba": dias_restantes_prueba,
+            "asistente": asistente,
             "citas_hoy": citas_hoy,
             "refuerzos_pendientes_hoy": refuerzos_pendientes_hoy,
             "total_pacientes": total_pacientes,
@@ -708,11 +934,13 @@ def vista_lista_pacientes(
     db: Session = Depends(get_db)
 ):
     verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else clinica_id
 
-    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
 
     query = db.query(Mascota).join(Cliente).filter(
-        Mascota.clinica_id == clinica_id,
+        Mascota.clinica_id == target_clinica_id,
         Mascota.is_deleted == False
     )
 
@@ -736,6 +964,7 @@ def vista_lista_pacientes(
         name="clinic/pacientes_list.html",
         context={
             "clinica": clinica,
+            "current_user": current_user,
             "pacientes": pacientes,
             "busqueda": q or "",
             "total_pacientes": len(pacientes)
@@ -750,7 +979,10 @@ def vista_nuevo_paciente(
     db: Session = Depends(get_db)
 ):
     verificar_acceso_veterinario(request)
-    clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id).first()
     especies = db.query(Especie).order_by(Especie.nombre.asc()).all()
 
     return templates.TemplateResponse(
@@ -758,7 +990,8 @@ def vista_nuevo_paciente(
         name="clinic/paciente_form.html",
         context={
             "clinica": clinica,
-            "clinica_id": clinica_id,
+            "current_user": current_user,
+            "clinica_id": target_clinica_id,
             "especies": especies
         }
     )
@@ -771,11 +1004,16 @@ def vista_ficha_mascota(
     db: Session = Depends(get_db)
 ):
     verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
 
-    mascota = db.query(Mascota).filter(
+    mascota_query = db.query(Mascota).filter(
         Mascota.id == mascota_id,
         Mascota.is_deleted == False
-    ).first()
+    )
+    if current_user:
+        mascota_query = mascota_query.filter(Mascota.clinica_id == current_user.clinica_id)
+
+    mascota = mascota_query.first()
 
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
@@ -821,6 +1059,7 @@ def vista_ficha_mascota(
         context={
             "mascota": mascota,
             "cliente": mascota.cliente,
+            "current_user": current_user,
             "atenciones": atenciones,
             "vacunas": vacunas_con_wa,
             "hoy": hoy

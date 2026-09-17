@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.models import Clinica
 from app.clinic.models import Veterinario, Cliente
 from app.core.security import hash_pin, verify_pin, hash_password, verify_password, create_access_token
+from app.core.timezone import get_lima_now
 from app.auth.schemas import (
     VetLoginRequest,
     VetLoginResponse,
@@ -21,7 +22,12 @@ class AuthService:
     def register_veterinario(db: Session, request: VetRegisterRequest) -> VetLoginResponse:
         """
         Registra una nueva clínica y su veterinario titular con correo y contraseña.
+        Asigna el rol 'ADMIN' y genera un código OTP de verificación de 6 dígitos.
         """
+        import random
+        from datetime import timedelta
+        from app.core.email import send_otp_email
+
         email_clean = request.email.strip().lower()
 
         # Verificar si el correo ya existe
@@ -35,7 +41,7 @@ class AuthService:
                 detail="Ya existe una cuenta registrada con este correo electrónico."
             )
 
-        # Crear nueva Clínica
+        # 1. Aislamiento Multi-tenant Estricto: Siempre crear nueva Clínica
         clinica = Clinica(
             nombre=request.nombre_clinica.strip(),
             zona_horaria="America/Lima",
@@ -44,25 +50,38 @@ class AuthService:
         db.add(clinica)
         db.flush()
 
-        # Crear Veterinario
+        # Generar código OTP de 6 dígitos válido por 15 minutos
+        otp_code = f"{random.randint(100000, 999999)}"
+        otp_expires_at = get_lima_now() + timedelta(minutes=15)
+
+        # 2. Crear Veterinario con rol ADMIN y pendiente de verificación
         vet = Veterinario(
             clinica_id=clinica.id,
             email=email_clean,
             nombre=request.nombre.strip(),
             password_hash=hash_password(request.password),
-            rol="veterinario",
-            is_active=True
+            rol="ADMIN",
+            is_active=True,
+            is_verified=False,
+            otp_code=otp_code,
+            otp_expires_at=otp_expires_at
         )
         db.add(vet)
         db.commit()
         db.refresh(vet)
 
+        # Enviar correo con código OTP
+        send_otp_email(destinatario=vet.email, otp_code=otp_code, nombre=vet.nombre)
+
         token_payload = {
             "sub": str(vet.id),
             "clinica_id": vet.clinica_id,
             "role": "vet",
+            "rol": vet.rol,
             "email": vet.email,
-            "nombre": vet.nombre
+            "username": vet.username,
+            "nombre": vet.nombre,
+            "is_verified": False
         }
         token = create_access_token(data=token_payload)
 
@@ -73,33 +92,135 @@ class AuthService:
         )
 
     @staticmethod
+    def verificar_otp(db: Session, email: str, otp_code: str) -> VetLoginResponse:
+        """
+        Verifica el código OTP de 6 dígitos y activa la cuenta del veterinario (is_verified=True).
+        """
+        email_clean = email.strip().lower()
+        vet = db.query(Veterinario).filter(
+            Veterinario.email == email_clean,
+            Veterinario.is_deleted == False
+        ).first()
+
+        if not vet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontró ninguna cuenta asociada a este correo electrónico."
+            )
+
+        if vet.is_verified:
+            # Si ya está verificada, generar token y retornar
+            token_payload = {
+                "sub": str(vet.id),
+                "clinica_id": vet.clinica_id,
+                "role": "vet",
+                "rol": vet.rol,
+                "email": vet.email,
+                "username": vet.username,
+                "nombre": vet.nombre,
+                "is_verified": True
+            }
+            token = create_access_token(data=token_payload)
+            return VetLoginResponse(access_token=token, token_type="bearer", veterinario=VetInfo.model_validate(vet))
+
+        if not vet.otp_code or vet.otp_code.strip() != otp_code.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El código de verificación ingresado es incorrecto."
+            )
+
+        if vet.otp_expires_at:
+            now = get_lima_now()
+            now_naive = now.replace(tzinfo=None)
+            ha_expirado = (vet.otp_expires_at < now) if vet.otp_expires_at.tzinfo else (vet.otp_expires_at < now_naive)
+            if ha_expirado:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El código de verificación ha expirado. Por favor solicita uno nuevo."
+                )
+
+        # Activar cuenta
+        vet.is_verified = True
+        vet.otp_code = None
+        vet.otp_expires_at = None
+        db.commit()
+        db.refresh(vet)
+
+        token_payload = {
+            "sub": str(vet.id),
+            "clinica_id": vet.clinica_id,
+            "role": "vet",
+            "rol": vet.rol,
+            "email": vet.email,
+            "username": vet.username,
+            "nombre": vet.nombre,
+            "is_verified": True
+        }
+        token = create_access_token(data=token_payload)
+
+        return VetLoginResponse(
+            access_token=token,
+            token_type="bearer",
+            veterinario=VetInfo.model_validate(vet)
+        )
+
+    @staticmethod
+    def reenviar_otp(db: Session, email: str) -> dict:
+        """
+        Genera y reenvía un nuevo código OTP al correo electrónico registrado.
+        """
+        import random
+        from datetime import timedelta
+        from app.core.email import send_otp_email
+
+        email_clean = email.strip().lower()
+        vet = db.query(Veterinario).filter(
+            Veterinario.email == email_clean,
+            Veterinario.is_deleted == False
+        ).first()
+
+        if not vet:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No se encontró una cuenta con ese correo."
+            )
+
+        if vet.is_verified:
+            return {"mensaje": "La cuenta ya se encuentra verificada."}
+
+        nuevo_otp = f"{random.randint(100000, 999999)}"
+        vet.otp_code = nuevo_otp
+        vet.otp_expires_at = get_lima_now() + timedelta(minutes=15)
+        db.commit()
+
+        send_otp_email(destinatario=vet.email, otp_code=nuevo_otp, nombre=vet.nombre)
+        return {"mensaje": "Se ha enviado un nuevo código de verificación a tu correo."}
+
+    @staticmethod
     def login_veterinario(db: Session, request: VetLoginRequest) -> VetLoginResponse:
         """
-        Autentica a un veterinario mediante Correo/Contraseña o Google Auth.
-        Si ya existe, verifica credenciales y genera JWT.
-        Si no existe pero se envía clinica_id válida (flujo legacy/auto), lo registra.
+        Autentica a un veterinario mediante Correo/Contraseña, Username (Asistente) o Google Auth.
         """
-        email_clean = request.email.strip().lower()
+        ident_clean = request.email.strip().lower()
 
-        # Filtrar siempre registros no borrados (Soft Delete)
+        # Filtrar por email O por username
         query = db.query(Veterinario).filter(
-            Veterinario.email == email_clean,
+            ((Veterinario.email == ident_clean) | (Veterinario.username == ident_clean)),
             Veterinario.is_deleted == False
         )
         if request.clinica_id:
             query = query.filter(Veterinario.clinica_id == request.clinica_id)
-        
+
         vet = query.first()
 
         if not vet:
-            # Si el veterinario no existe, verificar si se especificó clínica para autoregistro inicial (Google flow)
+            # Si el veterinario no existe pero se envía clinica_id (flujo legacy)
             if not request.clinica_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No existe una cuenta registrada con este correo electrónico."
+                    detail="No existe una cuenta registrada con este correo o usuario."
                 )
-            
-            # Verificar existencia de la clínica
+
             clinica = db.query(Clinica).filter(
                 Clinica.id == request.clinica_id,
                 Clinica.is_deleted == False
@@ -112,11 +233,12 @@ class AuthService:
 
             vet = Veterinario(
                 clinica_id=request.clinica_id,
-                email=email_clean,
+                email=ident_clean,
                 google_id=request.google_id,
                 password_hash=hash_password(request.password) if request.password else None,
-                rol="veterinario",
-                is_active=True
+                rol="ADMIN",
+                is_active=True,
+                is_verified=True if request.google_id else False
             )
             db.add(vet)
             db.commit()
@@ -125,7 +247,7 @@ class AuthService:
             if not vet.is_active:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="La cuenta de veterinario se encuentra desactivada."
+                    detail="La cuenta se encuentra desactivada."
                 )
 
             # Si envió contraseña, validarla
@@ -136,9 +258,17 @@ class AuthService:
                         detail="Contraseña incorrecta."
                     )
 
+            # Verificar si la cuenta requiere verificación por OTP (los asistentes no requieren OTP)
+            if vet.rol != "ASISTENTE" and not vet.is_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Tu cuenta no ha sido verificada. Ingresa el código OTP enviado a tu correo para activarla."
+                )
+
             # Actualizar google_id si no estaba seteado y viene de Google Auth
             if request.google_id and not vet.google_id:
                 vet.google_id = request.google_id
+                vet.is_verified = True
                 db.commit()
                 db.refresh(vet)
 
@@ -147,8 +277,11 @@ class AuthService:
             "sub": str(vet.id),
             "clinica_id": vet.clinica_id,
             "role": "vet",
+            "rol": vet.rol,
             "email": vet.email,
-            "nombre": vet.nombre
+            "username": vet.username,
+            "nombre": vet.nombre,
+            "is_verified": vet.is_verified
         }
         token = create_access_token(data=token_payload)
 

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Verificar Cuenta - SherekePet{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto py-8 px-4 space-y-6">
+
+    <!-- Encabezado -->
+    <div class="text-center space-y-2">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-teal-500/20">
+            📬
+        </div>
+        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Verifica tu Correo</h1>
+        <p class="text-xs text-slate-500 max-w-xs mx-auto">
+            Hemos enviado un código OTP de 6 dígitos para activar tu clínica y tus 14 días de prueba gratis.
+        </p>
+    </div>
+
+    <!-- Feedback / Alertas -->
+    {% if mensaje %}
+    <div class="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200">
+        <span class="text-base">✅</span>
+        <p>{{ mensaje }}</p>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200">
+        <span class="text-base">⚠️</span>
+        <p>{{ error }}</p>
+    </div>
+    {% endif %}
+
+    <div id="ajaxAlert" class="hidden p-4 rounded-2xl text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200"></div>
+
+    <!-- Formulario de Verificación -->
+    <div class="bg-white p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+        <form method="POST" action="/verificar" class="space-y-5">
+            <div>
+                <label for="email" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Correo Electrónico
+                </label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    value="{{ email or '' }}"
+                    placeholder="doctor@tuclinica.com" 
+                    class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium"
+                    required
+                >
+            </div>
+
+            <div>
+                <label for="otp_code" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 text-center">
+                    Código de 6 Dígitos
+                </label>
+                <input 
+                    type="text" 
+                    id="otp_code" 
+                    name="otp_code" 
+                    maxlength="6"
+                    pattern="\d{6}"
+                    placeholder="123456" 
+                    autofocus
+                    class="w-full py-3.5 text-center tracking-[0.4em] font-mono font-black text-2xl bg-slate-50 border-2 border-teal-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all text-teal-800 placeholder:text-slate-300 placeholder:tracking-normal"
+                    required
+                >
+                <p class="text-[11px] text-center text-slate-400 mt-1.5">
+                    Revisa tu bandeja de entrada o spam (válido por 15 minutos).
+                </p>
+            </div>
+
+            <button 
+                type="submit" 
+                class="btn-touch w-full py-3 px-4 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md hover:shadow transition-all"
+            >
+                Activar mi Cuenta
+            </button>
+        </form>
+
+        <div class="pt-4 border-t border-slate-100 flex flex-col items-center space-y-3">
+            <button 
+                type="button" 
+                id="btnReenviar"
+                onclick="solicitarReenvioOtp()"
+                class="text-xs font-bold text-teal-600 hover:text-teal-800 hover:underline cursor-pointer"
+            >
+                ¿No recibiste el código? Reenviar OTP
+            </button>
+            <a href="/login" class="text-xs text-slate-500 hover:text-slate-700">
+                Volver al inicio de sesión
+            </a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+async function solicitarReenvioOtp() {
+    const emailInput = document.getElementById("email");
+    const email = emailInput ? emailInput.value.trim() : "";
+    const btn = document.getElementById("btnReenviar");
+    const alertDiv = document.getElementById("ajaxAlert");
+
+    if (!email) {
+        alert("Por favor ingresa tu correo electrónico primero.");
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Enviando código...";
+
+    try {
+        const resp = await fetch("/api/auth/reenviar-otp", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email })
+        });
+
+        const data = await resp.json();
+        alertDiv.classList.remove("hidden", "bg-rose-50", "border-rose-200", "text-rose-700", "bg-teal-50", "border-teal-200", "text-teal-800");
+
+        if (resp.ok) {
+            alertDiv.classList.add("bg-teal-50", "border", "border-teal-200", "text-teal-800");
+            alertDiv.innerHTML = `<span>✅</span><p>${data.mensaje || 'Código reenviado con éxito.'}</p>`;
+        } else {
+            alertDiv.classList.add("bg-rose-50", "border", "border-rose-200", "text-rose-700");
+            alertDiv.innerHTML = `<span>⚠️</span><p>${data.detail || 'Error al reenviar el código.'}</p>`;
+        }
+    } catch (e) {
+        console.error(e);
+        alertDiv.classList.remove("hidden");
+        alertDiv.classList.add("bg-rose-50", "border", "border-rose-200", "text-rose-700");
+        alertDiv.innerHTML = `<span>⚠️</span><p>Error de conexión al reenviar.</p>`;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "¿No recibiste el código? Reenviar OTP";
+    }
+}
+</script>
+{% endblock %}

@@ -124,6 +124,14 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN nombre VARCHAR(255);"))
                 if "google_id" not in cols:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN google_id VARCHAR(255);"))
+                if "username" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN username VARCHAR(100);"))
+                if "is_verified" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;"))
+                if "otp_code" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN otp_code VARCHAR(10);"))
+                if "otp_expires_at" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN otp_expires_at TIMESTAMP WITH TIME ZONE;"))
 
         # Ampliar a TEXT en motores que lo soportan (PostgreSQL) para evitar truncamientos
         if not target_engine.url.drivername.startswith("sqlite"):
@@ -131,6 +139,7 @@ def run_auto_migrations(target_engine) -> None:
                 try:
                     conn.execute(text("ALTER TABLE sp_clinicas ALTER COLUMN logo_url TYPE TEXT;"))
                     conn.execute(text("ALTER TABLE sp_mascotas ALTER COLUMN foto_url TYPE TEXT;"))
+                    conn.execute(text("ALTER TABLE sp_veterinarios ALTER COLUMN email DROP NOT NULL;"))
                 except Exception:
                     pass
 

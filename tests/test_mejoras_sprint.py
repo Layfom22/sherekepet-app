@@ -3,7 +3,7 @@ import json
 import pytest
 from app.core.models import Clinica
 from app.core.security import create_access_token
-from app.clinic.models import Especie, Raza, Mascota, Cliente, RegistroVacuna
+from app.clinic.models import Especie, Raza, Mascota, Cliente, RegistroVacuna, Veterinario
 
 
 def test_catalogo_especies_y_razas(client, db_session):
@@ -282,7 +282,7 @@ def test_actualizar_perfil_mascota_dni(client, test_clinica, db_session):
 
 def test_auth_veterinario_registro_login_logout(client, db_session):
     """Verifica registro, login con contraseña y logout del veterinario."""
-    # 1. Registro
+    # 1. Registro (redirige a /verificar)
     reg_payload = {
         "nombre": "Dr. Martin San Martin",
         "nombre_clinica": "Clínica Veterinaria Los Sauces",
@@ -291,10 +291,20 @@ def test_auth_veterinario_registro_login_logout(client, db_session):
     }
     resp_reg = client.post("/registro", data=reg_payload, follow_redirects=False)
     assert resp_reg.status_code == 303
-    assert resp_reg.headers["location"] == "/dashboard"
-    assert "vet_token" in resp_reg.cookies
+    assert "/verificar" in resp_reg.headers["location"]
 
-    # 2. Login con contraseña correcta
+    # 1.1 Verificación de OTP
+    vet_reg = db_session.query(Veterinario).filter(Veterinario.email == "martin@saucesvet.com").first()
+    assert vet_reg is not None
+    assert vet_reg.is_verified is False
+    assert vet_reg.otp_code is not None
+
+    resp_verif = client.post("/verificar", data={"email": "martin@saucesvet.com", "otp_code": vet_reg.otp_code}, follow_redirects=False)
+    assert resp_verif.status_code == 303
+    assert resp_verif.headers["location"] == "/dashboard"
+    assert "vet_token" in resp_verif.cookies
+
+    # 2. Login con contraseña correcta (cuenta ya verificada)
     client.cookies.clear()
     login_payload = {
         "email": "martin@saucesvet.com",

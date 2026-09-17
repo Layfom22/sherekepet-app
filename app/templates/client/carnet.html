@@ -7,30 +7,55 @@
 
     <!-- Navegación Superior Móvil -->
     <div class="flex items-center justify-between px-1">
-        <a href="/portal/dashboard" class="btn-touch px-3.5 py-1.5 text-xs font-bold text-indigo-950 hover:text-indigo-700 bg-white border border-slate-200 rounded-xl shadow-xs">
+        <a href="/portal/dashboard" class="btn-touch px-3.5 py-1.5 text-xs font-bold text-indigo-950 hover:text-indigo-700 bg-white border border-slate-200 rounded-xl shadow-xs transition-colors">
             ← Mis Mascotas
         </a>
-        <span class="text-xs font-bold uppercase tracking-wider text-indigo-700">Carnet Digital Móvil</span>
+        <span class="sr-only">Carnet Digital Móvil</span>
+    </div>
+
+    <!-- Encabezado Minimalista con Respiro Visual -->
+    <div class="text-center py-4 mb-4">
+        <h2 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+            Veterinaria: <span class="text-indigo-600">{{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'SherekePet' }}</span>
+        </h2>
+        <p class="text-xs text-slate-500 font-medium mt-1 flex items-center justify-center space-x-1">
+            <span>📱</span>
+            <span>Portal de mi Mascota</span>
+        </p>
+    </div>
+
+    <!-- Selector de Tema Claro / Oscuro (Toggle Pill) -->
+    <div class="flex justify-center mb-4">
+        <div class="inline-flex items-center bg-slate-200/90 p-1 rounded-full text-xs shadow-inner">
+            <button type="button" id="btnTemaOscuro" onclick="cambiarTemaDni('oscuro')" class="px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all bg-indigo-900 text-white shadow-xs font-black">
+                <span>🌙</span>
+                <span>Oscuro</span>
+            </button>
+            <button type="button" id="btnTemaClaro" onclick="cambiarTemaDni('claro')" class="px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all text-slate-600 hover:text-slate-900 font-medium">
+                <span>☀️</span>
+                <span>Claro</span>
+            </button>
+        </div>
     </div>
 
     <!-- Tarjeta Estilo DNI de Mascota Oficial -->
-    <div class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 rounded-3xl p-5 text-white shadow-xl border border-indigo-400/30 relative overflow-hidden space-y-4">
+    <div id="dni-card" class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 rounded-3xl p-5 text-white shadow-xl border border-indigo-400/30 relative overflow-hidden space-y-4 transition-colors duration-300">
         
         <!-- Marca de Agua de Fondo y Holograma Decorativo -->
-        <div class="absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-white/5 pointer-events-none blur-xl"></div>
+        <div class="dni-watermark absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-white/5 pointer-events-none blur-xl"></div>
         <div class="absolute right-4 top-4 text-3xl opacity-20 pointer-events-none">🐾</div>
 
         <!-- Encabezado Superior del DNI -->
-        <div class="flex items-center justify-between border-b border-indigo-700/60 pb-3">
+        <div class="dni-divider flex items-center justify-between border-b border-indigo-700/60 pb-3">
             <div class="flex items-center space-x-2">
                 <span class="text-xl">🐾</span>
                 <div>
-                    <p class="text-[9px] font-black uppercase tracking-widest text-indigo-300">DOCUMENTO NACIONAL DE IDENTIDAD ANIMAL</p>
-                    <p class="text-xs font-black tracking-tight text-white uppercase">{{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'REPÚBLICA DE LAS MASCOTAS' }}</p>
+                    <p class="dni-subtext text-[9px] font-black uppercase tracking-widest text-indigo-300">DOCUMENTO NACIONAL DE IDENTIDAD ANIMAL</p>
+                    <p class="dni-maintext text-xs font-black tracking-tight text-white uppercase">{{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'REPÚBLICA DE LAS MASCOTAS' }}</p>
                 </div>
             </div>
-            <div class="text-right">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+            <div class="text-right shrink-0">
+                <span id="dniIdBadge" class="px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold whitespace-nowrap shrink-0 inline-block tracking-wider bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
                     ID: PE-{{ '%06d' % mascota.id }}
                 </span>
             </div>
@@ -41,7 +66,7 @@
             
             <!-- Foto de Perfil con Input de Carga WebP -->
             <div class="relative group flex-shrink-0">
-                <div id="petAvatarContainer" class="w-24 h-28 rounded-2xl bg-indigo-950/80 border-2 border-indigo-400/40 flex items-center justify-center text-4xl shadow-md overflow-hidden relative">
+                <div id="petAvatarContainer" class="w-24 h-28 rounded-2xl bg-indigo-950/80 border-2 border-indigo-400/40 flex items-center justify-center text-4xl shadow-md overflow-hidden relative transition-colors duration-300">
                     {% if mascota.foto_url %}
                     <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
                     <span class="hidden">{% if mascota.especie|lower == 'felino' %}🐱{% elif mascota.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
@@ -63,32 +88,32 @@
             <!-- Campos de Identidad -->
             <div class="flex-1 min-w-0 space-y-1 text-xs">
                 <div>
-                    <span class="text-[9px] font-bold uppercase tracking-wider text-indigo-300 block">Nombre del Paciente:</span>
-                    <h1 class="text-xl font-black text-white tracking-tight leading-tight">{{ mascota.nombre }}</h1>
+                    <span class="dni-subtext text-[9px] font-bold uppercase tracking-wider text-indigo-300 block">Nombre del Paciente:</span>
+                    <h1 class="dni-maintext text-xl font-black text-white tracking-tight leading-tight">{{ mascota.nombre }}</h1>
                 </div>
 
                 <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] pt-1">
                     <div>
-                        <span class="text-[9px] uppercase font-bold text-indigo-300 block">Especie / Raza:</span>
-                        <p class="font-semibold text-white truncate">{{ mascota.especie }} &bull; {{ mascota.raza or 'Mestizo' }}</p>
+                        <span class="dni-subtext text-[9px] uppercase font-bold text-indigo-300 block">Especie / Raza:</span>
+                        <p class="dni-maintext font-semibold text-white truncate">{{ mascota.especie }} &bull; {{ mascota.raza or 'Mestizo' }}</p>
                     </div>
                     <div>
-                        <span class="text-[9px] uppercase font-bold text-indigo-300 block">Sexo:</span>
-                        <p id="dniSexo" class="font-semibold text-white">{{ mascota.sexo or 'No registrado' }}</p>
+                        <span class="dni-subtext text-[9px] uppercase font-bold text-indigo-300 block">Sexo:</span>
+                        <p id="dniSexo" class="dni-maintext font-semibold text-white">{{ mascota.sexo or 'No registrado' }}</p>
                     </div>
                     <div>
-                        <span class="text-[9px] uppercase font-bold text-indigo-300 block">Nacimiento:</span>
-                        <p id="dniNacimiento" class="font-semibold text-white">{{ mascota.fecha_nacimiento.strftime('%d/%m/%Y') if mascota.fecha_nacimiento else 'No registrada' }}</p>
+                        <span class="dni-subtext text-[9px] uppercase font-bold text-indigo-300 block">Nacimiento:</span>
+                        <p id="dniNacimiento" class="dni-maintext font-semibold text-white">{{ mascota.fecha_nacimiento.strftime('%d/%m/%Y') if mascota.fecha_nacimiento else 'No registrada' }}</p>
                     </div>
                     <div>
-                        <span class="text-[9px] uppercase font-bold text-indigo-300 block">Microchip:</span>
-                        <p id="dniMicrochip" class="font-semibold text-white truncate">{{ mascota.microchip or 'Sin chip' }}</p>
+                        <span class="dni-subtext text-[9px] uppercase font-bold text-indigo-300 block">Microchip:</span>
+                        <p id="dniMicrochip" class="dni-maintext font-semibold text-white truncate">{{ mascota.microchip or 'Sin chip' }}</p>
                     </div>
                 </div>
 
                 <div class="pt-0.5">
-                    <span class="text-[9px] uppercase font-bold text-indigo-300 block">Señas / Rasgos:</span>
-                    <p id="dniRasgos" class="text-[11px] text-indigo-100 italic truncate">{{ mascota.rasgos_distintivos or 'Sin señas registradas' }}</p>
+                    <span class="dni-subtext text-[9px] uppercase font-bold text-indigo-300 block">Señas / Rasgos:</span>
+                    <p id="dniRasgos" class="dni-maintext text-[11px] text-indigo-100 italic truncate">{{ mascota.rasgos_distintivos or 'Sin señas registradas' }}</p>
                 </div>
             </div>
 
@@ -102,16 +127,22 @@
         {% endif %}
 
         <!-- Barra Inferior del DNI: Titular y Botón Editar Perfil -->
-        <div class="pt-3 border-t border-indigo-700/60 flex items-center justify-between text-xs">
-            <div class="text-[11px]">
-                <span class="text-indigo-300">Titular: <strong>{{ cliente.nombre_completo or cliente.dni }}</strong></span>
-                <span class="text-indigo-300 ml-1">(DNI: {{ cliente.dni }})</span>
+        <div id="dniBottomBar" class="dni-divider pt-3 border-t border-indigo-700/60 flex items-center justify-between text-xs">
+            <div class="text-[11px] flex items-center flex-wrap gap-1">
+                <span class="dni-subtext text-indigo-300">Titular: <strong class="dni-titular-nombre text-white">{{ cliente.nombre_completo or cliente.dni }}</strong></span>
+                <div class="inline-flex items-center space-x-1">
+                    <span class="dni-subtext text-indigo-300">(DNI: <span id="dniNumero" data-dni="{{ cliente.dni }}">{{ cliente.dni }}</span>)</span>
+                    <button type="button" id="btnTogglePrivacidad" onclick="togglePrivacidadDni()" class="text-xs hover:opacity-80 transition-transform active:scale-90 p-0.5" title="Ocultar/Mostrar DNI para capturas de pantalla">
+                        👁️
+                    </button>
+                </div>
             </div>
 
             <button 
                 type="button" 
+                id="btnEditarDni"
                 onclick="abrirModalEditarPerfil()"
-                class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-indigo-700/80 hover:bg-indigo-600 active:bg-indigo-500 rounded-xl border border-indigo-400/40 shadow-xs transition-all flex items-center space-x-1"
+                class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-indigo-700/80 hover:bg-indigo-600 active:bg-indigo-500 rounded-xl border border-indigo-400/40 shadow-xs transition-all flex items-center space-x-1 shrink-0 ml-2"
             >
                 <span>✏️</span>
                 <span>Editar DNI</span>
@@ -575,6 +606,154 @@ async function guardarPerfilMascota(e) {
             btn.disabled = false;
             btn.classList.remove("opacity-75");
             btn.innerHTML = `<span>Guardar Cambios</span>`;
+        }
+    }
+}
+
+function togglePrivacidadDni() {
+    const span = document.getElementById("dniNumero");
+    const btn = document.getElementById("btnTogglePrivacidad");
+    if (!span) return;
+
+    const realDni = span.getAttribute("data-dni") || "";
+    const isMasked = span.getAttribute("data-masked") === "true";
+
+    if (isMasked) {
+        span.textContent = realDni;
+        span.setAttribute("data-masked", "false");
+        if (btn) {
+            btn.textContent = "👁️";
+            btn.title = "Ocultar DNI para capturas de pantalla";
+        }
+    } else {
+        if (realDni.length >= 4) {
+            span.textContent = "***" + realDni.slice(-4);
+        } else {
+            span.textContent = "• Oculto •";
+        }
+        span.setAttribute("data-masked", "true");
+        if (btn) {
+            btn.textContent = "🙈";
+            btn.title = "Mostrar DNI";
+        }
+    }
+}
+
+function cambiarTemaDni(tema) {
+    const card = document.getElementById("dni-card");
+    const btnClaro = document.getElementById("btnTemaClaro");
+    const btnOscuro = document.getElementById("btnTemaOscuro");
+    if (!card) return;
+
+    const subtexts = card.querySelectorAll(".dni-subtext");
+    const maintexts = card.querySelectorAll(".dni-maintext");
+    const dividers = card.querySelectorAll(".dni-divider");
+    const badge = document.getElementById("dniIdBadge");
+    const avatar = document.getElementById("petAvatarContainer");
+    const btnEdit = document.getElementById("btnEditarDni");
+    const titularNom = card.querySelector(".dni-titular-nombre");
+
+    if (tema === 'claro') {
+        // Tarjeta en Modo Claro
+        card.classList.remove("bg-gradient-to-br", "from-indigo-900", "via-indigo-800", "to-purple-900", "text-white", "border-indigo-400/30");
+        card.classList.add("bg-white", "text-slate-800", "border-slate-200", "shadow-xl");
+
+        // Textos secundarios
+        subtexts.forEach(el => {
+            el.classList.remove("text-indigo-300", "text-indigo-200", "text-indigo-100");
+            el.classList.add("text-slate-500");
+        });
+
+        // Textos principales
+        maintexts.forEach(el => {
+            el.classList.remove("text-white", "text-indigo-100");
+            el.classList.add("text-slate-900");
+        });
+
+        if (titularNom) {
+            titularNom.classList.remove("text-white");
+            titularNom.classList.add("text-slate-900");
+        }
+
+        // Divisores
+        dividers.forEach(el => {
+            el.classList.remove("border-indigo-700/60");
+            el.classList.add("border-slate-200");
+        });
+
+        // Badge ID
+        if (badge) {
+            badge.classList.remove("bg-indigo-500/30", "text-indigo-200", "border-indigo-400/30");
+            badge.classList.add("bg-slate-100", "text-slate-700", "border-slate-300");
+        }
+
+        // Contenedor Avatar
+        if (avatar) {
+            avatar.classList.remove("bg-indigo-950/80", "border-indigo-400/40");
+            avatar.classList.add("bg-slate-100", "border-slate-300");
+        }
+
+        // Botón Editar
+        if (btnEdit) {
+            btnEdit.classList.remove("text-white", "bg-indigo-700/80", "hover:bg-indigo-600", "border-indigo-400/40");
+            btnEdit.classList.add("text-indigo-700", "bg-indigo-50", "hover:bg-indigo-100", "border-indigo-200");
+        }
+
+        // Estado visual de los botones del selector
+        if (btnClaro && btnOscuro) {
+            btnClaro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all bg-white text-indigo-950 shadow-sm font-black";
+            btnOscuro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all text-slate-600 hover:text-slate-900 font-medium";
+        }
+    } else {
+        // Tarjeta en Modo Oscuro (Default)
+        card.classList.remove("bg-white", "text-slate-800", "border-slate-200");
+        card.classList.add("bg-gradient-to-br", "from-indigo-900", "via-indigo-800", "to-purple-900", "text-white", "border-indigo-400/30");
+
+        // Textos secundarios
+        subtexts.forEach(el => {
+            el.classList.remove("text-slate-500");
+            el.classList.add("text-indigo-300");
+        });
+
+        // Textos principales
+        maintexts.forEach(el => {
+            el.classList.remove("text-slate-900");
+            el.classList.add("text-white");
+        });
+
+        if (titularNom) {
+            titularNom.classList.remove("text-slate-900");
+            titularNom.classList.add("text-white");
+        }
+
+        // Divisores
+        dividers.forEach(el => {
+            el.classList.remove("border-slate-200");
+            el.classList.add("border-indigo-700/60");
+        });
+
+        // Badge ID
+        if (badge) {
+            badge.classList.remove("bg-slate-100", "text-slate-700", "border-slate-300");
+            badge.classList.add("bg-indigo-500/30", "text-indigo-200", "border-indigo-400/30");
+        }
+
+        // Contenedor Avatar
+        if (avatar) {
+            avatar.classList.remove("bg-slate-100", "border-slate-300");
+            avatar.classList.add("bg-indigo-950/80", "border-indigo-400/40");
+        }
+
+        // Botón Editar
+        if (btnEdit) {
+            btnEdit.classList.remove("text-indigo-700", "bg-indigo-50", "hover:bg-indigo-100", "border-indigo-200");
+            btnEdit.classList.add("text-white", "bg-indigo-700/80", "hover:bg-indigo-600", "border-indigo-400/40");
+        }
+
+        // Estado visual de los botones del selector
+        if (btnClaro && btnOscuro) {
+            btnOscuro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all bg-indigo-900 text-white shadow-xs font-black";
+            btnClaro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all text-slate-600 hover:text-slate-900 font-medium";
         }
     }
 }

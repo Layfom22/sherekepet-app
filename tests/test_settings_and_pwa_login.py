@@ -282,3 +282,78 @@ def test_pwa_brand_reflection_in_portal(client, db_session):
     resp_carnet = client.get(f"/portal/carnet/{mascota.id}")
     assert resp_carnet.status_code == 200
     assert "Happy Pets 24 Horas" in resp_carnet.text
+
+
+def test_dni_mascota_ui_features(client, db_session):
+    """
+    Verifica los requerimientos de UI/UX del DNI de Mascota:
+    1. Header limpio con 'Veterinaria:' y 'Portal de mi Mascota'.
+    2. Badge ID con whitespace-nowrap y shrink-0.
+    3. Modo privacidad de DNI con data-dni y función toggle.
+    4. Alternador de Tema Claro / Oscuro con botones y transición.
+    """
+    clinica = Clinica(
+        nombre="Clínica San Lucas",
+        nombre_comercial="San Lucas Pets",
+        zona_horaria="America/Lima",
+        plan_activo="solo"
+    )
+    db_session.add(clinica)
+    db_session.flush()
+
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="87654321",
+        nombre_completo="Juan Pérez",
+        pin_hash=hash_pin("1234")
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Firulais",
+        especie="Canino",
+        raza="Golden Retriever"
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    token = create_access_token({
+        "sub": str(cliente.id),
+        "clinica_id": clinica.id,
+        "role": "client",
+        "dni": cliente.dni
+    })
+    client.cookies.set("client_token", token)
+
+    resp = client.get(f"/portal/carnet/{mascota.id}")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # 1. Header con respiro visual y nombre comercial
+    assert "Veterinaria:" in html
+    assert "San Lucas Pets" in html
+    assert "Portal de mi Mascota" in html
+
+    # 2. Badge de ID nunca cortado
+    assert 'id="dniIdBadge"' in html
+    assert "whitespace-nowrap" in html
+    assert "shrink-0" in html
+
+    # 3. Modo Privacidad DNI
+    assert 'id="btnTogglePrivacidad"' in html
+    assert 'onclick="togglePrivacidadDni()"' in html
+    assert 'data-dni="87654321"' in html
+    assert "togglePrivacidadDni" in html
+
+    # 4. Selector de tema claro / oscuro y clases dinámicas
+    assert 'id="btnTemaOscuro"' in html
+    assert 'id="btnTemaClaro"' in html
+    assert "cambiarTemaDni('oscuro')" in html
+    assert "cambiarTemaDni('claro')" in html
+    assert 'id="dni-card"' in html
+    assert "transition-colors duration-300" in html
+    assert "cambiarTemaDni" in html
+

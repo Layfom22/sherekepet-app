@@ -311,9 +311,10 @@ class AuthService:
                 detail="Cliente no registrado con ese DNI en esta clínica."
             )
 
-        # CASO 1: Primer ingreso (pin_hash es NULL)
-        if cliente.pin_hash is None:
-            if not request.nuevo_pin:
+        # CASO 1: Primer ingreso (pin_hash es NULL o vacío)
+        if not cliente.pin_hash or not str(cliente.pin_hash).strip():
+            pin_a_establecer = request.nuevo_pin or request.pin
+            if not pin_a_establecer:
                 return ClientLoginResponse(
                     access_token=None,
                     requires_pin_setup=True,
@@ -321,12 +322,20 @@ class AuthService:
                     cliente=ClientInfo.model_validate(cliente)
                 )
 
-            # Establecer nuevo PIN
-            cliente.pin_hash = hash_pin(request.nuevo_pin)
+            # Validar formato de 4 dígitos numéricos
+            pin_clean = str(pin_a_establecer).strip()
+            if not (len(pin_clean) == 4 and pin_clean.isdigit()):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="El PIN debe constar exactamente de 4 dígitos numéricos."
+                )
+
+            # Establecer y encriptar nuevo PIN (bcrypt)
+            cliente.pin_hash = hash_pin(pin_clean)
             db.commit()
             db.refresh(cliente)
 
-            # Emitir JWT una vez configurado el PIN
+            # Emitir JWT directamente para evitar doble inicio de sesión
             token_payload = {
                 "sub": str(cliente.id),
                 "clinica_id": cliente.clinica_id,

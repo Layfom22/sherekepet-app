@@ -3,80 +3,348 @@
 {% block title %}Acceso Dueños - SherekePet PWA{% endblock %}
 
 {% block content %}
-<div class="max-w-md mx-auto py-6 px-2 space-y-6">
+<div class="max-w-md mx-auto py-6 px-3 space-y-6">
 
-    <!-- Encabezado Móvil -->
+    <!-- Encabezado Móvil PWA -->
     <div class="text-center space-y-2">
-        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-teal-600 to-emerald-400 text-white flex items-center justify-center text-3xl shadow-lg">
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/20">
             🐾
         </div>
         <h1 class="text-2xl font-black text-slate-900 tracking-tight">Portal de Dueños</h1>
         <p class="text-xs text-slate-500">
-            Ingresa con tu DNI y tu PIN de 4 dígitos para ver el carnet y medicinas de tus mascotas.
+            Consulta el carnet de vacunación, recetas médicas y citas de tus mascotas desde tu celular.
         </p>
     </div>
 
-    <!-- Mensaje de Error si existe -->
-    {% if error %}
-    <div class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2">
-        <span>⚠️</span>
-        <p>{{ error }}</p>
+    <!-- Alerta de Error del Servidor (si viene de redirect o fallo) -->
+    <div id="serverAlert" class="{% if not error %}hidden{% endif %} p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
+        <span class="text-base">⚠️</span>
+        <p id="serverAlertMsg">{{ error or '' }}</p>
     </div>
-    {% endif %}
 
-    <!-- Formulario Login 1 Columna Touch -->
-    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-        <form method="POST" action="/portal/login" class="space-y-4">
-            <input type="hidden" name="clinica_id" value="1">
+    <!-- Alerta Dinámica de JS -->
+    <div id="jsAlert" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
+        <span class="text-base">⚠️</span>
+        <p id="jsAlertMsg"></p>
+    </div>
 
-            <div>
-                <label for="dni" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Número de DNI *
-                </label>
-                <input 
-                    type="text" 
-                    id="dni" 
-                    name="dni" 
-                    value="{{ dni or '' }}"
-                    maxlength="8" 
-                    placeholder="8 dígitos..." 
-                    class="w-full px-4 py-3.5 text-lg font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
-                    required
-                >
-            </div>
+    <!-- Card de Acceso en 2 Pasos -->
+    <div class="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200">
 
-            <div>
-                <label for="pin" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    PIN de 4 dígitos *
-                </label>
-                <input 
-                    type="password" 
-                    id="pin" 
-                    name="pin" 
-                    maxlength="4" 
-                    inputmode="numeric"
-                    placeholder="••••" 
-                    class="w-full px-4 py-3.5 text-2xl font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
-                    required
-                >
-            </div>
+        <form id="formLoginPWA" method="POST" action="/portal/login" class="space-y-4">
+            <input type="hidden" id="hiddenClinicaId" name="clinica_id" value="{{ clinica.id if clinica else 1 }}">
+            <input type="hidden" id="hiddenDni" name="dni" value="{{ dni or '' }}">
 
-            <div class="pt-2">
+            <!-- ============================================== -->
+            <!-- PASO 1: Ingreso de DNI                         -->
+            <!-- ============================================== -->
+            <div id="paso1Container" class="space-y-4">
+                <div>
+                    <label for="inputDni" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        Número de DNI del Dueño *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="inputDni" 
+                        maxlength="15" 
+                        inputmode="numeric"
+                        value="{{ dni or '' }}"
+                        placeholder="Ingresa tu DNI..." 
+                        class="w-full px-4 py-3.5 text-xl font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-slate-900"
+                        required
+                        autofocus
+                    >
+                    <p class="text-[11px] text-slate-400 text-center mt-1.5">
+                        Ingresa el documento con el que registraste a tu mascota.
+                    </p>
+                </div>
+
                 <button 
-                    type="submit" 
-                    class="btn-touch w-full py-4 text-base font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-2xl shadow-md transition-all"
+                    type="button" 
+                    id="btnPaso1"
+                    onclick="verificarDniPaso1()"
+                    class="btn-touch w-full py-3.5 px-4 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-2"
                 >
-                    Ingresar a mi Portal ➜
+                    <span id="btnPaso1Texto">Continuar ➜</span>
+                    <span id="btnPaso1Loader" class="hidden animate-spin text-base">⏳</span>
                 </button>
             </div>
+
+            <!-- ============================================== -->
+            <!-- PASO 2: Ingreso o Creación de PIN              -->
+            <!-- ============================================== -->
+            <div id="paso2Container" class="hidden space-y-4">
+
+                <!-- Header del Paso 2: Saludo personalizado y cambio de DNI -->
+                <div class="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-center justify-between">
+                    <div class="min-w-0">
+                        <p class="text-xs font-bold text-indigo-950 truncate">
+                            👋 <span id="saludoNombre">Hola</span>
+                        </p>
+                        <p id="subtituloClinica" class="text-[10px] text-indigo-700 truncate">
+                            DNI: <span id="displayDni" class="font-mono font-semibold"></span>
+                        </p>
+                    </div>
+                    <button 
+                        type="button" 
+                        onclick="volverAPaso1()" 
+                        class="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline flex-shrink-0 ml-2"
+                    >
+                        Cambiar DNI
+                    </button>
+                </div>
+
+                <!-- SUB-PASO A: Cliente con PIN ya configurado (needs_pin = FALSE) -->
+                <div id="subpasoLoginNormal" class="space-y-4">
+                    <div>
+                        <label for="inputPin" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                            Tu PIN de 4 dígitos *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="inputPin" 
+                            name="pin"
+                            maxlength="4" 
+                            inputmode="numeric"
+                            placeholder="••••" 
+                            class="w-full px-4 py-3.5 text-2xl font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-900 transition-all"
+                        >
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="btnEntrarNormal"
+                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-md shadow-indigo-600/20 transition-all"
+                    >
+                        Ingresar a mi Portal ➜
+                    </button>
+                </div>
+
+                <!-- SUB-PASO B: Primer Ingreso (needs_pin = TRUE) -->
+                <div id="subpasoCrearPin" class="hidden space-y-4">
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
+                        ✨ <strong>Primer ingreso detectado:</strong> Crea un código PIN numérico de 4 dígitos para proteger el historial médico de tus mascotas.
+                    </div>
+
+                    <div>
+                        <label for="inputNuevoPin" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                            Crea tu PIN (4 dígitos) *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="inputNuevoPin" 
+                            name="nuevo_pin"
+                            maxlength="4" 
+                            inputmode="numeric"
+                            placeholder="••••" 
+                            class="w-full px-4 py-3 text-xl font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-900 transition-all"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="inputConfirmarPin" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                            Confirma tu PIN *
+                        </label>
+                        <input 
+                            type="password" 
+                            id="inputConfirmarPin" 
+                            name="confirmar_pin"
+                            maxlength="4" 
+                            inputmode="numeric"
+                            placeholder="••••" 
+                            class="w-full px-4 py-3 text-xl font-mono text-center tracking-widest bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-slate-900 transition-all"
+                        >
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="btnCrearYEntrar"
+                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-2xl shadow-md shadow-teal-600/20 transition-all"
+                    >
+                        Crear PIN y Entrar ➜
+                    </button>
+                </div>
+
+            </div>
+
         </form>
+
     </div>
 
     <!-- PWA Install Hint -->
-    <div class="text-center">
+    <div class="text-center space-y-1">
         <p class="text-[11px] text-slate-400">
             📱 Puedes instalar SherekePet como una App en la pantalla de inicio de tu celular.
         </p>
     </div>
+
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentNeedsPin = false;
+
+function ocultarAlertas() {
+    const jsAlert = document.getElementById("jsAlert");
+    const serverAlert = document.getElementById("serverAlert");
+    if (jsAlert) jsAlert.classList.add("hidden");
+    if (serverAlert) serverAlert.classList.add("hidden");
+}
+
+function mostrarErrorJs(mensaje) {
+    const jsAlert = document.getElementById("jsAlert");
+    const jsAlertMsg = document.getElementById("jsAlertMsg");
+    if (jsAlert && jsAlertMsg) {
+        jsAlertMsg.textContent = mensaje;
+        jsAlert.classList.remove("hidden");
+        jsAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+async function verificarDniPaso1() {
+    ocultarAlertas();
+    const inputDni = document.getElementById("inputDni");
+    const dniVal = inputDni.value.trim();
+
+    if (!dniVal || dniVal.length < 4) {
+        mostrarErrorJs("Por favor ingresa un número de DNI válido (mínimo 4 dígitos).");
+        inputDni.focus();
+        return;
+    }
+
+    const btn = document.getElementById("btnPaso1");
+    const texto = document.getElementById("btnPaso1Texto");
+    const loader = document.getElementById("btnPaso1Loader");
+
+    btn.disabled = true;
+    texto.textContent = "Verificando...";
+    loader.classList.remove("hidden");
+
+    try {
+        const resp = await fetch("/api/portal/check-dni", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ dni: dniVal })
+        });
+
+        const data = await resp.json();
+
+        if (resp.ok) {
+            if (!data.exists) {
+                mostrarErrorJs("El DNI ingresado no se encuentra registrado en el sistema. Consulta con tu clínica veterinaria para que te den de alta.");
+                return;
+            }
+
+            // DNI encontrado: Pasar al Paso 2
+            currentNeedsPin = data.needs_pin;
+            activarPaso2(dniVal, data);
+        } else {
+            mostrarErrorJs(data.detail || "Error al verificar el DNI. Intenta nuevamente.");
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarErrorJs("Error de conexión al verificar el DNI. Revisa tu acceso a internet.");
+    } finally {
+        btn.disabled = false;
+        texto.textContent = "Continuar ➜";
+        loader.classList.add("hidden");
+    }
+}
+
+function activarPaso2(dni, data) {
+    document.getElementById("hiddenDni").value = dni;
+    if (data.clinica_id) {
+        document.getElementById("hiddenClinicaId").value = data.clinica_id;
+    }
+
+    document.getElementById("displayDni").textContent = dni;
+    document.getElementById("saludoNombre").textContent = data.nombre || "Hola";
+
+    const subClinica = document.getElementById("subtituloClinica");
+    if (data.clinica_nombre) {
+        subClinica.innerHTML = `DNI: <span class="font-mono font-semibold">${dni}</span> &bull; 🏥 ${data.clinica_nombre}`;
+    }
+
+    // Ocultar Paso 1 y Mostrar Paso 2
+    document.getElementById("paso1Container").classList.add("hidden");
+    document.getElementById("paso2Container").classList.remove("hidden");
+
+    const subpasoLogin = document.getElementById("subpasoLoginNormal");
+    const subpasoCrear = document.getElementById("subpasoCrearPin");
+    const inputPin = document.getElementById("inputPin");
+    const inputNuevoPin = document.getElementById("inputNuevoPin");
+    const inputConfirmar = document.getElementById("inputConfirmarPin");
+
+    if (data.needs_pin) {
+        // Modo Primer Ingreso: Crear PIN
+        subpasoLogin.classList.add("hidden");
+        subpasoCrear.classList.remove("hidden");
+        inputPin.removeAttribute("required");
+        inputNuevoPin.setAttribute("required", "required");
+        inputConfirmar.setAttribute("required", "required");
+        setTimeout(() => inputNuevoPin.focus(), 100);
+    } else {
+        // Modo Login Recurrente: Ingresar PIN
+        subpasoCrear.classList.add("hidden");
+        subpasoLogin.classList.remove("hidden");
+        inputPin.setAttribute("required", "required");
+        inputNuevoPin.removeAttribute("required");
+        inputConfirmar.removeAttribute("required");
+        setTimeout(() => inputPin.focus(), 100);
+    }
+}
+
+function volverAPaso1() {
+    ocultarAlertas();
+    document.getElementById("paso2Container").classList.add("hidden");
+    document.getElementById("paso1Container").classList.remove("hidden");
+    document.getElementById("inputPin").value = "";
+    document.getElementById("inputNuevoPin").value = "";
+    document.getElementById("inputConfirmarPin").value = "";
+    document.getElementById("inputDni").focus();
+}
+
+// Validación antes de enviar el formulario
+document.getElementById("formLoginPWA").addEventListener("submit", function(e) {
+    ocultarAlertas();
+
+    if (currentNeedsPin) {
+        const pin1 = document.getElementById("inputNuevoPin").value.trim();
+        const pin2 = document.getElementById("inputConfirmarPin").value.trim();
+
+        if (pin1.length !== 4 || !/^\d{4}$/.test(pin1)) {
+            e.preventDefault();
+            mostrarErrorJs("El PIN debe constar exactamente de 4 números.");
+            document.getElementById("inputNuevoPin").focus();
+            return;
+        }
+
+        if (pin1 !== pin2) {
+            e.preventDefault();
+            mostrarErrorJs("Los códigos PIN no coinciden. Confírmalo nuevamente.");
+            document.getElementById("inputConfirmarPin").focus();
+            return;
+        }
+    } else {
+        const pin = document.getElementById("inputPin").value.trim();
+        if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+            e.preventDefault();
+            mostrarErrorJs("El PIN debe constar de 4 dígitos numéricos.");
+            document.getElementById("inputPin").focus();
+            return;
+        }
+    }
+});
+
+// Permitir presionar ENTER en el input de DNI para ejecutar Paso 1
+document.getElementById("inputDni").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") {
+        e.preventDefault();
+        verificarDniPaso1();
+    }
+});
+</script>
 {% endblock %}

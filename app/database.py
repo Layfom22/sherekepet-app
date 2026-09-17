@@ -81,6 +81,8 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN logo_url VARCHAR(500);"))
                 if "logo_b64" not in cols:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN logo_b64 TEXT;"))
+                if "nombre_comercial" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN nombre_comercial VARCHAR(150);"))
 
         # 2. sp_mascotas
         if "sp_mascotas" in tables:

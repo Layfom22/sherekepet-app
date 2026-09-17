@@ -98,3 +98,22 @@ class ClientLoginResponse(BaseModel):
     requires_pin_setup: bool = False
     message: str
     cliente: Optional[ClientInfo] = None
+
+
+class ClinicaConfiguracionUpdate(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=150, description="Razón social o nombre legal de la veterinaria")
+    nombre_comercial: Optional[str] = Field(None, max_length=150, description="Nombre de marca de cara a los clientes")
+
+
+class CheckDniRequest(BaseModel):
+    dni: str = Field(..., min_length=4, max_length=20, description="Número de DNI a verificar")
+
+
+class CheckDniResponse(BaseModel):
+    exists: bool
+    needs_pin: bool
+    nombre: Optional[str] = None
+    clinica_id: Optional[int] = None
+    clinica_nombre: Optional[str] = None
+    clinica_logo: Optional[str] = None
+

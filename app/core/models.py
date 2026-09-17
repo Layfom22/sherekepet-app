@@ -45,9 +45,15 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    nombre_comercial: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     zona_horaria: Mapped[str] = mapped_column(String(50), default="America/Lima", nullable=False)
     plan_activo: Mapped[str] = mapped_column(String(50), default="solo", nullable=False)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    @property
+    def nombre_mostrado(self) -> str:
+        """Retorna el nombre comercial si está definido, de lo contrario la razón social / nombre."""
+        return self.nombre_comercial.strip() if (self.nombre_comercial and self.nombre_comercial.strip()) else self.nombre
 
     # Relaciones operativas
     veterinarios = relationship("Veterinario", back_populates="clinica", cascade="all, delete-orphan")
@@ -55,4 +61,4 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     mascotas = relationship("Mascota", back_populates="clinica", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<Clinica(id={self.id}, nombre='{self.nombre}', plan='{self.plan_activo}')>"
+        return f"<Clinica(id={self.id}, nombre='{self.nombre}', nombre_comercial='{self.nombre_comercial}', plan='{self.plan_activo}')>"

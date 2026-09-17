@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.core.config import settings
 from app.core.security import create_access_token
-from app.clinic.models import Veterinario
+from app.clinic.models import Veterinario, Cliente
 from app.core.models import Clinica
 from app.auth.schemas import (
     VetLoginRequest,
@@ -17,6 +17,8 @@ from app.auth.schemas import (
     ClientLoginResponse,
     VerificarOtpRequest,
     ReenviarOtpRequest,
+    CheckDniRequest,
+    CheckDniResponse,
 )
 from app.auth.service import AuthService
 
@@ -182,6 +184,57 @@ async def google_callback(
     db: Session = Depends(get_db)
 ):
     return await handle_google_callback_process(request, code, error, db)
+
+
+@google_router.post(
+    "/api/portal/check-dni",
+    response_model=CheckDniResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verificar DNI de Dueño para Login PWA",
+    description="Busca al cliente por DNI y determina si existe y si requiere crear su PIN por primera vez."
+)
+@router.post(
+    "/portal/check-dni",
+    response_model=CheckDniResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Verificar DNI de Dueño para Login PWA (Alias Auth)",
+    include_in_schema=False
+)
+def check_dni_portal(
+    payload: CheckDniRequest,
+    db: Session = Depends(get_db)
+) -> CheckDniResponse:
+    dni_clean = payload.dni.strip()
+    clientes = db.query(Cliente).filter(
+        Cliente.dni == dni_clean,
+        Cliente.is_deleted == False
+    ).all()
+
+    if not clientes:
+        return CheckDniResponse(
+            exists=False,
+            needs_pin=False,
+            nombre=None,
+            clinica_id=None,
+            clinica_nombre=None,
+            clinica_logo=None
+        )
+
+    cliente = clientes[0]
+    needs_pin = bool(cliente.pin_hash is None or str(cliente.pin_hash).strip() == "")
+    clinica = cliente.clinica
+    clinica_nombre = clinica.nombre_mostrado if clinica else None
+    clinica_logo = clinica.logo_url if clinica else None
+    nombre = cliente.nombre_completo or cliente.nombres or "Dueño de Mascota"
+
+    return CheckDniResponse(
+        exists=True,
+        needs_pin=needs_pin,
+        nombre=nombre,
+        clinica_id=cliente.clinica_id,
+        clinica_nombre=clinica_nombre,
+        clinica_logo=clinica_logo
+    )
 
 
 @router.post(

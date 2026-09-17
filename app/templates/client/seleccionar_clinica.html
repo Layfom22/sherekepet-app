@@ -30,7 +30,7 @@
                     {% if reg.clinica.logo_url or reg.clinica.logo_b64 %}
                     <img 
                         src="{{ reg.clinica.logo_url or reg.clinica.logo_b64 }}" 
-                        alt="{{ reg.clinica.nombre }}" 
+                        alt="{{ reg.clinica.nombre_comercial or reg.clinica.nombre }}" 
                         class="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0"
                     >
                     {% else %}
@@ -40,7 +40,7 @@
                     {% endif %}
                     <div class="min-w-0">
                         <h3 class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 truncate">
-                            {{ reg.clinica.nombre }}
+                            {{ reg.clinica.nombre_comercial or reg.clinica.nombre }}
                         </h3>
                         <p class="text-xs text-slate-400">
                             {{ reg.total_mascotas }} mascota(s) registrada(s)

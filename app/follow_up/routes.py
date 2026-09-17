@@ -279,13 +279,42 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
     dni = str(form.get("dni", "")).strip()
     pin = str(form.get("pin", "")).strip()
+    nuevo_pin = str(form.get("nuevo_pin", "")).strip()
+    confirmar_pin = str(form.get("confirmar_pin", "")).strip()
     form_clinica_id = form.get("clinica_id")
+
+    # Si se envió formulario de creación de PIN, validar coincidencia
+    if nuevo_pin:
+        if confirmar_pin and nuevo_pin != confirmar_pin:
+            clinica_first = db.query(Clinica).filter(Clinica.is_deleted == False).first()
+            return templates.TemplateResponse(
+                request=request,
+                name="client/login.html",
+                context={
+                    "error": "Los PIN ingresados no coinciden. Intenta de nuevo.",
+                    "dni": dni,
+                    "clinica": clinica_first,
+                    "needs_pin": True
+                }
+            )
 
     # Si no se pasó clinica_id específica o viene la default 1, verificar si el DNI existe en múltiples clínicas
     clientes_con_dni = db.query(Cliente).filter(
         Cliente.dni == dni,
         Cliente.is_deleted == False
     ).all()
+
+    if not clientes_con_dni:
+        clinica_first = db.query(Clinica).filter(Clinica.is_deleted == False).first()
+        return templates.TemplateResponse(
+            request=request,
+            name="client/login.html",
+            context={
+                "error": "DNI no registrado en el sistema. Consulta con tu veterinaria.",
+                "dni": dni,
+                "clinica": clinica_first
+            }
+        )
 
     if len(clientes_con_dni) > 1 and not form.get("clinica_seleccionada"):
         # Redirigir al selector intermedio
@@ -302,14 +331,17 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
             name="client/seleccionar_clinica.html",
             context={
                 "dni": dni,
-                "pin": pin,
+                "pin": nuevo_pin or pin,
                 "registros": registros,
                 "clinica": clientes_con_dni[0].clinica
             }
         )
 
     if form_clinica_id:
-        clinica_id = int(form_clinica_id)
+        try:
+            clinica_id = int(form_clinica_id)
+        except Exception:
+            clinica_id = clientes_con_dni[0].clinica_id
     elif clientes_con_dni:
         clinica_id = clientes_con_dni[0].clinica_id
     else:
@@ -318,7 +350,13 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
     clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
 
     try:
-        req = ClientLoginRequest(clinica_id=clinica_id, dni=dni, pin=pin if pin else None)
+        pin_final = nuevo_pin or pin or None
+        req = ClientLoginRequest(
+            clinica_id=clinica_id,
+            dni=dni,
+            pin=pin_final,
+            nuevo_pin=nuevo_pin if nuevo_pin else None
+        )
         auth_resp = AuthService.login_cliente(db, req)
 
         if auth_resp.requires_pin_setup:
@@ -326,9 +364,10 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
                 request=request,
                 name="client/login.html",
                 context={
-                    "error": "Primer ingreso detectado: Por favor establece tu PIN primero en la clínica.",
+                    "error": "Primer ingreso detectado: Por favor crea tu PIN de 4 dígitos para acceder.",
                     "dni": dni,
-                    "clinica": clinica
+                    "clinica": clinica,
+                    "needs_pin": True
                 }
             )
 

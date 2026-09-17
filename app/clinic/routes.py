@@ -13,7 +13,12 @@ from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token, hash_password
 from app.database import get_db
 from app.auth.service import AuthService
-from app.auth.schemas import VetLoginRequest, VetRegisterRequest, AsistenteCreateRequest
+from app.auth.schemas import (
+    VetLoginRequest,
+    VetRegisterRequest,
+    AsistenteCreateRequest,
+    ClinicaConfiguracionUpdate
+)
 from app.core.models import Clinica
 from app.clinic.models import (
     Especie,
@@ -186,6 +191,48 @@ async def upload_logo_clinica(
         logo_url=logo_url,
         logo_b64=logo_url
     )
+
+
+@router.put(
+    "/api/clinic/configuracion",
+    summary="Actualizar Configuración de Marca Blanca de la Clínica",
+    description="Permite al Administrador de la clínica editar el nombre legal y nombre comercial de su veterinaria."
+)
+def actualizar_configuracion_clinica(
+    payload: ClinicaConfiguracionUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user or current_user.rol != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el Administrador puede editar la configuración de la clínica."
+        )
+
+    clinica = db.query(Clinica).filter(
+        Clinica.id == current_user.clinica_id,
+        Clinica.is_deleted == False
+    ).first()
+
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    clinica.nombre = payload.nombre.strip()
+    clinica.nombre_comercial = payload.nombre_comercial.strip() if payload.nombre_comercial else None
+    db.commit()
+    db.refresh(clinica)
+
+    return {
+        "mensaje": "Configuración guardada exitosamente.",
+        "clinica": {
+            "id": clinica.id,
+            "nombre": clinica.nombre,
+            "nombre_comercial": clinica.nombre_comercial,
+            "nombre_mostrado": clinica.nombre_mostrado,
+            "logo_url": clinica.logo_url
+        }
+    }
 
 
 @router.post(
@@ -1065,3 +1112,40 @@ def vista_ficha_mascota(
             "hoy": hoy
         }
     )
+
+
+@router.get("/configuracion", response_class=HTMLResponse, summary="Vista Configuración de Marca Blanca")
+def vista_configuracion_clinica(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    clinica = db.query(Clinica).filter(
+        Clinica.id == target_clinica_id,
+        Clinica.is_deleted == False
+    ).first()
+
+    if not clinica:
+        clinica = Clinica(
+            id=target_clinica_id,
+            nombre="Clínica Veterinaria SherekePet",
+            zona_horaria="America/Lima",
+            plan_activo="solo"
+        )
+        db.add(clinica)
+        db.commit()
+        db.refresh(clinica)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/settings.html",
+        context={
+            "clinica": clinica,
+            "current_user": current_user,
+            "nombre_comercial": clinica.nombre_comercial or ""
+        }
+    )
+

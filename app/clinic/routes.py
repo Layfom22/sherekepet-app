@@ -3,6 +3,7 @@ import urllib.parse
 from datetime import date, timedelta
 import json
 from typing import List, Optional
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -136,6 +137,19 @@ def get_catalogo_especies(db: Session = Depends(get_db)):
     return db.query(Especie).order_by(Especie.nombre.asc()).all()
 
 
+@router.get(
+    "/api/catalogos/especies/{especie_id}/razas",
+    summary="Listado de Razas por Especie",
+    description="Retorna el listado de razas correspondientes a una especie."
+)
+def get_razas_por_especie(especie_id: int, db: Session = Depends(get_db)):
+    razas = db.query(Raza).filter(
+        Raza.especie_id == especie_id
+    ).order_by(Raza.nombre.asc()).all()
+    return [{"id": r.id, "nombre": r.nombre, "especie_id": r.especie_id} for r in razas]
+
+
+
 @router.post(
     "/api/clinic/logo",
     response_model=LogoUploadResponse,
@@ -233,6 +247,237 @@ def actualizar_configuracion_clinica(
             "logo_url": clinica.logo_url
         }
     }
+
+
+class VeterinarioPerfilUpdate(BaseModel):
+    nombre: Optional[str] = None
+    email: Optional[str] = None
+    foto_perfil: Optional[str] = None
+
+
+@router.put(
+    "/api/clinic/perfil",
+    summary="Actualizar Perfil del Veterinario",
+    description="Permite al veterinario actualizar su nombre, correo y foto de perfil."
+)
+def actualizar_perfil_veterinario(
+    payload: VeterinarioPerfilUpdate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    if payload.nombre is not None and payload.nombre.strip():
+        current_user.nombre = payload.nombre.strip()
+    if payload.email is not None and payload.email.strip():
+        email_limpio = payload.email.strip().lower()
+        otro = db.query(Veterinario).filter(
+            Veterinario.email == email_limpio,
+            Veterinario.id != current_user.id,
+            Veterinario.is_deleted == False
+        ).first()
+        if otro:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo ya se encuentra registrado.")
+        current_user.email = email_limpio
+    if payload.foto_perfil is not None:
+        current_user.foto_perfil = payload.foto_perfil.strip() or None
+
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "mensaje": "Perfil actualizado exitosamente.",
+        "veterinario": {
+            "id": current_user.id,
+            "nombre": current_user.nombre,
+            "email": current_user.email,
+            "foto_perfil": current_user.foto_perfil,
+            "rol": current_user.rol
+        }
+    }
+
+
+@router.post(
+    "/api/clinic/perfil/foto",
+    summary="Subir Foto de Perfil del Veterinario",
+    description="Sube la foto del veterinario a Cloudflare R2 y actualiza Veterinario.foto_perfil."
+)
+async def upload_foto_veterinario(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
+    content_type = file.content_type or "image/webp"
+    if content_type not in tipos_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+        )
+
+    contenido = await file.read()
+    if len(contenido) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo permitido (10MB)."
+        )
+
+    foto_url = await upload_image_to_r2(
+        file_bytes=contenido,
+        filename=file.filename or f"vet_{current_user.id}.webp",
+        folder="veterinarios",
+        content_type=content_type
+    )
+
+    current_user.foto_perfil = foto_url
+    db.commit()
+    db.refresh(current_user)
+
+    return {
+        "mensaje": "Foto de perfil actualizada correctamente.",
+        "foto_perfil": foto_url
+    }
+
+
+@router.get(
+    "/api/clinic/buscar-dni/{dni}",
+    summary="Búsqueda Global de Pacientes por DNI (Cross-Tenant Inteligente)",
+    description="Busca un cliente por DNI en toda la red SherekePet y retorna sus mascotas registradas sin historial médico."
+)
+def buscar_cliente_global_por_dni(
+    dni: str,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    dni_limpio = dni.strip()
+    if not dni_limpio or len(dni_limpio) != 8 or not dni_limpio.isdigit():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El DNI debe tener 8 dígitos numéricos.")
+
+    cliente = db.query(Cliente).filter(
+        Cliente.dni == dni_limpio,
+        Cliente.is_deleted == False
+    ).first()
+
+    if not cliente:
+        return {
+            "encontrado": False,
+            "mensaje": "DNI no encontrado en la red SherekePet."
+        }
+
+    mascotas = db.query(Mascota).filter(
+        Mascota.cliente_id == cliente.id,
+        Mascota.is_deleted == False
+    ).order_by(Mascota.created_at.desc()).all()
+
+    return {
+        "encontrado": True,
+        "cliente": {
+            "id": cliente.id,
+            "dni": cliente.dni,
+            "nombre_completo": cliente.nombre_completo or f"{cliente.nombres or ''} {cliente.apellido_paterno or ''}".strip(),
+            "telefono": cliente.telefono,
+            "clinica_id": cliente.clinica_id
+        },
+        "mascotas": [
+            {
+                "id": m.id,
+                "nombre": m.nombre,
+                "especie": m.especie,
+                "raza": m.raza,
+                "peso": m.peso,
+                "sexo": m.sexo,
+                "foto_url": m.foto_url,
+                "clinica_id": m.clinica_id
+            }
+            for m in mascotas
+        ]
+    }
+
+
+@router.post(
+    "/api/clinic/vincular-mascota/{mascota_id}",
+    summary="Vincular Mascota Existente a Clínica Actual",
+    description="Asocia una mascota existente de la red a la clínica actual del veterinario para abrir su ficha médica."
+)
+def vincular_mascota_a_clinica(
+    mascota_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    mascota_original = db.query(Mascota).filter(
+        Mascota.id == mascota_id,
+        Mascota.is_deleted == False
+    ).first()
+    if not mascota_original:
+        raise HTTPException(status_code=404, detail="Mascota no encontrada.")
+
+    # Si ya pertenece a la clínica actual, retornar id directo
+    if mascota_original.clinica_id == target_clinica_id:
+        return {
+            "mensaje": "Mascota ya asociada a su clínica.",
+            "mascota_id": mascota_original.id
+        }
+
+    # Asegurar cliente en la clínica local
+    cliente_original = mascota_original.cliente
+    cliente_local = db.query(Cliente).filter(
+        Cliente.clinica_id == target_clinica_id,
+        Cliente.dni == cliente_original.dni,
+        Cliente.is_deleted == False
+    ).first()
+
+    if not cliente_local:
+        cliente_local = Cliente(
+            clinica_id=target_clinica_id,
+            dni=cliente_original.dni,
+            nombre_completo=cliente_original.nombre_completo,
+            telefono=cliente_original.telefono,
+            nombres=cliente_original.nombres,
+            apellido_paterno=cliente_original.apellido_paterno,
+            apellido_materno=cliente_original.apellido_materno
+        )
+        db.add(cliente_local)
+        db.flush()
+
+    nueva_mascota = Mascota(
+        clinica_id=target_clinica_id,
+        cliente_id=cliente_local.id,
+        especie_id=mascota_original.especie_id,
+        raza_id=mascota_original.raza_id,
+        nombre=mascota_original.nombre,
+        especie=mascota_original.especie,
+        raza=mascota_original.raza,
+        sexo=mascota_original.sexo,
+        fecha_nacimiento=mascota_original.fecha_nacimiento,
+        peso=mascota_original.peso,
+        foto_url=mascota_original.foto_url,
+        rasgos_distintivos=mascota_original.rasgos_distintivos,
+        alergias=mascota_original.alergias,
+        tiene_alergias=mascota_original.tiene_alergias,
+        detalle_alergias=mascota_original.detalle_alergias
+    )
+    db.add(nueva_mascota)
+    db.commit()
+    db.refresh(nueva_mascota)
+
+    return {
+        "mensaje": "Mascota vinculada exitosamente a su clínica.",
+        "mascota_id": nueva_mascota.id
+    }
+
 
 
 @router.post(

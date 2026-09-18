@@ -134,6 +134,8 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN otp_code VARCHAR(10);"))
                 if "otp_expires_at" not in cols:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN otp_expires_at TIMESTAMP WITH TIME ZONE;"))
+                if "foto_perfil" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN foto_perfil VARCHAR(500);"))
 
         # Ampliar a TEXT en motores que lo soportan (PostgreSQL) para evitar truncamientos
         if not target_engine.url.drivername.startswith("sqlite"):

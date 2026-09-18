@@ -1,38 +1,174 @@
 {% extends "base.html" %}
 
-{% block title %}Configuración de Marca Blanca - SherekePet{% endblock %}
+{% block title %}Configuración - SherekePet{% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6">
 
-    <!-- Encabezado de la Sección -->
-    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <!-- Encabezado de la Sección con Selector de Tabs -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center space-x-2">
                 <span class="text-2xl">⚙️</span>
-                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Mi Veterinaria &bull; Marca Blanca</h1>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Panel de Configuración</h1>
             </div>
             <p class="text-xs text-slate-500 mt-1">
-                Personaliza la identidad visual y comercial de tu clínica para que tus clientes vean tu propia marca en el Portal PWA y Carnet Digital.
+                Administra tu perfil profesional y la identidad de Marca Blanca de tu clínica veterinaria.
             </p>
         </div>
-        <a href="/dashboard" class="btn-touch px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors self-start sm:self-auto">
-            ← Volver al Dashboard
-        </a>
+
+        <!-- Pestañas de Navegación (Tabs) -->
+        <div class="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200">
+            <button 
+                type="button" 
+                id="tabBtnPerfil" 
+                onclick="cambiarTab('perfil')"
+                class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+            >
+                👤 Mi Perfil
+            </button>
+            <button 
+                type="button" 
+                id="tabBtnClinica" 
+                onclick="cambiarTab('clinica')"
+                class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs"
+            >
+                🏥 Mi Veterinaria
+            </button>
+        </div>
     </div>
 
     <!-- Banner de Alertas / Feedback -->
     <div id="alertSuccess" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
         <span class="text-base">✅</span>
-        <p id="alertSuccessMsg">¡Configuración guardada exitosamente!</p>
+        <p id="alertSuccessMsg">¡Cambios guardados exitosamente!</p>
     </div>
 
     <div id="alertError" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
         <span class="text-base">⚠️</span>
-        <p id="alertErrorMsg">Ocurrió un error al guardar la configuración.</p>
+        <p id="alertErrorMsg">Ocurrió un error al guardar los cambios.</p>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- ======================================================== -->
+    <!-- TAB 1: MI PERFIL (VETERINARIO)                           -->
+    <!-- ======================================================== -->
+    <div id="tabContentPerfil" class="hidden space-y-6">
+        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 max-w-2xl mx-auto space-y-6">
+            <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        👤 Mi Perfil Profesional
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Actualiza tu información personal, fotografía y datos de acceso.
+                    </p>
+                </div>
+                <span class="text-xs font-extrabold uppercase px-2.5 py-1 rounded-full {% if current_user.rol == 'ADMIN' %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-100 text-slate-700 border border-slate-200{% endif %}">
+                    Rol: {{ current_user.rol }}
+                </span>
+            </div>
+
+            <!-- Sección de Avatar / Foto de Perfil -->
+            <div class="flex flex-col sm:flex-row items-center gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-200">
+                <div class="relative group">
+                    <div id="vetFotoContainer" class="w-24 h-24 rounded-full bg-teal-100 border-2 border-teal-200 flex items-center justify-center overflow-hidden shadow-sm relative text-teal-800 text-3xl font-black">
+                        {% if current_user.foto_perfil %}
+                        <img 
+                            id="vetFotoImg" 
+                            src="{{ current_user.foto_perfil }}" 
+                            alt="{{ current_user.nombre }}" 
+                            class="w-full h-full object-cover"
+                            onerror="this.style.display='none'; document.getElementById('vetFotoFallback')?.classList.remove('hidden');"
+                        >
+                        <span id="vetFotoFallback" class="hidden">{{ (current_user.nombre or current_user.email or 'U')[0] | upper }}</span>
+                        {% else %}
+                        <img id="vetFotoImg" src="" alt="Avatar" class="w-full h-full object-cover hidden">
+                        <span id="vetFotoFallback">{{ (current_user.nombre or current_user.email or 'U')[0] | upper }}</span>
+                        {% endif %}
+
+                        <!-- Loader visual durante upload -->
+                        <div id="vetFotoLoader" class="hidden absolute inset-0 bg-slate-900/75 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-1 text-center">
+                            <span class="animate-spin text-base mb-1">⏳</span>
+                            <span>Subiendo...</span>
+                        </div>
+                    </div>
+
+                    <label for="vetFotoInput" id="lblVetFotoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Subir foto de perfil">
+                        📷
+                    </label>
+                    <input type="file" id="vetFotoInput" accept="image/*" class="hidden" onchange="subirFotoPerfil(this)">
+                </div>
+
+                <div class="space-y-1 text-center sm:text-left flex-1">
+                    <p class="text-xs font-bold text-slate-800">
+                        Fotografía de Perfil
+                    </p>
+                    <p class="text-[11px] text-slate-500 leading-relaxed">
+                        Esta foto se mostrará en el encabezado del sistema y en las firmas de atenciones médicas. Se optimiza automáticamente en formato WebP.
+                    </p>
+                    <button 
+                        type="button" 
+                        onclick="document.getElementById('vetFotoInput').click()" 
+                        class="btn-touch px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 border border-teal-200 rounded-xl transition-colors mt-2"
+                    >
+                        Cambiar Fotografía...
+                    </button>
+                </div>
+            </div>
+
+            <!-- Formulario de Datos del Veterinario -->
+            <form id="formPerfilVet" onsubmit="guardarPerfilVet(event)" class="space-y-4">
+                <div>
+                    <label for="inputVetNombre" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Nombre Completo *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="inputVetNombre" 
+                        value="{{ current_user.nombre or '' }}" 
+                        required 
+                        maxlength="150"
+                        placeholder="Ej. Dr. Carlos Mendoza"
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium text-slate-900"
+                    >
+                </div>
+
+                <div>
+                    <label for="inputVetEmail" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                        Correo Electrónico (Acceso al Sistema) *
+                    </label>
+                    <input 
+                        type="email" 
+                        id="inputVetEmail" 
+                        value="{{ current_user.email or '' }}" 
+                        required 
+                        maxlength="150"
+                        placeholder="correo@ejemplo.com"
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all text-slate-900"
+                    >
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Tu correo de acceso principal a SherekePet.
+                    </p>
+                </div>
+
+                <div class="pt-2">
+                    <button 
+                        type="submit" 
+                        id="btnGuardarPerfil"
+                        class="btn-touch w-full py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all"
+                    >
+                        💾 Guardar Datos del Perfil
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: MI CLÍNICA (MARCA BLANCA)                         -->
+    <!-- ======================================================== -->
+    <div id="tabContentClinica" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
         <!-- Columna Izquierda: Formulario Principal (7 cols) -->
         <div class="lg:col-span-7 space-y-6">
@@ -60,8 +196,9 @@
                             required 
                             maxlength="150"
                             placeholder="Ej. Clínica Veterinaria San Francisco S.A.C."
-                            class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                            class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium text-slate-900"
                             oninput="actualizarMockupPreview()"
+                            {% if current_user and current_user.rol != 'ADMIN' %}disabled{% endif %}
                         >
                         <p class="text-[11px] text-slate-400 mt-1">
                             Nombre administrativo y legal registrado en la plataforma.
@@ -80,6 +217,7 @@
                             placeholder="Ej. Veterinaria San Francisco &bull; Cuidado Integral"
                             class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium text-slate-900"
                             oninput="actualizarMockupPreview()"
+                            {% if current_user and current_user.rol != 'ADMIN' %}disabled{% endif %}
                         >
                         <p class="text-[11px] text-teal-700 font-medium mt-1">
                             ✨ Este nombre será el que verán tus clientes en el encabezado del Portal PWA, el Carnet Digital y los mensajes automáticos. Si lo dejas vacío, se usará la Razón Social.
@@ -249,6 +387,39 @@
 
 {% block scripts %}
 <script>
+// Manejador de Tabs
+function cambiarTab(tab) {
+    const btnPerfil = document.getElementById("tabBtnPerfil");
+    const btnClinica = document.getElementById("tabBtnClinica");
+    const contentPerfil = document.getElementById("tabContentPerfil");
+    const contentClinica = document.getElementById("tabContentClinica");
+
+    if (tab === 'perfil') {
+        contentPerfil.classList.remove("hidden");
+        contentClinica.classList.add("hidden");
+
+        btnPerfil.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs";
+        btnClinica.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900";
+        window.location.hash = "perfil";
+    } else {
+        contentClinica.classList.remove("hidden");
+        contentPerfil.classList.add("hidden");
+
+        btnClinica.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs";
+        btnPerfil.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900";
+        window.location.hash = "clinica";
+    }
+}
+
+// Inicializar tab según hash de URL
+window.addEventListener("DOMContentLoaded", () => {
+    if (window.location.hash === "#perfil") {
+        cambiarTab("perfil");
+    } else {
+        cambiarTab("clinica");
+    }
+});
+
 function actualizarMockupPreview() {
     const nombre = document.getElementById("inputNombre").value.trim();
     const comercial = document.getElementById("inputNombreComercial").value.trim();
@@ -296,6 +467,123 @@ function comprimirImagenWebP(file, maxWidth = 1600, quality = 0.8) {
     });
 }
 
+// Subida de Foto de Perfil del Veterinario
+async function subirFotoPerfil(input) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+
+    const objectUrl = URL.createObjectURL(file);
+    const imgEl = document.getElementById("vetFotoImg");
+    const fallbackEl = document.getElementById("vetFotoFallback");
+    const loader = document.getElementById("vetFotoLoader");
+    const label = document.getElementById("lblVetFotoInput");
+
+    if (imgEl) {
+        imgEl.src = objectUrl;
+        imgEl.style.display = "block";
+        imgEl.classList.remove("hidden");
+    }
+    if (fallbackEl) fallbackEl.classList.add("hidden");
+
+    if (loader) loader.classList.remove("hidden");
+    if (label) label.classList.add("pointer-events-none", "opacity-50");
+
+    try {
+        const blobComprimido = await comprimirImagenWebP(file, 800, 0.85);
+        const webpFile = new File([blobComprimido], "avatar.webp", { type: "image/webp" });
+
+        const formData = new FormData();
+        formData.append("file", webpFile);
+
+        const resp = await fetch("/api/clinic/perfil/foto", {
+            method: "POST",
+            body: formData
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            const fotoUrl = data.foto_perfil;
+            if (imgEl) imgEl.src = fotoUrl;
+
+            // Actualizar Navbar inmediatamente
+            const navFoto = document.getElementById("navbarVetFoto");
+            const navFallback = document.getElementById("navbarVetFotoFallback");
+            if (navFoto) {
+                navFoto.src = fotoUrl;
+                navFoto.classList.remove("hidden");
+                navFoto.style.display = "block";
+            }
+            if (navFallback) navFallback.classList.add("hidden");
+
+            mostrarAlerta(true, "¡Fotografía de perfil actualizada correctamente!");
+        } else {
+            let errorMsg = "Error al procesar la imagen.";
+            try {
+                const err = await resp.json();
+                if (err.detail) errorMsg = err.detail;
+            } catch (e) {}
+            mostrarAlerta(false, "Error al subir foto: " + errorMsg);
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarAlerta(false, "Error de conexión al subir la fotografía.");
+    } finally {
+        if (loader) loader.classList.add("hidden");
+        if (label) label.classList.remove("pointer-events-none", "opacity-50");
+        input.value = "";
+    }
+}
+
+// Guardar Datos del Perfil del Veterinario
+async function guardarPerfilVet(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btnGuardarPerfil");
+    const nombre = document.getElementById("inputVetNombre").value.trim();
+    const email = document.getElementById("inputVetEmail").value.trim();
+
+    if (!nombre || !email) {
+        mostrarAlerta(false, "Nombre y correo son obligatorios.");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Guardando...";
+    }
+
+    try {
+        const resp = await fetch("/api/clinic/perfil", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                nombre: nombre,
+                email: email
+            })
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+            mostrarAlerta(true, data.mensaje || "¡Perfil actualizado exitosamente!");
+            // Actualizar Navbar en vivo
+            const navNombre = document.getElementById("navbarVetNombre");
+            if (navNombre) navNombre.textContent = nombre;
+        } else {
+            mostrarAlerta(false, data.detail || "Error al actualizar el perfil.");
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarAlerta(false, "Error de comunicación con el servidor.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "💾 Guardar Datos del Perfil";
+        }
+    }
+}
+
+// Subida de Logo de Clínica
 async function subirLogoSettings(input) {
     if (!input.files || !input.files[0]) return;
     const file = input.files[0];
@@ -363,6 +651,7 @@ async function subirLogoSettings(input) {
     }
 }
 
+// Guardar Configuración de Clínica
 async function guardarConfiguracion(event) {
     event.preventDefault();
     const btn = document.getElementById("btnGuardarConfig");

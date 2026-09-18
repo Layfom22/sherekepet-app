@@ -63,6 +63,7 @@ class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     otp_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     otp_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    foto_perfil: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
     # Relaciones
     clinica = relationship("Clinica", back_populates="veterinarios")

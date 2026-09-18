@@ -17,11 +17,26 @@
     border-color: rgb(20 184 166) !important;
     box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.2) !important;
 }
+/* Dropdown TomSelect con fondo sólido garantizado para evitar transparencias */
 .ts-dropdown {
+    background-color: #ffffff !important;
+    z-index: 50 !important;
     border-radius: 0.75rem !important;
     font-size: 0.875rem !important;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-    border-color: rgb(226 232 240) !important;
+    box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+    border: 1px solid rgb(226 232 240) !important;
+    overflow: hidden !important;
+}
+.ts-dropdown .option {
+    background-color: #ffffff !important;
+    color: rgb(15 23 42) !important;
+    padding: 0.6rem 1rem !important;
+    transition: background-color 0.15s ease;
+}
+.ts-dropdown .option:hover, .ts-dropdown .active {
+    background-color: rgb(241 245 249) !important;
+    color: rgb(13 148 136) !important;
+    font-weight: 600 !important;
 }
 </style>
 {% endblock %}
@@ -34,7 +49,7 @@
         <div>
             <h1 class="text-2xl font-black text-slate-900 tracking-tight">Registro Rápido de Paciente</h1>
             <p class="text-xs text-slate-500 mt-1">
-                Consulta automática por RENIEC y ficha clínica inteligente de la mascota.
+                Búsqueda global inteligente Cross-Tenant, RENIEC y ficha clínica inmediata.
             </p>
         </div>
         <a href="/dashboard" class="btn-touch px-3 py-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg">
@@ -46,14 +61,14 @@
     <form id="formPaciente" class="space-y-6">
         <input type="hidden" id="clinica_id" value="{{ clinica_id or 1 }}">
 
-        <!-- Sección 1: Datos del Dueño (RENIEC) -->
+        <!-- Sección 1: Datos del Dueño (Cross-Tenant + RENIEC) -->
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
             <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
                 <span class="text-xl">👤</span>
                 <h2 class="text-base font-bold text-slate-900">1. Datos del Dueño / Titular</h2>
             </div>
 
-            <!-- DNI con Autocompletado RENIEC -->
+            <!-- DNI con Autocompletado Inteligente -->
             <div>
                 <label for="dni" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                     DNI del Cliente *
@@ -74,27 +89,58 @@
                     </div>
                     <button 
                         type="button" 
-                        id="btnConsultarReniec"
-                        onclick="consultarReniec()"
+                        id="btnBuscarDni"
+                        onclick="ejecutarBusquedaDni()"
                         class="btn-touch px-5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors whitespace-nowrap"
                     >
-                        🔍 Consultar RENIEC
+                        🔍 Buscar DNI
                     </button>
+                </div>
+
+                <!-- Alerta SherekePet Network -->
+                <div id="alertaRedShereke" class="hidden mt-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-xs font-bold text-emerald-800 flex items-center space-x-2">
+                    <span class="text-base">✅</span>
+                    <span>Dueño encontrado en la red SherekePet</span>
                 </div>
                 <p id="reniecStatus" class="text-xs mt-1.5 font-medium"></p>
             </div>
 
-            <!-- Campos Autocompletados (o editables manualmente) -->
+            <!-- Contenedor de Mascotas Existentes (Cross-Tenant) -->
+            <div id="contenedorMascotasExistentes" class="hidden p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-black uppercase tracking-wider text-indigo-900 flex items-center space-x-1.5">
+                        <span>🐾</span>
+                        <span id="tituloMascotasExistentes">Mascotas registradas de este dueño</span>
+                    </h3>
+                    <button 
+                        type="button" 
+                        onclick="prepararNuevaMascotaParaDueño()"
+                        class="text-xs font-bold text-indigo-700 hover:text-indigo-900 bg-white border border-indigo-200 px-3 py-1 rounded-xl shadow-xs"
+                    >
+                        + Agregar Nueva Mascota
+                    </button>
+                </div>
+                <div id="listaTarjetasMascotas" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Tarjetas inyectadas dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Campos Autocompletados (con opción a desbloqueo) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                    <label for="nombre_completo" class="block text-xs font-semibold text-slate-700 mb-1">
-                        Nombres y Apellidos Completos *
-                    </label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="nombre_completo" class="block text-xs font-semibold text-slate-700">
+                            Nombres y Apellidos Completos *
+                        </label>
+                        <button type="button" id="btnDesbloquearDueno" onclick="desbloquearCamposDueno()" class="hidden text-[11px] font-bold text-teal-700 hover:underline">
+                            ✏️ Editar Datos
+                        </button>
+                    </div>
                     <input 
                         type="text" 
                         id="nombre_completo" 
-                        placeholder="Se autocompleta con RENIEC o ingrese manualmente" 
-                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                        placeholder="Se autocompleta con RENIEC o red SherekePet" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-colors"
                         required
                     >
                 </div>
@@ -109,20 +155,25 @@
                             type="tel" 
                             id="telefono" 
                             placeholder="Ej: 987654321" 
-                            class="w-full pl-10 pr-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                            class="w-full pl-10 pr-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono transition-colors"
                             required
                         >
                     </div>
-                    <span class="text-[11px] text-slate-400">Usado para recordatorios 1-clic por WhatsApp</span>
+                    <span class="text-[11px] text-slate-400">Usado para recordatorios y carnet digital</span>
                 </div>
             </div>
         </div>
 
         <!-- Sección 2: Datos de la Mascota -->
-        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
-            <div class="flex items-center space-x-2 border-b border-slate-100 pb-3">
-                <span class="text-xl">🐾</span>
-                <h2 class="text-base font-bold text-slate-900">2. Datos de la Mascota y Salud</h2>
+        <div id="seccionMascota" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <span class="text-xl">🐾</span>
+                    <h2 class="text-base font-bold text-slate-900">2. Datos de la Mascota y Salud</h2>
+                </div>
+                <span id="badgeModoMascota" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                    Nueva Mascota
+                </span>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -134,7 +185,7 @@
                         type="text" 
                         id="mascota_nombre" 
                         placeholder="Ej: Firulais, Michi..." 
-                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-bold text-slate-900"
                         required
                     >
                 </div>
@@ -146,7 +197,6 @@
                     </label>
                     <select 
                         id="especie_id" 
-                        onchange="actualizarRazasPorEspecie()"
                         class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-medium"
                         required
                     >
@@ -154,7 +204,7 @@
                     </select>
                 </div>
 
-                <!-- Select Reactivo: Raza filtrada dinámicamente -->
+                <!-- Select Reactivo: Raza filtrada dinámicamente con TomSelect -->
                 <div>
                     <label for="raza_id" class="block text-xs font-semibold text-slate-700 mb-1">
                         Raza *
@@ -164,7 +214,7 @@
                         class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-medium"
                         required
                     >
-                        <option value="">-- Seleccione una especie primero --</option>
+                        <option value="">-- Cargando razas... --</option>
                     </select>
                 </div>
 
@@ -244,26 +294,32 @@
 let catalogoEspecies = [];
 let tsEspecie = null;
 let tsRaza = null;
+let mascotasDueñoEncontradas = [];
 
-// Cargar catálogo de especies y razas al iniciar
+// Inicialización de TomSelect y Carga de Catálogo
 window.addEventListener('DOMContentLoaded', async () => {
-    // Inicializar TomSelect en Especie
+    // 1. Inicializar TomSelect en Especie
     tsEspecie = new TomSelect('#especie_id', {
         create: false,
         placeholder: '-- Seleccionar o buscar especie --',
         maxItems: 1,
+        dropdownParent: 'body',
         onChange: (val) => {
-            actualizarRazasPorEspecie(parseInt(val));
+            if (val) {
+                cargarRazasDinamicas(parseInt(val));
+            }
         }
     });
 
-    // Inicializar TomSelect en Raza
+    // 2. Inicializar TomSelect en Raza (con soporte create para razas no listadas)
     tsRaza = new TomSelect('#raza_id', {
-        create: false,
+        create: true,
         placeholder: '-- Seleccione una especie primero --',
-        maxItems: 1
+        maxItems: 1,
+        dropdownParent: 'body'
     });
 
+    // 3. Cargar especies desde API
     try {
         const resp = await fetch('/api/clinic/catalogo');
         if (resp.ok) {
@@ -276,36 +332,60 @@ window.addEventListener('DOMContentLoaded', async () => {
                 tsEspecie.addOption({ value: esp.id, text: esp.nombre });
             });
 
-            // Seleccionar Canino por defecto si existe
-            if (catalogoEspecies.length > 0) {
-                tsEspecie.setValue(catalogoEspecies[0].id);
+            // Selección por defecto: Canino (Perro)
+            const canino = catalogoEspecies.find(e => e.nombre.toLowerCase().includes("canino")) || catalogoEspecies[0];
+            if (canino) {
+                tsEspecie.setValue(canino.id);
             }
         }
     } catch (e) {
-        console.error("Error al cargar catálogo:", e);
+        console.error("Error al cargar catálogo de especies:", e);
     }
 });
 
-function actualizarRazasPorEspecie(espId) {
+// Carga Dinámica de Razas (Fetch a /api/catalogos/especies/{id}/razas)
+async function cargarRazasDinamicas(espId) {
     if (!tsRaza) return;
 
     tsRaza.clear();
     tsRaza.clearOptions();
+    tsRaza.settings.placeholder = 'Cargando razas...';
+    tsRaza.disable();
 
-    const especieEncontrada = catalogoEspecies.find(e => e.id === espId);
-    if (especieEncontrada && especieEncontrada.razas && especieEncontrada.razas.length > 0) {
-        especieEncontrada.razas.forEach(raza => {
-            tsRaza.addOption({ value: raza.id, text: raza.nombre });
-        });
+    try {
+        const resp = await fetch(`/api/catalogos/especies/${espId}/razas`);
+        if (resp.ok) {
+            const razas = await resp.json();
+            if (razas && razas.length > 0) {
+                razas.forEach(raza => {
+                    tsRaza.addOption({ value: raza.id, text: raza.nombre });
+                });
+                tsRaza.enable();
+                tsRaza.settings.placeholder = '-- Buscar o seleccionar raza --';
+                // Seleccionar Mestizo por defecto si existe en la lista
+                const mestizo = razas.find(r => r.nombre.toLowerCase().includes("mestizo"));
+                if (mestizo) {
+                    tsRaza.setValue(mestizo.id);
+                }
+            } else {
+                // Especie sin razas registradas (ej. Exótico)
+                tsRaza.addOption({ value: 'Única / No aplica', text: 'Única / No aplica' });
+                tsRaza.setValue('Única / No aplica');
+                tsRaza.enable();
+                tsRaza.settings.placeholder = 'Escriba la raza o seleccione Única';
+            }
+        } else {
+            tsRaza.enable();
+            tsRaza.settings.placeholder = 'Escriba el nombre de la raza';
+        }
+    } catch (err) {
+        console.error("Error al cargar razas:", err);
         tsRaza.enable();
-        tsRaza.settings.placeholder = '-- Buscar o seleccionar raza --';
-        tsRaza.inputState();
-    } else {
-        tsRaza.settings.placeholder = '-- Sin razas registradas --';
-        tsRaza.disable();
+        tsRaza.settings.placeholder = 'Escriba el nombre de la raza';
     }
 }
 
+// Alternar campo de detalle de alergias
 function toggleAlergias(checked) {
     const seccion = document.getElementById('seccionDetalleAlergias');
     const inputDetalle = document.getElementById('detalle_alergias');
@@ -318,19 +398,26 @@ function toggleAlergias(checked) {
     }
 }
 
-// Detección automática al completar 8 dígitos
-document.getElementById('dni').addEventListener('input', function(e) {
+// Listener de DNI (auto-búsqueda al completar 8 dígitos o al perder el foco blur)
+const inputDni = document.getElementById('dni');
+inputDni.addEventListener('input', function(e) {
     if (this.value.length === 8) {
-        consultarReniec();
+        ejecutarBusquedaDni();
+    }
+});
+inputDni.addEventListener('blur', function(e) {
+    if (this.value.trim().length === 8) {
+        ejecutarBusquedaDni();
     }
 });
 
-async function consultarReniec() {
-    const dniInput = document.getElementById('dni');
-    const dni = dniInput.value.trim();
+// Búsqueda Inteligente: Primero Red SherekePet (Cross-Tenant), luego RENIEC
+async function ejecutarBusquedaDni() {
+    const dni = inputDni.value.trim();
     const statusMsg = document.getElementById('reniecStatus');
     const loader = document.getElementById('loaderReniec');
-    const btn = document.getElementById('btnConsultarReniec');
+    const btn = document.getElementById('btnBuscarDni');
+    const alertaRed = document.getElementById('alertaRedShereke');
 
     if (dni.length !== 8 || !/^\d{8}$/.test(dni)) {
         statusMsg.className = "text-xs mt-1.5 font-medium text-rose-600";
@@ -341,29 +428,158 @@ async function consultarReniec() {
     loader.classList.remove('hidden');
     btn.disabled = true;
     statusMsg.className = "text-xs mt-1.5 font-medium text-teal-600";
-    statusMsg.textContent = "Consultando RENIEC en tiempo real...";
+    statusMsg.textContent = "Buscando en red SherekePet y registros oficiales...";
 
     try {
-        const resp = await fetch(`/api/reniec/dni/${dni}`);
-        if (resp.ok) {
-            const data = await resp.json();
-            document.getElementById('nombre_completo').value = data.nombre_completo;
+        // 1. Paso 1: Búsqueda Global en SherekePet
+        const respRed = await fetch(`/api/clinic/buscar-dni/${dni}`);
+        if (respRed.ok) {
+            const dataRed = await respRed.json();
+            if (dataRed.encontrado) {
+                // Dueño encontrado en la red
+                alertaRed.classList.remove('hidden');
+                statusMsg.textContent = "";
+
+                // Autocompletar datos del dueño
+                const inputNom = document.getElementById('nombre_completo');
+                const inputTel = document.getElementById('telefono');
+                inputNom.value = dataRed.cliente.nombre_completo || '';
+                inputTel.value = dataRed.cliente.telefono || '';
+
+                // Bloquear para evitar sobreescrituras accidentales
+                inputNom.readOnly = true;
+                inputTel.readOnly = true;
+                inputNom.classList.add('bg-slate-100', 'cursor-not-allowed');
+                inputTel.classList.add('bg-slate-100', 'cursor-not-allowed');
+                document.getElementById('btnDesbloquearDueno').classList.remove('hidden');
+
+                // Mostrar mascotas existentes si tiene
+                mascotasDueñoEncontradas = dataRed.mascotas || [];
+                renderizarMascotasExistentes(mascotasDueñoEncontradas);
+
+                loader.classList.add('hidden');
+                btn.disabled = false;
+                return;
+            }
+        }
+
+        // Si no está en SherekePet, ocultar alerta de red y consultar RENIEC
+        alertaRed.classList.add('hidden');
+        document.getElementById('contenedorMascotasExistentes').classList.add('hidden');
+
+        // 2. Paso 2: Consulta RENIEC
+        const respReniec = await fetch(`/api/reniec/dni/${dni}`);
+        if (respReniec.ok) {
+            const dataReniec = await respReniec.json();
+            document.getElementById('nombre_completo').value = dataReniec.nombre_completo;
             statusMsg.className = "text-xs mt-1.5 font-medium text-emerald-600";
-            statusMsg.textContent = `✓ Datos encontrados: ${data.nombre_completo}`;
+            statusMsg.textContent = `✓ Datos encontrados en RENIEC: ${dataReniec.nombre_completo}`;
         } else {
             statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
-            statusMsg.textContent = "DNI no encontrado. Puede completar los datos manualmente.";
+            statusMsg.textContent = "DNI no registrado previamente. Complete los datos manualmente.";
         }
     } catch (e) {
+        console.error(e);
         statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
-        statusMsg.textContent = "Error de conexión con RENIEC. Puede completar los datos manualmente.";
+        statusMsg.textContent = "Puede completar los datos del dueño manualmente.";
     } finally {
         loader.classList.add('hidden');
         btn.disabled = false;
     }
 }
 
-// Envío rápido del formulario
+// Desbloquear campos del dueño para edición manual
+function desbloquearCamposDueno() {
+    const inputNom = document.getElementById('nombre_completo');
+    const inputTel = document.getElementById('telefono');
+    inputNom.readOnly = false;
+    inputTel.readOnly = false;
+    inputNom.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    inputTel.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    inputNom.focus();
+}
+
+// Renderizar tarjetas de mascotas existentes del dueño encontrado
+function renderizarMascotasExistentes(mascotas) {
+    const contenedor = document.getElementById('contenedorMascotasExistentes');
+    const lista = document.getElementById('listaTarjetasMascotas');
+    const titulo = document.getElementById('tituloMascotasExistentes');
+
+    if (!mascotas || mascotas.length === 0) {
+        contenedor.classList.add('hidden');
+        return;
+    }
+
+    titulo.textContent = `Mascotas registradas de este dueño (${mascotas.length}):`;
+    lista.innerHTML = '';
+
+    mascotas.forEach(m => {
+        const tarjeta = document.createElement('div');
+        tarjeta.className = 'bg-white p-3 rounded-xl border border-indigo-200 shadow-xs flex items-center justify-between space-x-3 hover:border-indigo-400 transition-all';
+        
+        let emoji = '🐾';
+        if (m.especie && m.especie.toLowerCase().includes('canino')) emoji = '🐶';
+        else if (m.especie && m.especie.toLowerCase().includes('felino')) emoji = '🐱';
+
+        tarjeta.innerHTML = `
+            <div class="flex items-center space-x-2.5 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+                    ${m.foto_url ? `<img src="${m.foto_url}" class="w-full h-full object-cover">` : emoji}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-black text-slate-900 truncate">${m.nombre}</p>
+                    <p class="text-[10px] text-slate-500 truncate">${m.especie} &bull; ${m.raza || 'Mestizo'}</p>
+                </div>
+            </div>
+            <button 
+                type="button" 
+                onclick="vincularMascotaExistente(${m.id})"
+                class="btn-touch px-2.5 py-1 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-lg shadow-xs shrink-0"
+                title="Vincular a mi clínica y abrir ficha médica"
+            >
+                ✓ Vincular Ficha
+            </button>
+        `;
+        lista.appendChild(tarjeta);
+    });
+
+    contenedor.classList.remove('hidden');
+}
+
+// Vincular mascota existente a la clínica actual
+async function vincularMascotaExistente(mascotaId) {
+    if (!confirm("¿Deseas vincular este paciente existente a tu clínica y abrir su ficha clínica?")) return;
+
+    try {
+        const resp = await fetch(`/api/clinic/vincular-mascota/${mascotaId}`, {
+            method: 'POST'
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            window.location.href = `/pacientes/${data.mascota_id}`;
+        } else {
+            const err = await resp.json();
+            alert("Error al vincular mascota: " + (err.detail || "Verifique los datos."));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al vincular mascota.");
+    }
+}
+
+// Preparar formulario para agregar nueva mascota para este dueño
+function prepararNuevaMascotaParaDueño() {
+    document.getElementById('mascota_nombre').value = '';
+    document.getElementById('mascota_peso').value = '';
+    document.getElementById('tiene_alergias').checked = false;
+    document.getElementById('seccionDetalleAlergias').classList.add('hidden');
+    document.getElementById('detalle_alergias').value = '';
+    document.getElementById('condiciones_previas').value = '';
+    document.getElementById('badgeModoMascota').textContent = "Nueva Mascota para este Dueño";
+    document.getElementById('mascota_nombre').focus();
+}
+
+// Envío rápido del formulario para nuevo paciente
 document.getElementById('formPaciente').addEventListener('submit', async function(e) {
     e.preventDefault();
     const btn = document.getElementById('btnGuardar');
@@ -381,10 +597,10 @@ document.getElementById('formPaciente').addEventListener('submit', async functio
         nombre_completo: document.getElementById('nombre_completo').value.trim(),
         telefono: document.getElementById('telefono').value.trim(),
         mascota_nombre: document.getElementById('mascota_nombre').value.trim(),
-        especie_id: especieSelect.value ? parseInt(especieSelect.value) : null,
-        raza_id: razaSelect.value ? parseInt(razaSelect.value) : null,
+        especie_id: especieSelect.value && !isNaN(parseInt(especieSelect.value)) ? parseInt(especieSelect.value) : null,
+        raza_id: razaSelect.value && !isNaN(parseInt(razaSelect.value)) ? parseInt(razaSelect.value) : null,
         mascota_especie: especieSelect.options[especieSelect.selectedIndex]?.text || "Canino",
-        mascota_raza: razaSelect.options[razaSelect.selectedIndex]?.text || null,
+        mascota_raza: razaSelect.options[razaSelect.selectedIndex]?.text || (razaSelect.value || null),
         mascota_peso: document.getElementById('mascota_peso').value ? parseFloat(document.getElementById('mascota_peso').value) : null,
         tiene_alergias: tieneAlergias,
         detalle_alergias: tieneAlergias ? detalleAlergias : null,

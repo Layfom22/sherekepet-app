@@ -1,6 +1,7 @@
 import pytest
+from unittest.mock import patch
 from app.core.models import Clinica
-from app.clinic.models import Veterinario, Cliente, Mascota
+from app.clinic.models import Veterinario, Cliente, Mascota, Especie, Raza, AtencionClinica
 from app.core.security import create_access_token, hash_pin, hash_password
 
 
@@ -523,5 +524,210 @@ def test_autonomia_registro_y_busqueda_veterinario(client, db_session):
     assert resp_ficha.status_code == 200
     assert "Michi Estrella" in resp_ficha.text
     assert "María Elena Fuentes" in resp_ficha.text
+
+
+def test_catalogos_especies_y_razas(client, db_session):
+    """Verifica la carga dinámica de razas por especie."""
+    esp = Especie(nombre="Canino (Perro)")
+    db_session.add(esp)
+    db_session.flush()
+
+    r1 = Raza(especie_id=esp.id, nombre="Golden Retriever")
+    r2 = Raza(especie_id=esp.id, nombre="Labrador")
+    db_session.add_all([r1, r2])
+    db_session.commit()
+
+    resp = client.get(f"/api/catalogos/especies/{esp.id}/razas")
+    assert resp.status_code == 200
+    razas = resp.json()
+    assert len(razas) >= 2
+    nombres = [r["nombre"] for r in razas]
+    assert "Golden Retriever" in nombres
+    assert "Labrador" in nombres
+
+
+def test_buscar_dni_global_cross_tenant(client, db_session):
+    """
+    Cross-Tenant DNI Search:
+    - Retorna el cliente y sus mascotas sin exponer historial clínico sensible de otra clínica.
+    """
+    c_a = Clinica(nombre="Clínica Norte", zona_horaria="America/Lima", plan_activo="solo")
+    c_b = Clinica(nombre="Clínica Sur", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([c_a, c_b])
+    db_session.flush()
+
+    vet_b = Veterinario(
+        clinica_id=c_b.id,
+        nombre="Dra. Jimena",
+        email="jimena@sur.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet_b)
+    db_session.flush()
+
+    cliente_a = Cliente(
+        clinica_id=c_a.id,
+        dni="77889900",
+        nombre_completo="Juan Pérez Red",
+        telefono="+51999888777"
+    )
+    db_session.add(cliente_a)
+    db_session.flush()
+
+    m_a = Mascota(
+        clinica_id=c_a.id,
+        cliente_id=cliente_a.id,
+        nombre="Max CrossTenant",
+        especie="Canino",
+        raza="Beagle",
+        peso=12.5
+    )
+    db_session.add(m_a)
+    db_session.flush()
+
+    # Agregar historial médico confidencial en Clínica A
+    atencion_privada = AtencionClinica(
+        clinica_id=c_a.id,
+        mascota_id=m_a.id,
+        veterinario_id=vet_b.id,
+        tipo_atencion="CIRUGIA",
+        motivo="Cirugía confidencial interna",
+        diagnostico="Procedimiento reservado"
+    )
+    db_session.add(atencion_privada)
+    db_session.commit()
+
+    # Veterinario de Clínica B realiza la búsqueda por DNI
+    token_b = create_access_token({"sub": str(vet_b.id), "clinica_id": c_b.id, "rol": "ADMIN", "email": vet_b.email})
+    client.cookies.set("vet_token", token_b)
+
+    # 1. DNI inválido
+    resp_inv = client.get("/api/clinic/buscar-dni/123")
+    assert resp_inv.status_code == 400
+
+    # 2. DNI no registrado
+    resp_nf = client.get("/api/clinic/buscar-dni/00000000")
+    assert resp_nf.status_code == 200
+    assert resp_nf.json()["encontrado"] is False
+
+    # 3. DNI encontrado globalmente
+    resp_ok = client.get("/api/clinic/buscar-dni/77889900")
+    assert resp_ok.status_code == 200
+    data = resp_ok.json()
+    assert data["encontrado"] is True
+    assert data["cliente"]["dni"] == "77889900"
+    assert data["cliente"]["nombre_completo"] == "Juan Pérez Red"
+    assert len(data["mascotas"]) == 1
+    assert data["mascotas"][0]["nombre"] == "Max CrossTenant"
+
+    # Verificar que NO se expone historial médico sensible
+    json_text = resp_ok.text
+    assert "Cirugía confidencial interna" not in json_text
+    assert "Procedimiento reservado" not in json_text
+
+
+def test_vincular_mascota_a_clinica(client, db_session):
+    """
+    Vincular mascota existente de la red a la clínica actual del veterinario.
+    """
+    c_a = Clinica(nombre="Vet A", zona_horaria="America/Lima", plan_activo="solo")
+    c_b = Clinica(nombre="Vet B", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([c_a, c_b])
+    db_session.flush()
+
+    vet_b = Veterinario(
+        clinica_id=c_b.id,
+        nombre="Dr. Bruno",
+        email="bruno@vetb.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet_b)
+    db_session.flush()
+
+    cli_a = Cliente(clinica_id=c_a.id, dni="88776655", nombre_completo="Lucía Ramírez", telefono="+51911223344")
+    db_session.add(cli_a)
+    db_session.flush()
+
+    pet_a = Mascota(
+        clinica_id=c_a.id,
+        cliente_id=cli_a.id,
+        nombre="Toby Network",
+        especie="Canino",
+        raza="Poodle",
+        peso=6.2
+    )
+    db_session.add(pet_a)
+    db_session.commit()
+
+    token_b = create_access_token({"sub": str(vet_b.id), "clinica_id": c_b.id, "rol": "ADMIN", "email": vet_b.email})
+    client.cookies.set("vet_token", token_b)
+
+    resp = client.post(f"/api/clinic/vincular-mascota/{pet_a.id}")
+    assert resp.status_code == 200
+    res_json = resp.json()
+    nueva_m_id = res_json["mascota_id"]
+    assert nueva_m_id != pet_a.id
+
+    # Comprobar que en BD existe la mascota bajo clinica c_b.id
+    nueva_m = db_session.query(Mascota).filter(Mascota.id == nueva_m_id).first()
+    assert nueva_m.clinica_id == c_b.id
+    assert nueva_m.nombre == "Toby Network"
+    assert nueva_m.cliente.dni == "88776655"
+    assert nueva_m.cliente.clinica_id == c_b.id
+
+    # Si se vuelve a vincular, retorna el mismo ID
+    resp_repeat = client.post(f"/api/clinic/vincular-mascota/{nueva_m_id}")
+    assert resp_repeat.status_code == 200
+    assert resp_repeat.json()["mascota_id"] == nueva_m_id
+
+
+def test_perfil_veterinario_update_and_foto(client, db_session):
+    """
+    Actualización de perfil del veterinario y foto de avatar.
+    """
+    clinica = Clinica(nombre="Vet Lima", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    vet = Veterinario(
+        clinica_id=clinica.id,
+        nombre="Dr. Original",
+        email="original@vetlima.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet)
+    db_session.commit()
+
+    token = create_access_token({"sub": str(vet.id), "clinica_id": clinica.id, "rol": "ADMIN", "email": vet.email})
+    client.cookies.set("vet_token", token)
+
+    # 1. Actualizar nombre y email
+    resp = client.put("/api/clinic/perfil", json={
+        "nombre": "Dr. Fernando Soto",
+        "email": "fernando.soto@vetlima.com"
+    })
+    assert resp.status_code == 200
+    db_session.refresh(vet)
+    assert vet.nombre == "Dr. Fernando Soto"
+    assert vet.email == "fernando.soto@vetlima.com"
+
+    # 2. Subir foto de perfil con mock de R2
+    with patch("app.clinic.routes.upload_image_to_r2", return_value="https://cdn.sherekepet.com/veterinarios/vet_avatar.webp"):
+        resp_foto = client.post(
+            "/api/clinic/perfil/foto",
+            files={"file": ("avatar.webp", b"fake-webp-image-data", "image/webp")}
+        )
+        assert resp_foto.status_code == 200
+        assert resp_foto.json()["foto_perfil"] == "https://cdn.sherekepet.com/veterinarios/vet_avatar.webp"
+
+    db_session.refresh(vet)
+    assert vet.foto_perfil == "https://cdn.sherekepet.com/veterinarios/vet_avatar.webp"
+
 
 

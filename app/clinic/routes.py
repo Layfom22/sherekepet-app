@@ -1255,7 +1255,7 @@ def vista_dashboard(
     )
 
 
-@router.get("/pacientes", response_class=HTMLResponse, summary="Directorio de Pacientes de la Clínica")
+@router.get("/pacientes", response_class=HTMLResponse, summary="Directorio de Pacientes y Dueños de la Clínica")
 def vista_lista_pacientes(
     request: Request,
     q: Optional[str] = None,
@@ -1268,25 +1268,70 @@ def vista_lista_pacientes(
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
 
-    query = db.query(Mascota).join(Cliente).filter(
-        Mascota.clinica_id == target_clinica_id,
-        Mascota.is_deleted == False
-    )
-
-    if q and q.strip():
-        termino = f"%{q.strip()}%"
-        query = query.filter(
-            or_(
-                Mascota.nombre.ilike(termino),
-                Mascota.especie.ilike(termino),
-                Mascota.raza.ilike(termino),
-                Cliente.dni.ilike(termino),
-                Cliente.nombre_completo.ilike(termino),
-                Cliente.telefono.ilike(termino)
+    # 1. Obtener clientes vinculados a esta clínica (registrados directamente o con mascotas/atenciones)
+    clientes_raw = db.query(Cliente).filter(
+        Cliente.is_deleted == False,
+        or_(
+            Cliente.clinica_id == target_clinica_id,
+            Cliente.id.in_(
+                db.query(Mascota.cliente_id).filter(
+                    Mascota.clinica_id == target_clinica_id,
+                    Mascota.is_deleted == False
+                )
             )
         )
+    ).order_by(Cliente.created_at.desc()).all()
 
-    pacientes = query.order_by(Mascota.created_at.desc()).all()
+    # Unificar por DNI para evitar duplicidad de dueños
+    dnis_vistos = set()
+    propietarios_unicos = []
+    for c in clientes_raw:
+        if c.dni not in dnis_vistos:
+            dnis_vistos.add(c.dni)
+            propietarios_unicos.append(c)
+
+    # 2. Para cada dueño, agrupar todas sus mascotas (indiferentemente de si han sido atendidas en esta clínica o registradas en el portal)
+    termino = q.strip().lower() if q and q.strip() else None
+    propietarios_data = []
+
+    for c in propietarios_unicos:
+        # Todas las mascotas vinculadas a este DNI unificado
+        todas_mascotas = db.query(Mascota).join(Cliente).filter(
+            Cliente.dni == c.dni,
+            Mascota.is_deleted == False
+        ).order_by(Mascota.nombre.asc()).all()
+
+        if not todas_mascotas:
+            continue
+
+        if termino:
+            dueno_coincide = (
+                (c.nombre_completo and termino in c.nombre_completo.lower()) or
+                (c.dni and termino in c.dni.lower()) or
+                (c.telefono and termino in c.telefono.lower())
+            )
+            if dueno_coincide:
+                mascotas_a_mostrar = todas_mascotas
+            else:
+                mascotas_a_mostrar = [
+                    m for m in todas_mascotas
+                    if (termino in m.nombre.lower() or
+                        (m.especie and termino in m.especie.lower()) or
+                        (m.raza and termino in m.raza.lower()))
+                ]
+            if not mascotas_a_mostrar:
+                continue
+        else:
+            mascotas_a_mostrar = todas_mascotas
+
+        propietarios_data.append({
+            "cliente": c,
+            "mascotas": mascotas_a_mostrar,
+            "total_mascotas": len(todas_mascotas)
+        })
+
+    # Lista plana para compatibilidad con tests y utilidades
+    pacientes_planos = [m for p in propietarios_data for m in p["mascotas"]]
 
     return templates.TemplateResponse(
         request=request,
@@ -1294,9 +1339,11 @@ def vista_lista_pacientes(
         context={
             "clinica": clinica,
             "current_user": current_user,
-            "pacientes": pacientes,
+            "propietarios": propietarios_data,
+            "pacientes": pacientes_planos,
             "busqueda": q or "",
-            "total_pacientes": len(pacientes)
+            "total_propietarios": len(propietarios_data),
+            "total_pacientes": len(pacientes_planos)
         }
     )
 

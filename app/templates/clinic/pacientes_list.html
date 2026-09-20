@@ -49,94 +49,144 @@
         </div>
     </div>
 
-    <!-- Lista / Cuadrícula de Pacientes -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+    <!-- Lista / Tarjetas de Propietarios con Mascotas Agrupadas -->
+    <div class="space-y-4">
+        <div class="flex items-center justify-between px-1">
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500">
-                Total Registrados: <strong class="text-slate-900">{{ pacientes|length }}</strong>
+                Total Registrados: <strong class="text-slate-900">{{ total_propietarios or propietarios|length }} Propietario{{ 's' if (total_propietarios or propietarios|length) != 1 else '' }}</strong> 
+                <span class="text-slate-400 font-normal">({{ total_pacientes or pacientes|length }} mascota{{ 's' if (total_pacientes or pacientes|length) != 1 else '' }})</span>
             </span>
             {% if busqueda %}
-            <span class="text-xs text-teal-700 font-medium">Filtrado por: "{{ busqueda }}"</span>
+            <span class="text-xs text-teal-700 font-semibold bg-teal-50 px-2.5 py-1 rounded-full border border-teal-200">
+                Filtrado por: "{{ busqueda }}"
+            </span>
             {% endif %}
         </div>
 
-        {% if pacientes %}
-        <div class="divide-y divide-slate-100">
-            {% for m in pacientes %}
-            <div class="p-4 sm:p-5 hover:bg-slate-50/80 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {% if propietarios %}
+        <div class="space-y-4">
+            {% for p in propietarios %}
+            <div class="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-4 transition-all hover:border-teal-300">
                 
-                <!-- Info de Mascota & Avatar -->
-                <div class="flex items-center space-x-4">
-                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center text-2xl shadow-xs overflow-hidden flex-shrink-0">
-                        {% if m.foto_url %}
-                        <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
-                        <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
-                        {% else %}
-                        <span>{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
-                        {% endif %}
+                <!-- Encabezado del Propietario (Dueño) como Entidad Principal -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                    <div class="flex items-center space-x-3.5 min-w-0">
+                        <!-- Avatar del Dueño -->
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">
+                            👤
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex items-center space-x-2 flex-wrap">
+                                <h2 class="text-base sm:text-lg font-black text-slate-900 truncate">
+                                    {{ p.cliente.nombre_completo or 'Propietario Sin Nombre' }}
+                                </h2>
+                                <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                    Dueño
+                                </span>
+                            </div>
+                            <div class="flex items-center space-x-3 text-xs text-slate-500 mt-0.5 flex-wrap gap-y-1">
+                                <span>🪪 <strong>DNI:</strong> <span class="font-mono font-bold text-slate-700">{{ p.cliente.dni }}</span></span>
+                                {% if p.cliente.telefono %}
+                                <span class="text-slate-300">•</span>
+                                <span>📞 <span class="text-slate-700 font-medium">{{ p.cliente.telefono }}</span></span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="space-y-0.5">
-                        <div class="flex items-center space-x-2 flex-wrap">
-                            <h3 class="text-base font-black text-slate-900">{{ m.nombre }}</h3>
-                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
-                                {{ m.especie }}
-                            </span>
-                            {% if m.raza %}
-                            <span class="text-xs text-slate-500">&bull; {{ m.raza }}</span>
-                            {% endif %}
-                        </div>
-
-                        <div class="text-xs text-slate-500 flex items-center space-x-3 flex-wrap gap-y-1">
-                            <span><strong>Dueño:</strong> {{ m.cliente.nombre_completo or m.cliente.dni }}</span>
-                            <span class="text-slate-400">|</span>
-                            <span>DNI: {{ m.cliente.dni }}</span>
-                            {% if m.peso %}
-                            <span class="text-slate-400">|</span>
-                            <span>Peso: <span class="font-mono font-semibold text-slate-700">{{ m.peso }} kg</span></span>
-                            {% endif %}
-                        </div>
-
-                        {% if m.tiene_alergias or m.detalle_alergias or m.alergias %}
-                        <div class="pt-1">
-                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                ⚠️ {{ m.detalle_alergias or m.alergias }}
-                            </span>
-                        </div>
+                    <!-- Contacto Rápido y Total de Mascotas del Dueño -->
+                    <div class="flex items-center space-x-2 self-start sm:self-center shrink-0 flex-wrap gap-y-2">
+                        {% if p.cliente.telefono %}
+                        <a 
+                            href="https://wa.me/51{{ p.cliente.telefono|replace(' ', '')|replace('-', '') }}" 
+                            target="_blank" 
+                            class="btn-touch px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200 rounded-xl transition-colors flex items-center space-x-1.5"
+                            title="Contactar al dueño por WhatsApp"
+                        >
+                            <span>💬</span>
+                            <span>WhatsApp</span>
+                        </a>
                         {% endif %}
+
+                        <span class="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-50 text-teal-800 border border-teal-200">
+                            🐾 {{ p.mascotas|length }} mascota{{ 's' if p.mascotas|length != 1 else '' }}
+                        </span>
                     </div>
                 </div>
 
-                <!-- Acciones Rápidas -->
-                <div class="flex items-center space-x-2.5 self-end sm:self-center flex-shrink-0">
-                    {% if m.cliente.telefono %}
-                    <a 
-                        href="https://wa.me/51{{ m.cliente.telefono|replace(' ', '')|replace('-', '') }}" 
-                        target="_blank" 
-                        class="btn-touch px-3 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center space-x-1"
-                        title="Enviar WhatsApp al dueño"
-                    >
-                        <span>💬</span>
-                        <span class="hidden md:inline">{{ m.cliente.telefono }}</span>
-                    </a>
-                    {% endif %}
+                <!-- Lista Agrupada de Mascotas de este Dueño -->
+                <div class="space-y-2.5">
+                    <span class="text-[10px] font-black uppercase tracking-wider text-slate-400 block px-1">
+                        Mascotas a cargo del propietario:
+                    </span>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {% for m in p.mascotas %}
+                        <div class="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/70 hover:bg-white hover:border-teal-400 hover:shadow-xs transition-all flex items-center justify-between gap-3">
+                            
+                            <!-- Avatar y Datos de la Mascota -->
+                            <div class="flex items-center space-x-3 min-w-0">
+                                <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-2xl shadow-2xs shrink-0 overflow-hidden">
+                                    {% if m.foto_url %}
+                                    <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                                    <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                                    {% else %}
+                                    <span>{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="min-w-0 text-xs">
+                                    <div class="flex items-center space-x-1.5">
+                                        <h3 class="font-black text-slate-900 text-sm truncate">{{ m.nombre }}</h3>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-teal-100 text-teal-800 border border-teal-200">
+                                            {{ m.especie }}
+                                        </span>
+                                    </div>
+                                    <p class="text-[11px] text-slate-500 truncate mt-0.5">
+                                        {{ m.raza or 'Mestizo' }} {% if m.peso %}&bull; <span class="font-mono">{{ m.peso }} kg</span>{% endif %}
+                                    </p>
+                                    
+                                    <!-- Badge de Afiliación Clínica -->
+                                    <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+                                        {% if m.clinica_id == clinica.id %}
+                                        <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                            🏥 Paciente de tu Clínica
+                                        </span>
+                                        {% else %}
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700" title="Registrada por el dueño o en otra sede de la red">
+                                            🐾 Mascota del Propietario
+                                        </span>
+                                        {% endif %}
 
-                    <a 
-                        href="/pacientes/{{ m.id }}" 
-                        class="btn-touch px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-700 rounded-xl shadow-xs transition-colors flex items-center space-x-1"
-                    >
-                        <span>Ver Ficha</span>
-                        <span>→</span>
-                    </a>
+                                        {% if m.tiene_alergias or m.detalle_alergias or m.alergias %}
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
+                                            ⚠️ Alergias
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Botón Ficha Clínica de la Mascota -->
+                            <a 
+                                href="/pacientes/{{ m.id }}" 
+                                class="btn-touch px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center space-x-1 shrink-0"
+                                title="Ver Ficha Médica e Historial"
+                            >
+                                <span>Ver Ficha</span>
+                                <span>→</span>
+                            </a>
+
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
 
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <div class="p-12 text-center space-y-3">
+        <div class="bg-white p-12 text-center space-y-3 rounded-3xl border border-slate-200 shadow-sm">
             <span class="text-4xl block">🔍</span>
-            <h3 class="text-base font-bold text-slate-800">No se encontraron pacientes</h3>
+            <h3 class="text-base font-bold text-slate-800">No se encontraron propietarios ni pacientes</h3>
             <p class="text-xs text-slate-500 max-w-sm mx-auto">
                 {% if busqueda %}
                 No hay coincidencias para "{{ busqueda }}". Intenta con otro término o limpia el buscador.
@@ -145,7 +195,7 @@
                 {% endif %}
             </p>
             <div class="pt-2">
-                <a href="/pacientes/nuevo" class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow">
+                <a href="/pacientes/nuevo" class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-sm">
                     + Registrar Paciente
                 </a>
             </div>

@@ -139,17 +139,24 @@
             </div>
         </div>
 
-        <!-- KPI 3 -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <!-- KPI 3: Total Pacientes con enlace a lista de pacientes -->
+        <a 
+            href="/pacientes" 
+            class="bg-white p-5 rounded-2xl border border-slate-200 hover:border-teal-400 hover:shadow-md transition-all flex items-center justify-between group cursor-pointer block"
+            title="Ir al Directorio de Pacientes y Dueños"
+        >
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Pacientes</p>
                 <p class="text-3xl font-black text-teal-700 mt-1">{{ total_pacientes }}</p>
-                <span class="text-xs text-teal-600 font-medium">Mascotas activas</span>
+                <span class="text-xs text-teal-600 font-bold flex items-center space-x-1 mt-0.5 group-hover:text-teal-800 transition-colors">
+                    <span>Mascotas activas</span>
+                    <span class="group-hover:translate-x-1 transition-transform">➜ Ver lista</span>
+                </span>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl">
+            <div class="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform shrink-0">
                 🐕
             </div>
-        </div>
+        </a>
     </div>
 
     <!-- Sección de Mi Equipo (Visible solo para ADMIN) -->

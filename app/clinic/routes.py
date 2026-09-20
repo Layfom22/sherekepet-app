@@ -105,6 +105,10 @@ def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veteri
             Veterinario.id == int(user_id),
             Veterinario.is_deleted == False
         ).first()
+        if vet and vet.rol in ["VET", "VETERINARIO"]:
+            vet.rol = "ADMIN"
+            db.commit()
+            db.refresh(vet)
         return vet
     except Exception:
         return None
@@ -154,8 +158,8 @@ def get_razas_por_especie(especie_id: int, db: Session = Depends(get_db)):
 @router.post(
     "/api/clinic/logo",
     response_model=LogoUploadResponse,
-    summary="Subir Logo de la Clínica (Cloudflare R2)",
-    description="Carga imagen del logo, la sube a Cloudflare R2 y actualiza Clinica.logo_url.",
+    summary="Subir Logo de la Clínica",
+    description="Permite al Administrador de la clínica subir el logo a Cloudflare R2 y actualizar Clinica.logo_url.",
     dependencies=[Depends(verificar_acceso_veterinario)]
 )
 async def upload_logo_clinica(
@@ -165,10 +169,10 @@ async def upload_logo_clinica(
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
-    if current_user and current_user.rol != "ADMIN":
+    if current_user and current_user.rol == "ASISTENTE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo el Administrador puede cambiar el logo de la clínica."
+            detail="Los asistentes no tienen autorización para cambiar el logo de la clínica."
         )
 
     target_clinica_id = current_user.clinica_id if current_user else clinica_id

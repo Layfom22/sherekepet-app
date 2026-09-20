@@ -198,7 +198,7 @@
                             placeholder="Ej. Clínica Veterinaria San Francisco S.A.C."
                             class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium text-slate-900"
                             oninput="actualizarMockupPreview()"
-                            {% if current_user and current_user.rol != 'ADMIN' %}disabled{% endif %}
+                            {% if current_user and current_user.rol == 'ASISTENTE' %}disabled{% endif %}
                         >
                         <p class="text-[11px] text-slate-400 mt-1">
                             Nombre administrativo y legal registrado en la plataforma.
@@ -217,14 +217,14 @@
                             placeholder="Ej. Veterinaria San Francisco &bull; Cuidado Integral"
                             class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all font-medium text-slate-900"
                             oninput="actualizarMockupPreview()"
-                            {% if current_user and current_user.rol != 'ADMIN' %}disabled{% endif %}
+                            {% if current_user and current_user.rol == 'ASISTENTE' %}disabled{% endif %}
                         >
                         <p class="text-[11px] text-teal-700 font-medium mt-1">
                             ✨ Este nombre será el que verán tus clientes en el encabezado del Portal PWA, el Carnet Digital y los mensajes automáticos. Si lo dejas vacío, se usará la Razón Social.
                         </p>
                     </div>
 
-                    {% if not current_user or current_user.rol == 'ADMIN' %}
+                    {% if not current_user or current_user.rol != 'ASISTENTE' %}
                     <div class="pt-2">
                         <button 
                             type="submit" 
@@ -236,7 +236,7 @@
                     </div>
                     {% else %}
                     <p class="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        🔒 Tu usuario tiene rol ASISTENTE. Solo el Administrador de la clínica puede modificar estos datos.
+                        🔒 Tu usuario tiene rol ASISTENTE. Solo el Administrador o Veterinario titular de la clínica puede modificar estos datos.
                     </p>
                     {% endif %}
                 </form>
@@ -275,7 +275,7 @@
                             </div>
                         </div>
 
-                        {% if not current_user or current_user.rol == 'ADMIN' %}
+                        {% if not current_user or current_user.rol != 'ASISTENTE' %}
                         <label for="settingsLogoInput" id="lblSettingsLogoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Seleccionar nueva imagen de logo">
                             📷
                         </label>
@@ -290,7 +290,7 @@
                         <p class="text-[11px] text-slate-500 leading-relaxed">
                             Se comprime automáticamente en tu navegador a formato <strong>WebP</strong> (máx. 1600px, 80% calidad) para una carga ultrarrápida en dispositivos móviles.
                         </p>
-                        {% if not current_user or current_user.rol == 'ADMIN' %}
+                        {% if not current_user or current_user.rol != 'ASISTENTE' %}
                         <button 
                             type="button" 
                             onclick="document.getElementById('settingsLogoInput').click()" 
@@ -416,6 +416,14 @@ window.addEventListener("DOMContentLoaded", () => {
     if (window.location.hash === "#perfil") {
         cambiarTab("perfil");
     } else {
+        cambiarTab("clinica");
+    }
+});
+
+window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#perfil") {
+        cambiarTab("perfil");
+    } else if (window.location.hash === "#clinica") {
         cambiarTab("clinica");
     }
 });

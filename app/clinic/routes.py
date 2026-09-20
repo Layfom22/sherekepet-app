@@ -219,11 +219,16 @@ def actualizar_configuracion_clinica(
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
-    if not current_user or current_user.rol != "ADMIN":
+    if not current_user or current_user.rol == "ASISTENTE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo el Administrador puede editar la configuración de la clínica."
+            detail="Los asistentes no tienen autorización para editar la configuración de la clínica."
         )
+
+    # Normalizar automáticamente rol de veterinarios titulares
+    if current_user.rol in ["VET", "VETERINARIO"]:
+        current_user.rol = "ADMIN"
+        db.commit()
 
     clinica = db.query(Clinica).filter(
         Clinica.id == current_user.clinica_id,
@@ -271,6 +276,9 @@ def actualizar_perfil_veterinario(
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
 
+    if current_user.rol in ["VET", "VETERINARIO"]:
+        current_user.rol = "ADMIN"
+
     if payload.nombre is not None and payload.nombre.strip():
         current_user.nombre = payload.nombre.strip()
     if payload.email is not None and payload.email.strip():
@@ -281,7 +289,7 @@ def actualizar_perfil_veterinario(
             Veterinario.is_deleted == False
         ).first()
         if otro:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo ya se encuentra registrado.")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El correo ya se encuentra registrado por otro usuario.")
         current_user.email = email_limpio
     if payload.foto_perfil is not None:
         current_user.foto_perfil = payload.foto_perfil.strip() or None
@@ -1391,6 +1399,11 @@ def vista_configuracion_clinica(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
+    if current_user and current_user.rol in ["VET", "VETERINARIO"]:
+        current_user.rol = "ADMIN"
+        db.commit()
+        db.refresh(current_user)
+
     target_clinica_id = current_user.clinica_id if current_user else 1
 
     clinica = db.query(Clinica).filter(

@@ -48,6 +48,7 @@ class PacienteRapidoRequest(BaseModel):
     detalle_alergias: Optional[str] = Field(None, description="Detalle de las alergias")
     condiciones_previas: Optional[str] = Field(None, description="Condiciones previas o antecedentes clínicos")
     mascota_alergias: Optional[str] = Field(None, description="Campo legado de alergias")
+    foto_url: Optional[str] = Field(None, description="URL de la foto de la mascota en Cloudflare R2")
 
     @field_validator("dni")
     @classmethod
@@ -76,6 +77,7 @@ class MascotaSummary(BaseModel):
     especie: str
     raza: Optional[str]
     peso: Optional[float]
+    foto_url: Optional[str] = None
     especie_id: Optional[int] = None
     raza_id: Optional[int] = None
     tiene_alergias: bool = False

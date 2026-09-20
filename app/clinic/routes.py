@@ -29,7 +29,8 @@ from app.clinic.models import (
     Veterinario,
     AtencionClinica,
     RegistroVacuna,
-    SeguimientoNotificacion
+    SeguimientoNotificacion,
+    Cita
 )
 from app.core.storage import upload_image_to_r2
 from app.clinic.schemas import (
@@ -529,6 +530,14 @@ async def upload_foto_mascota(
 
 
 @router.post(
+    "/api/clinic/pacientes",
+    response_model=PacienteRapidoResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registro de Paciente y Dueño (Unificación Global por DNI)",
+    description="Crea o reutiliza globalmente el Cliente por DNI y registra su Mascota.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+@router.post(
     "/api/clinic/paciente-rapido",
     response_model=PacienteRapidoResponse,
     status_code=status.HTTP_201_CREATED,
@@ -555,12 +564,19 @@ def registrar_paciente_rapido(
             detail="La clínica especificada no existe o fue dada de baja."
         )
 
-    # 2. Buscar o crear Cliente
+    # 2. Unificación Global por DNI: Buscar primero en la clínica actual, y si no, en toda la red SherekePet
     cliente = db.query(Cliente).filter(
         Cliente.clinica_id == target_clinica_id,
         Cliente.dni == payload.dni,
         Cliente.is_deleted == False
     ).first()
+
+    if not cliente:
+        # Búsqueda global por DNI para evitar duplicación entre clínicas
+        cliente = db.query(Cliente).filter(
+            Cliente.dni == payload.dni,
+            Cliente.is_deleted == False
+        ).first()
 
     nombre_completo = payload.nombre_completo
     if not nombre_completo:
@@ -581,9 +597,10 @@ def registrar_paciente_rapido(
         db.add(cliente)
         db.flush()
     else:
-        if not cliente.nombre_completo and nombre_completo:
+        # Si ya existe el cliente en la red, actualizar datos de contacto si fueron provistos
+        if nombre_completo and not cliente.nombre_completo:
             cliente.nombre_completo = nombre_completo
-        if not cliente.telefono and payload.telefono:
+        if payload.telefono and not cliente.telefono:
             cliente.telefono = payload.telefono
         db.flush()
 
@@ -602,7 +619,7 @@ def registrar_paciente_rapido(
 
     alergias_legado = payload.detalle_alergias if payload.tiene_alergias else payload.mascota_alergias
 
-    # 4. Registrar Mascota
+    # 4. Registrar Mascota (con foto_url si se envió)
     mascota = Mascota(
         clinica_id=target_clinica_id,
         cliente_id=cliente.id,
@@ -612,6 +629,7 @@ def registrar_paciente_rapido(
         especie=nombre_especie,
         raza=nombre_raza,
         peso=payload.mascota_peso,
+        foto_url=payload.foto_url,
         tiene_alergias=payload.tiene_alergias,
         detalle_alergias=payload.detalle_alergias if payload.tiene_alergias else None,
         condiciones_previas=payload.condiciones_previas.strip() if payload.condiciones_previas else None,
@@ -771,6 +789,13 @@ def marcar_seguimiento_enviado(
     "/api/clinic/clientes/{cliente_id}/reset-pin",
     status_code=status.HTTP_200_OK,
     summary="Restablecer PIN de Cliente / Dueño",
+    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+@router.post(
+    "/api/clinic/clientes/{cliente_id}/reset-pin",
+    status_code=status.HTTP_200_OK,
+    summary="Restablecer PIN de Cliente / Dueño (Alias POST)",
     description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso.",
     dependencies=[Depends(verificar_acceso_veterinario)]
 )
@@ -1393,4 +1418,126 @@ def vista_configuracion_clinica(
             "nombre_comercial": clinica.nombre_comercial or ""
         }
     )
+
+
+# ==========================================
+# 6. AGENDA Y CITAS VETERINARIAS
+# ==========================================
+
+@router.get("/agenda", response_class=HTMLResponse, summary="Vista Agenda de Citas del Veterinario")
+def vista_agenda_citas(
+    request: Request,
+    fecha: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
+
+    hoy = get_lima_now().date()
+    fecha_filtro = hoy
+    if fecha and fecha.strip():
+        try:
+            fecha_filtro = date.fromisoformat(fecha.strip())
+        except Exception:
+            fecha_filtro = hoy
+
+    # Citas de la fecha seleccionada en la clínica
+    citas = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.fecha == fecha_filtro,
+        Cita.is_deleted == False
+    ).order_by(Cita.hora.asc()).all()
+
+    total_hoy = len(citas)
+    total_pendientes = sum(1 for c in citas if c.estado == "PENDIENTE")
+    total_confirmadas = sum(1 for c in citas if c.estado == "CONFIRMADA")
+    total_canceladas = sum(1 for c in citas if c.estado == "CANCELADA")
+
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/agenda.html",
+        context={
+            "clinica": clinica,
+            "current_user": current_user,
+            "citas": citas,
+            "fecha_seleccionada": fecha_filtro,
+            "hoy": hoy,
+            "total_hoy": total_hoy,
+            "total_pendientes": total_pendientes,
+            "total_confirmadas": total_confirmadas,
+            "total_canceladas": total_canceladas
+        }
+    )
+
+
+@router.put(
+    "/api/clinic/citas/{cita_id}/confirmar",
+    summary="Confirmar Cita Agendada",
+    description="Actualiza el estado de la cita a CONFIRMADA.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def confirmar_cita_veterinario(
+    cita_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    cita = db.query(Cita).filter(
+        Cita.id == cita_id,
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    cita.estado = "CONFIRMADA"
+    db.commit()
+    db.refresh(cita)
+
+    return {
+        "mensaje": "Cita confirmada exitosamente.",
+        "cita_id": cita.id,
+        "estado": cita.estado
+    }
+
+
+@router.put(
+    "/api/clinic/citas/{cita_id}/cancelar",
+    summary="Cancelar Cita Agendada",
+    description="Actualiza el estado de la cita a CANCELADA.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def cancelar_cita_veterinario(
+    cita_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    cita = db.query(Cita).filter(
+        Cita.id == cita_id,
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    cita.estado = "CANCELADA"
+    db.commit()
+    db.refresh(cita)
+
+    return {
+        "mensaje": "Cita cancelada.",
+        "cita_id": cita.id,
+        "estado": cita.estado
+    }
+
 

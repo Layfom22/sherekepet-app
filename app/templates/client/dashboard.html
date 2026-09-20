@@ -45,6 +45,67 @@
         </div>
     </div>
 
+    <!-- Barra de Acciones Principales -->
+    <div class="grid grid-cols-2 gap-3">
+        <button 
+            type="button" 
+            onclick="abrirModalAgendarCita()"
+            class="btn-touch p-3.5 text-xs font-black text-white bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 active:scale-[0.98] rounded-2xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-2"
+        >
+            <span class="text-base">📅</span>
+            <span>Agendar Cita</span>
+        </button>
+
+        <button 
+            type="button" 
+            onclick="abrirModalNuevaMascota()"
+            class="btn-touch p-3.5 text-xs font-black text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:scale-[0.98] border border-indigo-200 rounded-2xl shadow-2xs transition-all flex items-center justify-center space-x-2"
+        >
+            <span class="text-base">➕</span>
+            <span>Nueva Mascota</span>
+        </button>
+    </div>
+
+    <!-- Sección: Mis Próximas Citas (si existen) -->
+    {% if citas_cliente %}
+    <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h2 class="text-sm font-black text-slate-900 flex items-center space-x-1.5 tracking-tight">
+                <span>📅</span>
+                <span>Mis Próximas Citas</span>
+            </h2>
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {{ citas_cliente|length }} agendada{{ 's' if citas_cliente|length != 1 else '' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {% for c in citas_cliente %}
+            <div class="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start space-x-3">
+                <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex flex-col items-center justify-center text-teal-800 font-mono shrink-0 shadow-2xs">
+                    <span class="text-xs font-black">{{ c.hora.strftime('%I:%M') }}</span>
+                    <span class="text-[9px] font-bold uppercase text-slate-400">{{ c.hora.strftime('%p') }}</span>
+                </div>
+                <div class="min-w-0 flex-1 text-xs">
+                    <div class="flex items-center justify-between">
+                        <p class="font-black text-slate-900 truncate">{{ c.mascota.nombre }}</p>
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full {% if c.estado == 'CONFIRMADA' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                            {{ c.estado }}
+                        </span>
+                    </div>
+                    <p class="text-[11px] font-semibold text-teal-700 truncate mt-0.5">
+                        🏥 {{ c.clinica.nombre_comercial or c.clinica.nombre }}
+                    </p>
+                    <p class="text-[11px] text-slate-500 mt-0.5 truncate">
+                        📆 {{ c.fecha.strftime('%d/%m/%Y') }} &bull; {{ c.motivo }}
+                    </p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Alertas de Medicinas Pendientes (si existen) -->
     {% if dosis_pendientes %}
     <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-xs space-y-3">
@@ -362,6 +423,160 @@
     </div>
 </div>
 
+<!-- MODAL 3: AGENDAR CITA VETERINARIA (FLUJO SECUENCIAL 4 PASOS) -->
+<div id="modalAgendarCita" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100 my-8">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-black text-slate-900 flex items-center space-x-2">
+                <span>📅</span>
+                <span>Agendar Cita Veterinaria</span>
+            </h3>
+            <button type="button" onclick="cerrarModalAgendarCita()" class="text-slate-400 hover:text-slate-600 text-lg font-bold p-1">
+                ✕
+            </button>
+        </div>
+
+        <form id="formAgendarCita" onsubmit="enviarAgendarCita(event)" class="space-y-4 text-xs">
+
+            <!-- PASO A: SELECCIONAR CLÍNICA -->
+            <div>
+                <label for="citaClinica" class="block font-bold text-slate-700 mb-1">
+                    a) Selecciona la Veterinaria *
+                </label>
+                <select 
+                    id="citaClinica" 
+                    name="clinica_id" 
+                    required 
+                    class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white font-bold text-slate-900"
+                    onchange="consultarDisponibilidadCita()"
+                >
+                    {% if clinicas_cliente %}
+                        {% for cl in clinicas_cliente %}
+                        <option value="{{ cl.id }}" data-tel="{{ cl.telefono or '' }}" {% if loop.first %}selected{% endif %}>
+                            🏥 {{ cl.nombre_comercial or cl.nombre }}
+                        </option>
+                        {% endfor %}
+                    {% else %}
+                        <option value="{{ clinica.id }}" data-tel="{{ clinica.telefono or '' }}" selected>
+                            🏥 {{ clinica.nombre_comercial or clinica.nombre }}
+                        </option>
+                    {% endif %}
+                </select>
+            </div>
+
+            <!-- PASO B: SELECCIONAR MASCOTA -->
+            <div>
+                <label for="citaMascota" class="block font-bold text-slate-700 mb-1">
+                    b) Selecciona la Mascota *
+                </label>
+                <select 
+                    id="citaMascota" 
+                    name="mascota_id" 
+                    required 
+                    class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white font-bold text-slate-900"
+                    onchange="consultarDisponibilidadCita()"
+                >
+                    {% for m in mascotas %}
+                    <option value="{{ m.id }}" data-nombre="{{ m.nombre }}" {% if loop.first %}selected{% endif %}>
+                        🐾 {{ m.nombre }} ({{ m.especie }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- PASO C: SELECCIONAR FECHA -->
+            <div>
+                <label for="citaFecha" class="block font-bold text-slate-700 mb-1">
+                    c) Selecciona la Fecha *
+                </label>
+                <input 
+                    type="date" 
+                    id="citaFecha" 
+                    name="fecha" 
+                    required 
+                    min="{{ ahora.strftime('%Y-%m-%d') }}"
+                    value="{{ ahora.strftime('%Y-%m-%d') }}"
+                    class="w-full px-3 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white font-bold text-slate-900"
+                    onchange="consultarDisponibilidadCita()"
+                >
+            </div>
+
+            <!-- PASO D: SELECCIONAR HORA (DINÁMICA O FALLBACK DE EMERGENCIA) -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block font-bold text-slate-700">
+                        d) Selecciona la Hora *
+                    </label>
+                    <span id="citaLoaderHoras" class="hidden text-[10px] text-teal-600 font-bold animate-pulse">
+                        ⏳ Consultando horarios...
+                    </span>
+                </div>
+
+                <input type="hidden" id="citaHoraSeleccionada" name="hora" required>
+
+                <!-- Selector de Horarios Disponibles -->
+                <div id="citaContenedorHoras" class="space-y-2">
+                    <div id="citaGridHoras" class="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-44 overflow-y-auto p-1 bg-slate-50 rounded-2xl border border-slate-200">
+                        <!-- Generado por JS -->
+                    </div>
+                </div>
+
+                <!-- Fallback de Emergencia / Urgencias -->
+                <div id="citaFallbackUrgencia" class="hidden p-4 rounded-2xl bg-rose-50 border-2 border-rose-200 space-y-2.5 text-center">
+                    <div class="flex items-center justify-center space-x-1.5 text-rose-800 font-bold">
+                        <span class="text-lg">🚨</span>
+                        <span>Sin turnos regulares disponibles</span>
+                    </div>
+                    <p class="text-[11px] text-rose-700 leading-tight">
+                        No encontramos horarios libres para la fecha seleccionada. Si tu mascota requiere atención médica inmediata, comunícate directamente con la clínica:
+                    </p>
+                    <a 
+                        id="btnWhatsappUrgencia" 
+                        href="#" 
+                        target="_blank" 
+                        class="btn-touch w-full py-2.5 px-4 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 active:bg-rose-800 rounded-xl shadow-sm transition-all flex items-center justify-center space-x-2"
+                    >
+                        <span>🚨</span>
+                        <span>Solicitar sobreturno o Urgencia</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Motivo de la Consulta -->
+            <div id="citaContenedorMotivo">
+                <label for="citaMotivo" class="block font-bold text-slate-700 mb-1">
+                    Motivo de la Consulta *
+                </label>
+                <input 
+                    type="text" 
+                    id="citaMotivo" 
+                    name="motivo" 
+                    required 
+                    placeholder="Ej. Control de vacunas, desparasitación, decaimiento..." 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-slate-800 font-medium"
+                >
+            </div>
+
+            <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalAgendarCita()" 
+                    class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnConfirmarCita" 
+                    class="btn-touch px-5 py-2 bg-teal-600 text-white font-bold rounded-xl hover:bg-teal-700 shadow-md hover:shadow transition-all"
+                >
+                    Confirmar Cita
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Toast Flotante -->
 <div id="toastDashboard" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-2.5 text-xs font-bold transition-all">
     <span class="text-base text-emerald-400">✔</span>
@@ -395,6 +610,169 @@ function abrirModalNuevaMascota() {
 }
 function cerrarModalNuevaMascota() {
     document.getElementById("modalNuevaMascota")?.classList.add("hidden");
+}
+
+// Modal Agendar Cita
+function abrirModalAgendarCita() {
+    const modal = document.getElementById("modalAgendarCita");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    consultarDisponibilidadCita();
+}
+
+function cerrarModalAgendarCita() {
+    const modal = document.getElementById("modalAgendarCita");
+    if (modal) modal.classList.add("hidden");
+    const horaInput = document.getElementById("citaHoraSeleccionada");
+    if (horaInput) horaInput.value = "";
+}
+
+function seleccionarHoraCita(hora) {
+    const horaInput = document.getElementById("citaHoraSeleccionada");
+    if (horaInput) horaInput.value = hora;
+
+    const botones = document.querySelectorAll("#citaGridHoras button");
+    botones.forEach(b => {
+        if (b.getAttribute("data-hora") === hora) {
+            b.className = "btn-touch py-2 text-xs font-black rounded-xl bg-teal-600 text-white border border-teal-600 shadow-sm transition-all";
+        } else {
+            b.className = "btn-touch py-2 text-xs font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-teal-50 hover:border-teal-300 transition-all";
+        }
+    });
+}
+
+async function consultarDisponibilidadCita() {
+    const clinicaSelect = document.getElementById("citaClinica");
+    const fechaInput = document.getElementById("citaFecha");
+    const mascotaSelect = document.getElementById("citaMascota");
+    const loader = document.getElementById("citaLoaderHoras");
+    const gridHoras = document.getElementById("citaGridHoras");
+    const contenedorHoras = document.getElementById("citaContenedorHoras");
+    const fallbackUrgencia = document.getElementById("citaFallbackUrgencia");
+    const btnWhatsapp = document.getElementById("btnWhatsappUrgencia");
+    const btnConfirmar = document.getElementById("btnConfirmarCita");
+    const horaInput = document.getElementById("citaHoraSeleccionada");
+
+    if (!clinicaSelect || !fechaInput) return;
+    const clinicaId = clinicaSelect.value;
+    const fecha = fechaInput.value;
+    if (!clinicaId || !fecha) return;
+
+    if (horaInput) horaInput.value = "";
+    if (loader) loader.classList.remove("hidden");
+    if (gridHoras) gridHoras.innerHTML = "";
+    if (fallbackUrgencia) fallbackUrgencia.classList.add("hidden");
+    if (contenedorHoras) contenedorHoras.classList.remove("hidden");
+    if (btnConfirmar) {
+        btnConfirmar.disabled = false;
+        btnConfirmar.classList.remove("opacity-50", "cursor-not-allowed", "hidden");
+    }
+
+    try {
+        const resp = await fetch(`/api/portal/clinica/${clinicaId}/disponibilidad?fecha=${fecha}`);
+        if (!resp.ok) throw new Error("No se pudo obtener disponibilidad");
+        const data = await resp.json();
+
+        const horasDisponibles = data.horas_disponibles || [];
+
+        if (horasDisponibles.length > 0) {
+            // Renderizar horarios disponibles
+            gridHoras.innerHTML = "";
+            horasDisponibles.forEach(hora => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.setAttribute("data-hora", hora);
+                btn.className = "btn-touch py-2 text-xs font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-teal-50 hover:border-teal-300 transition-all";
+                btn.textContent = hora;
+                btn.onclick = () => seleccionarHoraCita(hora);
+                gridHoras.appendChild(btn);
+            });
+            contenedorHoras.classList.remove("hidden");
+            fallbackUrgencia.classList.add("hidden");
+            if (btnConfirmar) btnConfirmar.classList.remove("hidden");
+        } else {
+            // Sin turnos regulares: Activar Fallback de Emergencia / Urgencias
+            contenedorHoras.classList.add("hidden");
+            fallbackUrgencia.classList.remove("hidden");
+            if (btnConfirmar) btnConfirmar.classList.add("hidden");
+
+            // Configurar enlace de WhatsApp directo
+            const optMascota = mascotaSelect?.options[mascotaSelect.selectedIndex];
+            const mascotaNombre = optMascota ? optMascota.getAttribute("data-nombre") || "mi mascota" : "mi mascota";
+            const optClinica = clinicaSelect?.options[clinicaSelect.selectedIndex];
+            const clinicaTel = data.contacto_emergencia || optClinica?.getAttribute("data-tel") || "";
+            
+            const textoMensaje = `Hola, necesito una cita de urgencia para mi mascota ${mascotaNombre} el día ${fecha}...`;
+            const cleanTel = clinicaTel.replace(/\D/g, "");
+            
+            if (cleanTel) {
+                btnWhatsapp.href = `https://wa.me/${cleanTel}?text=${encodeURIComponent(textoMensaje)}`;
+                btnWhatsapp.target = "_blank";
+            } else {
+                btnWhatsapp.href = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
+                btnWhatsapp.target = "_blank";
+            }
+        }
+    } catch (err) {
+        console.error("Error consultando disponibilidad:", err);
+        gridHoras.innerHTML = `<p class="col-span-full text-center text-rose-500 text-xs py-2">Error al cargar horarios.</p>`;
+    } finally {
+        if (loader) loader.classList.add("hidden");
+    }
+}
+
+// Enviar Formulario de Agendar Cita
+async function enviarAgendarCita(e) {
+    e.preventDefault();
+    const hora = document.getElementById("citaHoraSeleccionada")?.value;
+    if (!hora) {
+        alert("Por favor, selecciona una hora disponible para tu cita.");
+        return;
+    }
+
+    const btn = document.getElementById("btnConfirmarCita");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Agendando...";
+    }
+
+    const payload = {
+        clinica_id: parseInt(document.getElementById("citaClinica")?.value),
+        mascota_id: parseInt(document.getElementById("citaMascota")?.value),
+        fecha: document.getElementById("citaFecha")?.value,
+        hora: hora,
+        motivo: document.getElementById("citaMotivo")?.value.trim()
+    };
+
+    try {
+        const resp = await fetch("/api/portal/citas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            cerrarModalAgendarCita();
+            mostrarToast("¡Cita agendada con éxito!");
+            setTimeout(() => {
+                window.location.reload();
+            }, 700);
+        } else {
+            const err = await resp.json();
+            alert("Error al agendar cita: " + (err.detail || "Verifique los datos ingresados"));
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Confirmar Cita";
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al agendar cita.");
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Confirmar Cita";
+        }
+    }
 }
 
 function actualizarEmojiEspecie(esp) {

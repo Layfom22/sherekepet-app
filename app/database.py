@@ -13,7 +13,8 @@ from app.clinic.models import (
     Mascota,
     AtencionClinica,
     RegistroVacuna,
-    SeguimientoNotificacion
+    SeguimientoNotificacion,
+    Cita
 )
 from app.follow_up.models import (
     MedicationPlan,
@@ -83,6 +84,12 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN logo_b64 TEXT;"))
                 if "nombre_comercial" not in cols:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN nombre_comercial VARCHAR(150);"))
+                if "telefono" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN telefono VARCHAR(50);"))
+
+        # Crear sp_citas si no existe
+        if "sp_citas" not in tables:
+            Base.metadata.create_all(target_engine, tables=[Cita.__table__])
 
         # 2. sp_mascotas
         if "sp_mascotas" in tables:

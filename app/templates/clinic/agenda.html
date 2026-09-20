@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Agenda de Citas - SherekePet{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Encabezado de la Agenda con Filtro de Fecha -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <div class="flex items-center space-x-2.5">
+                <span class="text-2xl">📅</span>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">Agenda de Citas</h1>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+                Control y seguimiento de citas programadas por los propietarios desde el Portal PWA.
+            </p>
+        </div>
+
+        <!-- Selector de Fecha -->
+        <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+            <a 
+                href="/agenda?fecha={{ hoy.strftime('%Y-%m-%d') }}" 
+                class="btn-touch px-3 py-1.5 text-xs font-bold rounded-xl transition-all {% if fecha_seleccionada == hoy %}bg-teal-600 text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-white{% endif %}"
+            >
+                Hoy
+            </a>
+            <input 
+                type="date" 
+                id="inputFechaAgenda"
+                value="{{ fecha_seleccionada.strftime('%Y-%m-%d') }}" 
+                class="px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
+                onchange="cambiarFechaAgenda(this.value)"
+            >
+        </div>
+    </div>
+
+    <!-- Tarjetas de Métricas Rápidas del Día -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Citas</span>
+            <p class="text-2xl font-black text-slate-900 mt-0.5">{{ total_hoy }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-2xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700 block">Pendientes</span>
+            <p class="text-2xl font-black text-amber-800 mt-0.5">{{ total_pendientes }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-emerald-200 bg-emerald-50/30 shadow-2xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Confirmadas</span>
+            <p class="text-2xl font-black text-emerald-800 mt-0.5">{{ total_confirmadas }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Canceladas</span>
+            <p class="text-2xl font-black text-slate-500 mt-0.5">{{ total_canceladas }}</p>
+        </div>
+    </div>
+
+    <!-- Lista Cronológica de Citas -->
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span>🕒</span>
+                <span>Citas para el {{ fecha_seleccionada.strftime('%d/%m/%Y') }}</span>
+            </h2>
+            <span class="text-xs text-slate-400 font-medium">Orden cronológico</span>
+        </div>
+
+        {% if citas %}
+        <div class="divide-y divide-slate-100">
+            {% for c in citas %}
+            <div id="cita-row-{{ c.id }}" class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                <!-- Hora y Mascota -->
+                <div class="flex items-start sm:items-center space-x-4 min-w-0">
+                    <!-- Badge Hora Exacta -->
+                    <div class="w-16 h-14 rounded-2xl bg-teal-50 border border-teal-200 flex flex-col items-center justify-center text-teal-800 shrink-0 font-mono">
+                        <span class="text-sm font-black">{{ c.hora.strftime('%I:%M') }}</span>
+                        <span class="text-[10px] font-bold uppercase">{{ c.hora.strftime('%p') }}</span>
+                    </div>
+
+                    <!-- Avatar Mascota y Datos -->
+                    <div class="flex items-center space-x-3 min-w-0">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                            {% if c.mascota.foto_url %}
+                            <img src="{{ c.mascota.foto_url }}" alt="{{ c.mascota.nombre }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <span>{% if c.mascota.especie|lower == 'felino' %}🐱{% elif c.mascota.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="min-w-0">
+                            <a href="/pacientes/{{ c.mascota.id }}" class="text-sm font-black text-slate-900 hover:text-teal-700 transition-colors truncate block">
+                                {{ c.mascota.nombre }}
+                            </a>
+                            <p class="text-xs text-slate-500 truncate">
+                                {{ c.mascota.especie }} &bull; {{ c.mascota.raza or 'Mestizo' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datos del Dueño, Teléfono y Motivo -->
+                <div class="flex-1 max-w-md space-y-1 text-xs">
+                    <div class="flex items-center space-x-2">
+                        <span class="font-bold text-slate-800">{{ c.cliente.nombre_completo or c.cliente.dni }}</span>
+                        <span class="text-slate-400">&bull;</span>
+                        <span class="text-slate-500">DNI: {{ c.cliente.dni }}</span>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        {% if c.cliente.telefono %}
+                        <a 
+                            href="https://wa.me/51{{ c.cliente.telefono|replace(' ', '')|replace('-', '') }}?text={{ ('Hola ' ~ (c.cliente.nombre_completo or '') ~ ', te escribimos de ' ~ (clinica.nombre_comercial or clinica.nombre) ~ ' para confirmar la cita de ' ~ c.mascota.nombre ~ ' a las ' ~ c.hora.strftime('%I:%M %p'))|urlencode }}" 
+                            target="_blank" 
+                            class="inline-flex items-center text-emerald-600 font-bold hover:underline"
+                            title="Conversar por WhatsApp"
+                        >
+                            💬 {{ c.cliente.telefono }}
+                        </a>
+                        {% else %}
+                        <span class="text-slate-400 italic">Sin teléfono</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-200/80 font-medium">
+                        <strong>Motivo:</strong> {{ c.motivo }}
+                    </p>
+                </div>
+
+                <!-- Estado y Botones de Acción -->
+                <div class="flex items-center space-x-2 sm:self-center shrink-0">
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if c.estado == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif c.estado == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                        {{ c.estado }}
+                    </span>
+
+                    {% if c.estado != 'CONFIRMADA' %}
+                    <button 
+                        type="button" 
+                        id="btn-confirmar-{{ c.id }}"
+                        onclick="cambiarEstadoCita({{ c.id }}, 'confirmar')"
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-xs transition-all flex items-center space-x-1"
+                        title="Confirmar cita"
+                    >
+                        <span>✓</span>
+                        <span>Confirmar</span>
+                    </button>
+                    {% endif %}
+
+                    {% if c.estado != 'CANCELADA' %}
+                    <button 
+                        type="button" 
+                        id="btn-cancelar-{{ c.id }}"
+                        onclick="cambiarEstadoCita({{ c.id }}, 'cancelar')"
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-xl transition-all"
+                        title="Cancelar cita"
+                    >
+                        <span>✕ Cancelar</span>
+                    </button>
+                    {% endif %}
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-12 text-center text-slate-400 space-y-3">
+            <span class="text-4xl block">🏖️</span>
+            <p class="text-sm font-bold text-slate-600">No hay citas registradas para esta fecha.</p>
+            <p class="text-xs text-slate-400">Selecciona otra fecha en el calendario superior o espera solicitudes desde el Portal del Dueño.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function cambiarFechaAgenda(fecha) {
+    if (!fecha) return;
+    window.location.href = `/agenda?fecha=${fecha}`;
+}
+
+async function cambiarEstadoCita(citaId, accion) {
+    const confirmacion = accion === 'confirmar' 
+        ? "¿Deseas marcar esta cita como CONFIRMADA?" 
+        : "¿Seguro que deseas CANCELAR esta cita?";
+
+    if (!confirm(confirmacion)) return;
+
+    try {
+        const resp = await fetch(`/api/clinic/citas/${citaId}/${accion}`, {
+            method: 'PUT'
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            const badge = document.getElementById(`badge-estado-${citaId}`);
+            const btnConfirmar = document.getElementById(`btn-confirmar-${citaId}`);
+            const btnCancelar = document.getElementById(`btn-cancelar-${citaId}`);
+
+            if (badge) {
+                badge.textContent = data.estado;
+                if (data.estado === 'CONFIRMADA') {
+                    badge.className = "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
+                    if (btnConfirmar) btnConfirmar.remove();
+                } else if (data.estado === 'CANCELADA') {
+                    badge.className = "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
+                    if (btnCancelar) btnCancelar.remove();
+                    if (btnConfirmar) btnConfirmar.remove();
+                }
+            }
+        } else {
+            const err = await resp.json();
+            alert("Error: " + (err.detail || "No se pudo actualizar el estado."));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al actualizar la cita.");
+    }
+}
+</script>
+{% endblock %}

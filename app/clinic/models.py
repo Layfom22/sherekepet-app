@@ -1,6 +1,6 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Optional, List
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.models import Base, SoftDeleteMixin, TimestampMixin
@@ -104,6 +104,11 @@ class Cliente(Base, SoftDeleteMixin, TimestampMixin):
         back_populates="cliente",
         cascade="all, delete-orphan"
     )
+    citas: Mapped[List["Cita"]] = relationship(
+        "Cita",
+        back_populates="cliente",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Cliente(id={self.id}, dni='{self.dni}', nombre='{self.nombre_completo}', clinica_id={self.clinica_id})>"
@@ -175,6 +180,11 @@ class Mascota(Base, SoftDeleteMixin, TimestampMixin):
     )
     seguimientos: Mapped[List["SeguimientoNotificacion"]] = relationship(
         "SeguimientoNotificacion",
+        back_populates="mascota",
+        cascade="all, delete-orphan"
+    )
+    citas: Mapped[List["Cita"]] = relationship(
+        "Cita",
         back_populates="mascota",
         cascade="all, delete-orphan"
     )
@@ -311,3 +321,41 @@ class SeguimientoNotificacion(Base, SoftDeleteMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<SeguimientoNotificacion(id={self.id}, tipo='{self.tipo}', estado='{self.estado}')>"
+
+
+class Cita(Base, SoftDeleteMixin, TimestampMixin):
+    """Modelo de Citas y Agendamiento Inteligente de Pacientes."""
+    __tablename__ = "sp_citas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    clinica_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clinicas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    cliente_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clientes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    mascota_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_mascotas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    hora: Mapped[time] = mapped_column(Time, nullable=False)
+    motivo: Mapped[str] = mapped_column(String(255), nullable=False)
+    estado: Mapped[str] = mapped_column(String(50), default="PENDIENTE", nullable=False)  # 'PENDIENTE', 'CONFIRMADA', 'CANCELADA'
+
+    # Relaciones
+    clinica = relationship("Clinica", back_populates="citas")
+    cliente = relationship("Cliente", back_populates="citas")
+    mascota = relationship("Mascota", back_populates="citas")
+
+    def __repr__(self) -> str:
+        return f"<Cita(id={self.id}, fecha={self.fecha}, hora={self.hora}, estado='{self.estado}', mascota_id={self.mascota_id})>"
+

@@ -49,6 +49,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     zona_horaria: Mapped[str] = mapped_column(String(50), default="America/Lima", nullable=False)
     plan_activo: Mapped[str] = mapped_column(String(50), default="solo", nullable=False)
     logo_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    telefono: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     @property
     def nombre_mostrado(self) -> str:
@@ -59,6 +60,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     veterinarios = relationship("Veterinario", back_populates="clinica", cascade="all, delete-orphan")
     clientes = relationship("Cliente", back_populates="clinica", cascade="all, delete-orphan")
     mascotas = relationship("Mascota", back_populates="clinica", cascade="all, delete-orphan")
+    citas = relationship("Cita", back_populates="clinica", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Clinica(id={self.id}, nombre='{self.nombre}', nombre_comercial='{self.nombre_comercial}', plan='{self.plan_activo}')>"

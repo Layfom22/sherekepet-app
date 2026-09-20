@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import date
+from datetime import date, datetime, time
 from typing import Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
@@ -13,7 +13,7 @@ from app.core.security import decode_access_token
 from app.core.storage import upload_image_to_r2
 from app.database import get_db
 from app.core.models import Clinica
-from app.clinic.models import Cliente, Mascota, RegistroVacuna
+from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita
 from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
 from app.follow_up.schemas import (
     MedicationPlanCreateRequest,
@@ -413,11 +413,29 @@ def portal_dashboard(
         else:
             return RedirectResponse(url="/portal/login")
 
-    # Obtener mascotas activas del cliente
-    mascotas = db.query(Mascota).filter(
-        Mascota.cliente_id == cliente.id,
+    # Obtener mascotas activas del cliente filtrando por su DNI (Unificación Global SherekePet)
+    mascotas = db.query(Mascota).join(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False,
         Mascota.is_deleted == False
-    ).all()
+    ).order_by(Mascota.created_at.desc()).all()
+
+    # Obtener veterinarias asociadas al cliente y sus mascotas para agendamiento centralizado
+    clinica_ids = {m.clinica_id for m in mascotas}
+    if cliente.clinica_id:
+        clinica_ids.add(cliente.clinica_id)
+    clinicas_cliente = db.query(Clinica).filter(
+        Clinica.id.in_(clinica_ids),
+        Clinica.is_deleted == False
+    ).all() if clinica_ids else []
+
+    # Citas agendadas vigentes del cliente (por DNI)
+    citas_cliente = db.query(Cita).join(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False,
+        Cita.is_deleted == False,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"])
+    ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
     # Obtener tratamientos activos con sus próximas dosis
     mascota_ids = [m.id for m in mascotas]
@@ -425,7 +443,7 @@ def portal_dashboard(
         MedicationPlan.pet_id.in_(mascota_ids),
         MedicationPlan.estado == "ACTIVO",
         MedicationPlan.is_deleted == False
-    ).all()
+    ).all() if mascota_ids else []
 
     # Recopilar próximas dosis pendientes
     dosis_pendientes = []
@@ -447,7 +465,9 @@ def portal_dashboard(
         context={
             "cliente": cliente,
             "clinica": cliente.clinica,
+            "clinicas_cliente": clinicas_cliente,
             "mascotas": mascotas,
+            "citas_cliente": citas_cliente,
             "dosis_pendientes": dosis_pendientes,
             "ahora": get_lima_now()
         }
@@ -683,5 +703,166 @@ async def portal_upload_foto(
     )
 
     return {"foto_url": foto_url}
+
+
+# =======================================================
+# 6. MOTOR DE CITAS Y DISPONIBILIDAD (PORTAL DUEÑO)
+# =======================================================
+
+class CitaCreateRequest(BaseModel):
+    clinica_id: int
+    mascota_id: int
+    fecha: date
+    hora: str  # "HH:MM"
+    motivo: str
+
+
+@router.get(
+    "/api/portal/clinica/{clinica_id}/disponibilidad",
+    summary="Consultar Disponibilidad de Citas de una Clínica",
+    description="Retorna las horas ocupadas y horas disponibles para una fecha seleccionada."
+)
+def get_disponibilidad_clinica(
+    clinica_id: int,
+    fecha: str,
+    db: Session = Depends(get_db)
+):
+    clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    try:
+        fecha_obj = date.fromisoformat(fecha.strip())
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de fecha inválido (use YYYY-MM-DD).")
+
+    hoy_lima = get_lima_now().date()
+    if fecha_obj < hoy_lima:
+        return {
+            "clinica_id": clinica.id,
+            "clinica_nombre": clinica.nombre_comercial or clinica.nombre,
+            "fecha": fecha,
+            "horas_ocupadas": [],
+            "horas_disponibles": [],
+            "hay_disponibilidad": False,
+            "telefono_urgencia": clinica.telefono
+        }
+
+    # Citas activas para esta fecha en la clínica (ocupadas)
+    citas_existentes = db.query(Cita).filter(
+        Cita.clinica_id == clinica_id,
+        Cita.fecha == fecha_obj,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.is_deleted == False
+    ).all()
+
+    horas_ocupadas = [c.hora.strftime("%H:%M") for c in citas_existentes]
+
+    slots_base = [
+        "08:30", "09:00", "09:30", "10:00", "10:30", "11:00",
+        "11:30", "12:00", "12:30", "14:00", "14:30", "15:00",
+        "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"
+    ]
+
+    ahora_lima = get_lima_now()
+    horas_disponibles = []
+    for slot in slots_base:
+        if slot in horas_ocupadas:
+            continue
+        # Si la fecha es hoy, descartar slots que ya pasaron
+        if fecha_obj == hoy_lima:
+            partes = slot.split(":")
+            slot_time = time(hour=int(partes[0]), minute=int(partes[1]))
+            if slot_time <= ahora_lima.time():
+                continue
+        horas_disponibles.append(slot)
+
+    return {
+        "clinica_id": clinica.id,
+        "clinica_nombre": clinica.nombre_comercial or clinica.nombre,
+        "fecha": fecha,
+        "horas_ocupadas": horas_ocupadas,
+        "horas_disponibles": horas_disponibles,
+        "hay_disponibilidad": len(horas_disponibles) > 0,
+        "contacto_emergencia": clinica.telefono,
+        "telefono_urgencia": clinica.telefono
+    }
+
+
+@router.post(
+    "/api/portal/citas",
+    status_code=status.HTTP_201_CREATED,
+    summary="Agendar Cita desde el Portal del Dueño"
+)
+def agendar_cita_portal(
+    payload: CitaCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
+        if not cliente:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    # Validar que la mascota pertenezca al dueño (por DNI unificado)
+    mascota = db.query(Mascota).join(Cliente).filter(
+        Mascota.id == payload.mascota_id,
+        Cliente.dni == cliente.dni,
+        Mascota.is_deleted == False
+    ).first()
+    if not mascota:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada o no pertenece a su perfil.")
+
+    # Validar clínica
+    clinica = db.query(Clinica).filter(Clinica.id == payload.clinica_id, Clinica.is_deleted == False).first()
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    # Parsear hora
+    try:
+        partes = payload.hora.strip().split(":")
+        hora_obj = time(hour=int(partes[0]), minute=int(partes[1]))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de hora inválido (use HH:MM).")
+
+    # Validar que el slot no esté ocupado
+    conflicto = db.query(Cita).filter(
+        Cita.clinica_id == payload.clinica_id,
+        Cita.fecha == payload.fecha,
+        Cita.hora == hora_obj,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.is_deleted == False
+    ).first()
+    if conflicto:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este horario ya se encuentra ocupado. Por favor seleccione otro.")
+
+    nueva_cita = Cita(
+        clinica_id=payload.clinica_id,
+        cliente_id=cliente.id,
+        mascota_id=mascota.id,
+        fecha=payload.fecha,
+        hora=hora_obj,
+        motivo=payload.motivo.strip(),
+        estado="PENDIENTE"
+    )
+    db.add(nueva_cita)
+    db.commit()
+    db.refresh(nueva_cita)
+
+    return {
+        "mensaje": "¡Cita agendada exitosamente!",
+        "cita": {
+            "id": nueva_cita.id,
+            "clinica_id": nueva_cita.clinica_id,
+            "clinica_nombre": clinica.nombre_comercial or clinica.nombre,
+            "mascota_nombre": mascota.nombre,
+            "fecha": nueva_cita.fecha.strftime("%Y-%m-%d"),
+            "hora": nueva_cita.hora.strftime("%H:%M"),
+            "motivo": nueva_cita.motivo,
+            "estado": nueva_cita.estado
+        }
+    }
+
 
 

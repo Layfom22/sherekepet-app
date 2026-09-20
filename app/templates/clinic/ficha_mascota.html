@@ -39,7 +39,8 @@
                     
                     <div class="flex items-center space-x-3 mt-2 text-xs text-slate-600 flex-wrap gap-y-1">
                         <span><strong>Peso:</strong> <span class="font-mono">{{ mascota.peso or '--' }} kg</span></span>
-                        <span><strong>Dueño:</strong> {{ cliente.nombre_completo or cliente.dni }} (DNI: {{ cliente.dni }})</span>
+                        <span>&bull;</span>
+                        <span><strong>Dueño:</strong> {{ cliente.nombre_completo or cliente.dni }}</span>
                         {% if cliente.telefono %}
                         <a 
                             href="https://wa.me/51{{ cliente.telefono|replace(' ', '')|replace('-', '') }}" 
@@ -49,16 +50,6 @@
                             💬 {{ cliente.telefono }}
                         </a>
                         {% endif %}
-                        <button 
-                            type="button" 
-                            id="btnResetPin"
-                            onclick="resetearPinCliente({{ cliente.id }})" 
-                            class="btn-touch px-2 py-0.5 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-200 rounded-lg transition-colors inline-flex items-center space-x-1"
-                            title="Borrar PIN actual del cliente para exigirle crear uno nuevo al ingresar"
-                        >
-                            <span>🔑</span>
-                            <span>Restablecer PIN</span>
-                        </button>
                     </div>
 
                     {% if mascota.alergias %}
@@ -96,8 +87,64 @@
     <!-- Layout 2 Columnas: Carnet de Vacunas & Historial Clínico -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <!-- Columna Izquierda: Carnet de Vacunas (1 col) -->
+        <!-- Columna Izquierda: Información del Propietario y Carnet de Vacunas (1 col) -->
         <div class="lg:col-span-1 space-y-4">
+
+            <!-- Tarjeta Exclusiva: Información del Propietario (Owner-Centric) -->
+            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 space-y-3.5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl">👤</span>
+                        <h2 class="text-base font-bold text-slate-900">Datos del Propietario</h2>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                        DNI: {{ cliente.dni }}
+                    </span>
+                </div>
+
+                <div class="space-y-2.5 text-xs">
+                    <div>
+                        <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Nombre Completo</span>
+                        <p class="font-black text-slate-900 text-sm mt-0.5">{{ cliente.nombre_completo or cliente.dni }}</p>
+                    </div>
+
+                    {% if cliente.telefono %}
+                    <div>
+                        <span class="text-slate-400 text-[10px] uppercase font-bold tracking-wider block">Teléfono de Contacto</span>
+                        <div class="flex items-center space-x-2 mt-1">
+                            <span class="font-bold text-slate-800">{{ cliente.telefono }}</span>
+                            <a 
+                                href="https://wa.me/51{{ cliente.telefono|replace(' ', '')|replace('-', '') }}" 
+                                target="_blank" 
+                                class="btn-touch px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200 rounded-lg transition-colors inline-flex items-center space-x-1"
+                            >
+                                <span>💬 WhatsApp</span>
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Gestión de Seguridad del Dueño (PIN) -->
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <div>
+                            <span class="text-slate-500 font-bold block text-[11px]">Acceso al Portal PWA</span>
+                            <span class="text-[10px] text-slate-400">PIN de seguridad de 4 dígitos</span>
+                        </div>
+                        <button 
+                            type="button" 
+                            id="btnResetPin"
+                            onclick="resetearPinCliente({{ cliente.id }})" 
+                            class="btn-touch px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-300 rounded-xl transition-all inline-flex items-center space-x-1.5 shadow-2xs"
+                            title="Borrar PIN actual del cliente para exigirle crear uno nuevo al ingresar"
+                        >
+                            <span>🔑</span>
+                            <span>Restablecer PIN</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carnet de Vacunas -->
             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
                 <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
                     <div class="flex items-center space-x-2">

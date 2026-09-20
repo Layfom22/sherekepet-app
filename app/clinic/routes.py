@@ -540,6 +540,40 @@ async def upload_foto_mascota(
     )
 
 
+@router.post(
+    "/api/clinic/upload-foto",
+    summary="Subir foto temporal de mascota",
+    description="Permite subir una foto de mascota antes de crear el registro clínico.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+async def upload_foto_clinica_temp(
+    file: UploadFile = File(...)
+):
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
+    content_type = file.content_type or "image/webp"
+    if content_type not in tipos_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+        )
+
+    contenido = await file.read()
+    if len(contenido) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El archivo excede el tamaño máximo permitido (10MB)."
+        )
+
+    foto_url = await upload_image_to_r2(
+        file_bytes=contenido,
+        filename=file.filename or "mascota.webp",
+        folder="mascotas",
+        content_type=content_type
+    )
+
+    return {"foto_url": foto_url}
+
+
 
 @router.post(
     "/api/clinic/pacientes",

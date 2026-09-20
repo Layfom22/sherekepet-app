@@ -169,9 +169,9 @@
                     <div class="w-16 h-16 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-3xl shadow-xs shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
                         {% if m.foto_url %}
                         <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
-                        <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                        <span class="hidden">{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                         {% else %}
-                        <span>{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                        <span>{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                         {% endif %}
                     </div>
 

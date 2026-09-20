@@ -11,9 +11,10 @@
                 <div class="relative group flex-shrink-0">
                     <div id="petAvatarContainer" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center text-3xl shadow-md overflow-hidden relative">
                         {% if mascota.foto_url %}
-                        <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover">
+                        <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('petAvatarEmoji')?.classList.remove('hidden');">
+                        <span id="petAvatarEmoji" class="hidden">{% if 'felino' in (mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                         {% else %}
-                        <span id="petAvatarEmoji">{% if mascota.especie|lower == 'felino' %}🐱{% elif mascota.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                        <span id="petAvatarEmoji">{% if 'felino' in (mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                         {% endif %}
                         <!-- Loader visual para subida -->
                         <div id="fotoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">

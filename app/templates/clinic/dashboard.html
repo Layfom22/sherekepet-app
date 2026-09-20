@@ -95,8 +95,13 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {% for m in resultados_busqueda %}
             <a href="/pacientes/{{ m.id }}" class="bg-white p-4 rounded-xl shadow-xs border border-teal-100 hover:border-teal-500 hover:shadow-md transition-all flex items-center space-x-3">
-                <div class="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-xl">
-                    {% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}
+                <div class="w-12 h-12 rounded-full bg-teal-100 flex items-center justify-center text-xl overflow-hidden shrink-0">
+                    {% if m.foto_url %}
+                    <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                    <span class="hidden">{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                    {% else %}
+                    <span>{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                    {% endif %}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="text-base font-bold text-slate-900 truncate">{{ m.nombre }}</p>

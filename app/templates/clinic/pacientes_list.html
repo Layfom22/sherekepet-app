@@ -125,13 +125,22 @@
                             
                             <!-- Avatar y Datos de la Mascota -->
                             <div class="flex items-center space-x-3 min-w-0">
-                                <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-2xl shadow-2xs shrink-0 overflow-hidden">
-                                    {% if m.foto_url %}
-                                    <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
-                                    <span class="hidden">{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
-                                    {% else %}
-                                    <span>{% if m.especie|lower == 'felino' %}🐱{% elif m.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
-                                    {% endif %}
+                                <div class="relative group/avatar shrink-0">
+                                    <div id="petAvatarBox_{{ m.id }}" class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-2xl shadow-2xs overflow-hidden relative">
+                                        {% if m.foto_url %}
+                                        <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                                        <span class="hidden">{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                        {% else %}
+                                        <span>{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                        {% endif %}
+                                        <div id="avatarLoader_{{ m.id }}" class="hidden absolute inset-0 bg-slate-900/70 flex items-center justify-center text-white text-[10px]">
+                                            <span class="animate-spin text-xs">⏳</span>
+                                        </div>
+                                    </div>
+                                    <label for="fotoInput_{{ m.id }}" class="cursor-pointer absolute -bottom-1 -right-1 w-5 h-5 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-[10px] shadow transition-transform hover:scale-110" title="Subir o cambiar foto de {{ m.nombre }}">
+                                        📷
+                                    </label>
+                                    <input type="file" id="fotoInput_{{ m.id }}" accept="image/*" class="hidden" onchange="subirFotoDirecta(this, {{ m.id }})">
                                 </div>
                                 <div class="min-w-0 text-xs">
                                     <div class="flex items-center space-x-1.5">
@@ -204,4 +213,80 @@
     </div>
 
 </div>
+
+<script>
+function comprimirImagenWebP(file, maxWidth = 1200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                const canvas = document.createElement("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error("Error al convertir a WebP"));
+                }, "image/webp", quality);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+async function subirFotoDirecta(input, mascotaId) {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+
+    const box = document.getElementById(`petAvatarBox_${mascotaId}`);
+    const loader = document.getElementById(`avatarLoader_${mascotaId}`);
+    if (loader) loader.classList.remove("hidden");
+
+    try {
+        const blobComprimido = await comprimirImagenWebP(file, 1200, 0.82);
+        const webpFile = new File([blobComprimido], `mascota_${mascotaId}.webp`, { type: "image/webp" });
+
+        const formData = new FormData();
+        formData.append("file", webpFile);
+
+        const resp = await fetch(`/api/mascotas/${mascotaId}/foto`, {
+            method: "POST",
+            body: formData
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            if (box) {
+                box.innerHTML = `
+                    <img src="${data.foto_url}" alt="Mascota" class="w-full h-full object-cover">
+                    <div id="avatarLoader_${mascotaId}" class="hidden absolute inset-0 bg-slate-900/70 flex items-center justify-center text-white text-[10px]">
+                        <span class="animate-spin text-xs">⏳</span>
+                    </div>
+                `;
+            }
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error al subir foto: " + (err.detail || "Verifique la imagen"));
+            if (loader) loader.classList.add("hidden");
+        }
+    } catch (err) {
+        console.error("Error al procesar foto:", err);
+        alert("Ocurrió un error al procesar la foto.");
+        if (loader) loader.classList.add("hidden");
+    } finally {
+        input.value = "";
+    }
+}
+</script>
 {% endblock %}

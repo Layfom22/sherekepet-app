@@ -82,9 +82,10 @@
                     <div class="flex items-center space-x-3 min-w-0">
                         <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-2xl overflow-hidden shrink-0">
                             {% if c.mascota.foto_url %}
-                            <img src="{{ c.mascota.foto_url }}" alt="{{ c.mascota.nombre }}" class="w-full h-full object-cover">
+                            <img src="{{ c.mascota.foto_url }}" alt="{{ c.mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                            <span class="hidden">{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                             {% else %}
-                            <span>{% if c.mascota.especie|lower == 'felino' %}🐱{% elif c.mascota.especie|lower == 'canino' %}🐶{% else %}🐾{% endif %}</span>
+                            <span>{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
                             {% endif %}
                         </div>
 

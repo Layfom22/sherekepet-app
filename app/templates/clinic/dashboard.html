@@ -118,33 +118,83 @@
     </div>
     {% endif %}
 
+    <!-- Alerta Destacada de Citas Pendientes de Confirmación -->
+    {% if citas_pendientes_count and citas_pendientes_count > 0 %}
+    <div id="banner-citas-pendientes" class="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-500 text-white p-4 sm:p-5 rounded-3xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in fade-in">
+        <div class="flex items-center space-x-3.5">
+            <span class="text-3xl sm:text-4xl shrink-0 animate-bounce">🔔</span>
+            <div>
+                <div class="flex items-center space-x-2 flex-wrap">
+                    <h3 class="text-base sm:text-lg font-black tracking-tight">
+                        ¡Tienes {{ citas_pendientes_count }} cita{{ 's' if citas_pendientes_count != 1 else '' }} pendiente{{ 's' if citas_pendientes_count != 1 else '' }} de confirmación!
+                    </h3>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-white/20 text-white border border-white/30">
+                        Portal Dueños
+                    </span>
+                </div>
+                <p class="text-xs text-amber-100 mt-0.5">
+                    Propietarios de mascotas han solicitado citas desde su celular. Revisa los detalles y confirma la atención.
+                </p>
+            </div>
+        </div>
+        <a 
+            href="#seccionCitasPendientes" 
+            class="btn-touch px-4 py-2.5 bg-white text-amber-900 hover:bg-amber-50 active:bg-amber-100 font-bold text-xs rounded-xl shadow transition-all shrink-0 text-center flex items-center justify-center space-x-1.5"
+        >
+            <span>Ver Solicitudes</span>
+            <span>↓</span>
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Tarjetas KPI del Día -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <!-- KPI 1 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Atenciones de Hoy</p>
                 <p class="text-3xl font-black text-slate-900 mt-1">{{ citas_hoy }}</p>
-                <span class="text-xs text-emerald-600 font-medium">Registradas hoy en clínica</span>
+                <span class="text-xs text-emerald-600 font-medium">Registradas en clínica</span>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl">
+            <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-2xl shrink-0">
                 🩺
             </div>
         </div>
 
-        <!-- KPI 2 -->
+        <!-- KPI 2: Citas Pendientes de Confirmación -->
+        <a 
+            href="{% if citas_pendientes_count and citas_pendientes_count > 0 %}#seccionCitasPendientes{% else %}/agenda{% endif %}" 
+            class="bg-white p-5 rounded-2xl border {% if citas_pendientes_count and citas_pendientes_count > 0 %}border-amber-300 bg-amber-50/40 hover:border-amber-500 hover:shadow-md{% else %}border-slate-200 hover:border-teal-400{% endif %} shadow-sm flex items-center justify-between group transition-all cursor-pointer block"
+            title="Ver citas solicitadas por clientes"
+        >
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-amber-800">Citas por Confirmar</p>
+                <p id="kpi-citas-pendientes" class="text-3xl font-black {% if citas_pendientes_count and citas_pendientes_count > 0 %}text-amber-600{% else %}text-slate-400{% endif %} mt-1">
+                    {{ citas_pendientes_count or 0 }}
+                </p>
+                <span class="text-xs {% if citas_pendientes_count and citas_pendientes_count > 0 %}text-amber-700 font-bold{% else %}text-slate-400{% endif %} flex items-center space-x-1 mt-0.5">
+                    <span>Portal de dueños</span>
+                    <span class="group-hover:translate-x-1 transition-transform">➜</span>
+                </span>
+            </div>
+            <div class="w-12 h-12 rounded-xl {% if citas_pendientes_count and citas_pendientes_count > 0 %}bg-amber-100 text-amber-600{% else %}bg-slate-100 text-slate-400{% endif %} flex items-center justify-center text-2xl group-hover:scale-105 transition-transform shrink-0">
+                🔔
+            </div>
+        </a>
+
+        <!-- KPI 3 -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-500">Refuerzos Pendientes</p>
                 <p class="text-3xl font-black text-amber-600 mt-1">{{ refuerzos_pendientes_hoy }}</p>
-                <span class="text-xs text-amber-600 font-medium">Por contactar hoy / vencidos</span>
+                <span class="text-xs text-amber-600 font-medium">Por contactar / vencidos</span>
             </div>
-            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl">
+            <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl shrink-0">
                 💉
             </div>
         </div>
 
-        <!-- KPI 3: Total Pacientes con enlace a lista de pacientes -->
+        <!-- KPI 4: Total Pacientes con enlace a lista de pacientes -->
         <a 
             href="/pacientes" 
             class="bg-white p-5 rounded-2xl border border-slate-200 hover:border-teal-400 hover:shadow-md transition-all flex items-center justify-between group cursor-pointer block"
@@ -244,6 +294,140 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- SECCIÓN: Solicitudes de Citas Pendientes de Confirmación (Agrupadas por Fecha) -->
+    <div id="seccionCitasPendientes" class="bg-white rounded-3xl shadow-sm border border-amber-200/80 overflow-hidden">
+        <div class="px-5 py-4 border-b border-amber-100 bg-gradient-to-r from-amber-50/80 via-white to-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center text-xl shrink-0">
+                    📅
+                </div>
+                <div>
+                    <h2 class="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                        <span>Citas Pendientes de Confirmación</span>
+                        {% if citas_pendientes_count and citas_pendientes_count > 0 %}
+                        <span id="badge-contador-citas-pendientes" class="px-2.5 py-0.5 text-xs font-black bg-amber-500 text-white rounded-full">
+                            {{ citas_pendientes_count }}
+                        </span>
+                        {% endif %}
+                    </h2>
+                    <p class="text-xs text-slate-500">Solicitudes agendadas por dueños desde el Portal PWA esperando tu revisión</p>
+                </div>
+            </div>
+            <a href="/agenda" class="btn-touch inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-xl border border-teal-200 transition-colors">
+                <span>Ver Agenda Completa</span>
+                <span>➜</span>
+            </a>
+        </div>
+
+        {% if citas_pendientes_por_fecha %}
+        <div class="p-4 sm:p-6 space-y-6">
+            {% for grupo in citas_pendientes_por_fecha %}
+            <div class="space-y-3" id="grupo-citas-{{ grupo.fecha_str }}">
+                <!-- Encabezado del Grupo por Fecha -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <span class="px-3 py-1 text-xs font-black rounded-xl border {{ grupo.badge_class }}">
+                            {{ grupo.etiqueta }}
+                        </span>
+                        <span class="text-xs text-slate-400 font-medium">({{ grupo.citas|length }} {% if grupo.citas|length == 1 %}cita{% else %}citas{% endif %})</span>
+                    </div>
+                    <a href="/agenda?fecha={{ grupo.fecha_str }}" class="text-[11px] font-bold text-slate-500 hover:text-teal-700">
+                        Abrir fecha en agenda &rarr;
+                    </a>
+                </div>
+
+                <!-- Cuadrícula de Citas en esta Fecha -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {% for item in grupo.citas %}
+                    {% set c = item.cita %}
+                    <div id="card-cita-dash-{{ c.id }}" class="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-teal-300 hover:shadow-xs transition-all flex flex-col justify-between gap-3">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-start space-x-3 min-w-0">
+                                <!-- Avatar Mascota -->
+                                <div class="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                                    {% if c.mascota.foto_url %}
+                                    <img src="{{ c.mascota.foto_url }}" alt="{{ c.mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                                    <span class="hidden">{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                    {% else %}
+                                    <span>{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center space-x-2">
+                                        <a href="/pacientes/{{ c.mascota.id }}" class="text-sm font-black text-slate-900 hover:text-teal-700 transition-colors truncate">
+                                            {{ c.mascota.nombre }}
+                                        </a>
+                                        <span class="px-2 py-0.5 text-[10px] font-bold bg-teal-50 text-teal-800 rounded-lg border border-teal-200 font-mono">
+                                            {{ c.hora.strftime('%I:%M %p') }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-slate-500 truncate">
+                                        {{ c.mascota.especie }} &bull; {{ c.mascota.raza or 'Mestizo' }}
+                                    </p>
+                                    <p class="text-xs text-slate-700 mt-1">
+                                        <span class="font-bold">Dueño:</span> {{ c.cliente.nombre_completo or c.cliente.dni }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Motivo de la Cita -->
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200/80 text-xs">
+                            <span class="font-bold text-slate-700">Motivo:</span>
+                            <span class="text-slate-600">{{ c.motivo }}</span>
+                        </div>
+
+                        <!-- Acciones: WhatsApp + Cancelar + Confirmar -->
+                        <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                            {% if item.enlace_whatsapp %}
+                            <a 
+                                href="{{ item.enlace_whatsapp }}" 
+                                target="_blank"
+                                class="btn-touch px-2.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors inline-flex items-center space-x-1"
+                                title="Contactar por WhatsApp"
+                            >
+                                <span>💬</span>
+                                <span class="hidden sm:inline">WhatsApp</span>
+                            </a>
+                            {% else %}
+                            <div></div>
+                            {% endif %}
+
+                            <div class="flex items-center space-x-1.5">
+                                <button 
+                                    type="button" 
+                                    onclick="cancelarCitaDashboard({{ c.id }})"
+                                    class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl transition-colors"
+                                    title="Rechazar / Cancelar cita"
+                                >
+                                    ✕ Rechazar
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onclick="confirmarCitaDashboard({{ c.id }})"
+                                    class="btn-touch px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-2xs transition-colors inline-flex items-center space-x-1"
+                                    title="Aceptar y confirmar cita"
+                                >
+                                    <span>✓</span>
+                                    <span>Confirmar</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-400 space-y-2">
+            <span class="text-3xl block">✨</span>
+            <p class="text-sm font-bold text-slate-700">¡Al día! No hay citas pendientes de confirmación.</p>
+            <p class="text-xs text-slate-400">Cuando un propietario solicite una cita desde el portal del dueño, aparecerá aquí inmediatamente.</p>
+        </div>
+        {% endif %}
+    </div>
 
     <!-- Lista de Seguimientos y Recordatorios: WhatsApp 1-Clic -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -520,6 +704,78 @@ async function eliminarAsistente(asistenteId) {
     } catch (e) {
         console.error(e);
         alert('Error de conexión con el servidor.');
+    }
+}
+
+async function confirmarCitaDashboard(citaId) {
+    if (!confirm('¿Deseas CONFIRMAR esta cita programada?')) return;
+    try {
+        const resp = await fetch(`/api/clinic/citas/${citaId}/confirmar`, {
+            method: 'PUT'
+        });
+        if (resp.ok) {
+            const card = document.getElementById(`card-cita-dash-${citaId}`);
+            if (card) {
+                card.style.transition = 'all 0.35s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    card.remove();
+                    actualizarContadoresPendientes();
+                }, 350);
+            }
+        } else {
+            const err = await resp.json();
+            alert('Error: ' + (err.detail || 'No se pudo confirmar la cita.'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión al confirmar la cita.');
+    }
+}
+
+async function cancelarCitaDashboard(citaId) {
+    if (!confirm('¿Estás seguro de RECHAZAR / CANCELAR esta cita?')) return;
+    try {
+        const resp = await fetch(`/api/clinic/citas/${citaId}/cancelar`, {
+            method: 'PUT'
+        });
+        if (resp.ok) {
+            const card = document.getElementById(`card-cita-dash-${citaId}`);
+            if (card) {
+                card.style.transition = 'all 0.35s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    card.remove();
+                    actualizarContadoresPendientes();
+                }, 350);
+            }
+        } else {
+            const err = await resp.json();
+            alert('Error: ' + (err.detail || 'No se pudo cancelar la cita.'));
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error de conexión al cancelar la cita.');
+    }
+}
+
+function actualizarContadoresPendientes() {
+    const cards = document.querySelectorAll('[id^="card-cita-dash-"]');
+    const badge = document.getElementById('badge-contador-citas-pendientes');
+    const banner = document.getElementById('banner-citas-pendientes');
+    const kpiCount = document.getElementById('kpi-citas-pendientes');
+    
+    if (cards.length === 0) {
+        if (badge) badge.remove();
+        if (banner) banner.remove();
+        if (kpiCount) kpiCount.textContent = '0';
+        // Recargar suavemente para actualizar grupos vacíos
+        setTimeout(() => window.location.reload(), 300);
+    } else {
+        if (badge) badge.textContent = cards.length;
+        if (kpiCount) kpiCount.textContent = cards.length;
     }
 }
 </script>

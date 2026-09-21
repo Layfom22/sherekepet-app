@@ -105,10 +105,21 @@ def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veteri
             Veterinario.id == int(user_id),
             Veterinario.is_deleted == False
         ).first()
-        if vet and vet.rol in ["VET", "VETERINARIO"]:
-            vet.rol = "ADMIN"
-            db.commit()
-            db.refresh(vet)
+        if vet:
+            if vet.rol in ["VET", "VETERINARIO"]:
+                vet.rol = "ADMIN"
+                db.commit()
+                db.refresh(vet)
+            try:
+                hoy = get_lima_now().date()
+                vet.citas_pendientes_count = db.query(Cita).filter(
+                    Cita.clinica_id == vet.clinica_id,
+                    Cita.is_deleted == False,
+                    Cita.estado == "PENDIENTE",
+                    Cita.fecha >= hoy
+                ).count()
+            except Exception:
+                vet.citas_pendientes_count = 0
         return vet
     except Exception:
         return None
@@ -1270,6 +1281,50 @@ def vista_dashboard(
             )
         ).limit(10).all()
 
+    # KPI Citas: Solicitudes de Citas Pendientes de Confirmación (Hoy y a futuro)
+    citas_pendientes_query = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False,
+        Cita.estado == "PENDIENTE",
+        Cita.fecha >= hoy
+    ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
+
+    total_citas_pendientes = len(citas_pendientes_query)
+
+    citas_pendientes_agrupadas = {}
+    for c in citas_pendientes_query:
+        fecha_str = c.fecha.strftime("%Y-%m-%d")
+        if fecha_str not in citas_pendientes_agrupadas:
+            if c.fecha == hoy:
+                etiqueta = "HOY"
+                badge_class = "bg-rose-100 text-rose-800 border-rose-300"
+            elif c.fecha == hoy + timedelta(days=1):
+                etiqueta = "MAÑANA (" + c.fecha.strftime("%d/%m") + ")"
+                badge_class = "bg-amber-100 text-amber-800 border-amber-300"
+            else:
+                etiqueta = c.fecha.strftime("%d/%m/%Y")
+                badge_class = "bg-indigo-50 text-indigo-800 border-indigo-200"
+
+            citas_pendientes_agrupadas[fecha_str] = {
+                "fecha": c.fecha,
+                "fecha_str": fecha_str,
+                "etiqueta": etiqueta,
+                "badge_class": badge_class,
+                "citas": []
+            }
+
+        telefono = c.cliente.telefono or ""
+        enlace_wa = generar_enlace_whatsapp(
+            telefono,
+            f"Hola {c.cliente.nombre_completo or ''}, te saludamos de {clinica.nombre}. Hemos recibido tu solicitud de cita para {c.mascota.nombre} el día {c.fecha.strftime('%d/%m/%Y')} a las {c.hora.strftime('%I:%M %p')}. Motivo: {c.motivo}."
+        )
+        citas_pendientes_agrupadas[fecha_str]["citas"].append({
+            "cita": c,
+            "enlace_whatsapp": enlace_wa
+        })
+
+    citas_pendientes_por_fecha = list(citas_pendientes_agrupadas.values())
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/dashboard.html",
@@ -1281,6 +1336,8 @@ def vista_dashboard(
             "citas_hoy": citas_hoy,
             "refuerzos_pendientes_hoy": refuerzos_pendientes_hoy,
             "total_pacientes": total_pacientes,
+            "citas_pendientes_count": total_citas_pendientes,
+            "citas_pendientes_por_fecha": citas_pendientes_por_fecha,
             "seguimientos": seguimientos_con_wa,
             "busqueda": q,
             "resultados_busqueda": resultados_busqueda,
@@ -1554,6 +1611,37 @@ def vista_agenda_citas(
     total_confirmadas = sum(1 for c in citas if c.estado == "CONFIRMADA")
     total_canceladas = sum(1 for c in citas if c.estado == "CANCELADA")
 
+    # Citas pendientes en OTRAS fechas futuras para alertar al veterinario
+    otras_fechas_query = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False,
+        Cita.estado == "PENDIENTE",
+        Cita.fecha != fecha_filtro,
+        Cita.fecha >= hoy
+    ).order_by(Cita.fecha.asc()).all()
+
+    resumen_otras_fechas = {}
+    for c in otras_fechas_query:
+        f_str = c.fecha.strftime("%Y-%m-%d")
+        if f_str not in resumen_otras_fechas:
+            if c.fecha == hoy + timedelta(days=1):
+                lbl = "Mañana (" + c.fecha.strftime("%d/%m") + ")"
+            else:
+                lbl = c.fecha.strftime("%d/%m/%Y")
+            resumen_otras_fechas[f_str] = {
+                "fecha_str": f_str,
+                "label": lbl,
+                "cantidad": 0
+            }
+        resumen_otras_fechas[f_str]["cantidad"] += 1
+
+    total_pendientes_global = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False,
+        Cita.estado == "PENDIENTE",
+        Cita.fecha >= hoy
+    ).count()
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/agenda.html",
@@ -1566,7 +1654,9 @@ def vista_agenda_citas(
             "total_hoy": total_hoy,
             "total_pendientes": total_pendientes,
             "total_confirmadas": total_confirmadas,
-            "total_canceladas": total_canceladas
+            "total_canceladas": total_canceladas,
+            "otras_fechas_pendientes": list(resumen_otras_fechas.values()),
+            "citas_pendientes_count": total_pendientes_global
         }
     )
 

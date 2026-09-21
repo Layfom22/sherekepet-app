@@ -840,6 +840,29 @@ def agendar_cita_portal(
     db.commit()
     db.refresh(nueva_cita)
 
+    # Notificación por correo a los veterinarios de la clínica
+    try:
+        from app.core.email import send_appointment_notification_email
+        from app.clinic.models import Veterinario
+        vets = db.query(Veterinario).filter(
+            Veterinario.clinica_id == payload.clinica_id,
+            Veterinario.is_deleted == False
+        ).all()
+        for v in vets:
+            if v.email:
+                send_appointment_notification_email(
+                    destinatario=v.email,
+                    cliente_nombre=cliente.nombre_completo or f"DNI {cliente.dni}",
+                    cliente_telefono=cliente.telefono or "",
+                    mascota_nombre=mascota.nombre,
+                    fecha_str=nueva_cita.fecha.strftime("%d/%m/%Y"),
+                    hora_str=nueva_cita.hora.strftime("%I:%M %p"),
+                    motivo=nueva_cita.motivo,
+                    clinica_nombre=clinica.nombre_comercial or clinica.nombre
+                )
+    except Exception as mail_err:
+        logger.warning(f"Aviso de cita por correo omitido o fallido: {mail_err}")
+
     return {
         "mensaje": "¡Cita agendada exitosamente!",
         "cita": {

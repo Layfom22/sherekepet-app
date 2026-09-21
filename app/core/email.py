@@ -108,3 +108,99 @@ https://sherekepet-app.onrender.com
         # En caso de fallo de red SMTP, mostramos en log el código para no bloquear al usuario
         print(f"[FALLBACK OTP] Código generado para {destinatario}: {otp_code}")
         return False
+
+
+def send_appointment_notification_email(
+    destinatario: str,
+    cliente_nombre: str,
+    cliente_telefono: str,
+    mascota_nombre: str,
+    fecha_str: str,
+    hora_str: str,
+    motivo: str,
+    clinica_nombre: str
+) -> bool:
+    """Envía un correo de notificación al veterinario cuando un cliente agenda una cita."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[NOTIFICACIÓN CITA SIMULADA] Para: {destinatario} | Mascota: {mascota_nombre} | Fecha: {fecha_str} {hora_str}")
+        return False
+
+    remitente = settings.SMTP_FROM or settings.SMTP_USER
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"🐾 Nueva Cita Solicitada: {mascota_nombre} ({fecha_str} {hora_str})"
+    msg["From"] = f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
+
+    texto_plano = f"""
+Hola,
+
+{cliente_nombre} ha solicitado una cita para su mascota {mascota_nombre} en {clinica_nombre}.
+
+Detalles de la cita:
+- Mascota: {mascota_nombre}
+- Fecha: {fecha_str}
+- Hora: {hora_str}
+- Motivo: {motivo}
+- Contacto Dueño: {cliente_telefono or 'No registrado'}
+
+Ingresa a tu panel de SherekePet para confirmarla:
+https://sherekepet-app.onrender.com/dashboard#seccionCitasPendientes
+"""
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; padding: 24px; color: #1e293b; margin: 0; }}
+    .card {{ max-width: 500px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 28px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }}
+    .badge {{ display: inline-block; padding: 4px 12px; background-color: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase; margin-bottom: 14px; }}
+    .info-box {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin: 18px 0; }}
+    .btn {{ display: inline-block; padding: 12px 24px; background-color: #0f766e; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px; text-align: center; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">🔔 Nueva Solicitud de Cita</div>
+    <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Cita Agendada por Propietario</h2>
+    <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0 0 16px 0;">
+      El propietario <strong>{cliente_nombre}</strong> ha programado una cita desde el portal para su mascota <strong>{mascota_nombre}</strong>.
+    </p>
+
+    <div class="info-box">
+      <p style="margin: 4px 0; font-size: 13px;"><strong>📅 Fecha:</strong> {fecha_str}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>⏰ Hora:</strong> {hora_str}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>📝 Motivo:</strong> {motivo}</p>
+      <p style="margin: 4px 0; font-size: 13px;"><strong>📞 Teléfono:</strong> {cliente_telefono or 'No registrado'}</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="https://sherekepet-app.onrender.com/dashboard#seccionCitasPendientes" class="btn" style="color:#ffffff;">
+        Ver y Confirmar en el Dashboard
+      </a>
+    </div>
+  </div>
+</body>
+</html>
+"""
+
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        if settings.SMTP_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.sendmail(remitente, [destinatario], msg.as_string())
+        server.quit()
+        logger.info(f"[OK] Correo de cita enviado a {destinatario}")
+        return True
+    except Exception as e:
+        logger.warning(f"Error enviando correo de cita por SMTP: {e}")
+        return False
+

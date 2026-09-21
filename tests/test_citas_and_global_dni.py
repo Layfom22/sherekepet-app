@@ -82,6 +82,11 @@ def test_portal_dashboard_filtra_por_dni(client, db_session):
     db_session.add_all([mascota1, mascota2])
     db_session.commit()
 
+    # Sin cookie -> Redirige a /portal/login (nunca filtra datos de otro cliente)
+    resp_unauth = client.get("/portal/dashboard", follow_redirects=False)
+    assert resp_unauth.status_code == 303
+    assert resp_unauth.headers["location"] == "/portal/login"
+
     token = create_access_token({
         "sub": str(cliente.id),
         "dni": cliente.dni,

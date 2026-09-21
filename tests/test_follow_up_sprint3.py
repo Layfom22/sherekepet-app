@@ -203,13 +203,28 @@ def test_portal_vistas_moviles(client, test_clinica, db_session):
     assert resp_login.status_code == 200
     assert "Portal de Dueños" in resp_login.text
 
-    # 2. Vista Dashboard
+    # 2. Sin autenticación -> Redirige a /portal/login
+    resp_unauth = client.get("/portal/dashboard", follow_redirects=False)
+    assert resp_unauth.status_code == 303
+    assert resp_unauth.headers["location"] == "/portal/login"
+
+    # Autenticar cliente con token JWT
+    from app.core.security import create_access_token
+    token = create_access_token({
+        "sub": str(cliente.id),
+        "role": "client",
+        "dni": cliente.dni,
+        "clinica_id": test_clinica.id
+    })
+    client.cookies.set("client_token", token)
+
+    # 3. Vista Dashboard con cliente autenticado
     resp_dash = client.get("/portal/dashboard")
     assert resp_dash.status_code == 200
     assert "Portal del Dueño" in resp_dash.text
     assert "Chispita" in resp_dash.text
 
-    # 3. Vista Carnet
+    # 4. Vista Carnet
     resp_carnet = client.get(f"/portal/carnet/{mascota.id}")
     assert resp_carnet.status_code == 200
     assert "Chispita" in resp_carnet.text

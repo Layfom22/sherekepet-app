@@ -375,11 +375,14 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
 
         # Login exitoso: redirigir a dashboard guardando cookie
         response = RedirectResponse(url="/portal/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+        is_https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(
             key="client_token",
             value=auth_resp.access_token,
             httponly=True,
             samesite="lax",
+            secure=is_https,
+            path="/",
             max_age=60 * 60 * 24 * 7  # 7 días
         )
         return response
@@ -395,7 +398,7 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
 @router.get("/portal/logout")
 def portal_logout():
     resp = RedirectResponse(url="/portal/login", status_code=status.HTTP_303_SEE_OTHER)
-    resp.delete_cookie("client_token")
+    resp.delete_cookie("client_token", path="/")
     return resp
 
 
@@ -406,12 +409,7 @@ def portal_dashboard(
 ):
     cliente = obtener_cliente_autenticado(request, db)
     if not cliente:
-        # Si hay clientes en la DB y estamos en ambiente local, seleccionar el primero para facilitar pruebas
-        primer_cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
-        if primer_cliente:
-            cliente = primer_cliente
-        else:
-            return RedirectResponse(url="/portal/login")
+        return RedirectResponse(url="/portal/login", status_code=status.HTTP_303_SEE_OTHER)
 
     # Obtener mascotas activas del cliente filtrando por su DNI (Unificación Global SherekePet)
     mascotas = db.query(Mascota).join(Cliente).filter(
@@ -596,9 +594,7 @@ def actualizar_perfil_cliente(
 ):
     cliente = obtener_cliente_autenticado(request, db)
     if not cliente:
-        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
-        if not cliente:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
     if payload.nombre_completo is not None:
         cliente.nombre_completo = payload.nombre_completo.strip()
@@ -635,9 +631,7 @@ def portal_crear_mascota(
 ):
     cliente = obtener_cliente_autenticado(request, db)
     if not cliente:
-        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
-        if not cliente:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
     if not payload.nombre or not payload.nombre.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El nombre de la mascota es obligatorio.")
@@ -676,9 +670,7 @@ async def portal_upload_foto(
 ):
     cliente = obtener_cliente_autenticado(request, db)
     if not cliente:
-        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
-        if not cliente:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
     tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
     content_type = file.content_type or "image/webp"
@@ -801,9 +793,7 @@ def agendar_cita_portal(
 ):
     cliente = obtener_cliente_autenticado(request, db)
     if not cliente:
-        cliente = db.query(Cliente).filter(Cliente.is_deleted == False).first()
-        if not cliente:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
     # Validar que la mascota pertenezca al dueño (por DNI unificado)
     mascota = db.query(Mascota).join(Cliente).filter(

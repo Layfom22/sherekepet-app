@@ -222,6 +222,26 @@ async def test_r2_storage_upload_direct():
 
 def test_directorio_pacientes_list(client, test_clinica, db_session):
     """Verifica el endpoint GET /pacientes y su buscador."""
+    vet = Veterinario(
+        clinica_id=test_clinica.id,
+        nombre="Dr. Mejoras",
+        email="dr.mejoras@test.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet)
+    db_session.commit()
+
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": test_clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", token)
+
     # Crear cliente y mascotas
     c1 = Cliente(clinica_id=test_clinica.id, dni="44556677", nombre_completo="Carlos Alcantara", telefono="+51987654321")
     db_session.add(c1)

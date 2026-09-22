@@ -153,3 +153,33 @@ def test_client_not_found(client, test_clinica):
         "pin": "1234"
     })
     assert resp.status_code == 404
+
+
+def test_usuario_nuevo_o_sin_sesion_redirige_a_login(client):
+    """
+    Verifica que si un usuario ingresa por primera vez o sin sesión activa:
+    - La ruta raíz (/) redirige a /login (303).
+    - El dashboard (/dashboard) redirige a /login (303).
+    - Las vistas de clínica (/pacientes, /configuracion, /agenda) redirigen a /login (303).
+    """
+    client.cookies.clear()
+
+    resp_root = client.get("/", follow_redirects=False)
+    assert resp_root.status_code == 303
+    assert resp_root.headers["location"] == "/login"
+
+    resp_dash = client.get("/dashboard", follow_redirects=False)
+    assert resp_dash.status_code == 303
+    assert resp_dash.headers["location"] == "/login"
+
+    resp_cfg = client.get("/configuracion", follow_redirects=False)
+    assert resp_cfg.status_code == 303
+    assert resp_cfg.headers["location"] == "/login"
+
+    resp_agenda = client.get("/agenda", follow_redirects=False)
+    assert resp_agenda.status_code == 303
+    assert resp_agenda.headers["location"] == "/login"
+
+    resp_pacientes = client.get("/pacientes", follow_redirects=False)
+    assert resp_pacientes.status_code == 303
+    assert resp_pacientes.headers["location"] == "/login"

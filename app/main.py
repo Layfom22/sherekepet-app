@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -48,8 +48,12 @@ app.include_router(follow_up_router)
 
 
 @app.get("/", include_in_schema=False)
-def root():
-    return RedirectResponse(url="/dashboard")
+def root(request: Request):
+    if request.cookies.get("vet_token"):
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    if request.cookies.get("client_token"):
+        return RedirectResponse(url="/portal/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/api/health", tags=["Health"])

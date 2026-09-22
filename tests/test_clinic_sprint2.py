@@ -2,7 +2,8 @@ from datetime import date, timedelta
 from unittest.mock import patch, AsyncMock
 import pytest
 
-from app.clinic.models import Cliente, Mascota, AtencionClinica, RegistroVacuna, SeguimientoNotificacion
+from app.clinic.models import Cliente, Mascota, AtencionClinica, RegistroVacuna, SeguimientoNotificacion, Veterinario
+from app.core.security import create_access_token
 from app.clinic.services.whatsapp_service import normalizar_telefono_peru, generar_enlace_whatsapp
 
 
@@ -202,6 +203,26 @@ def test_marcar_seguimiento_enviado(client, test_clinica, db_session):
 
 def test_vistas_html_render(client, test_clinica, db_session):
     """Verifica que los endpoints HTML de Jinja2 rendericen correctamente con código 200."""
+    vet = Veterinario(
+        clinica_id=test_clinica.id,
+        nombre="Dr. Sprint2",
+        email="dr.sprint2@test.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet)
+    db_session.commit()
+
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": test_clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", token)
+
     cliente = Cliente(clinica_id=test_clinica.id, dni="12344321", nombre_completo="Maria Elena")
     db_session.add(cliente)
     db_session.commit()

@@ -1039,7 +1039,11 @@ def resetear_pin_cliente(
 # ==========================================
 
 @router.get("/login", response_class=HTMLResponse, summary="Vista Login Veterinario")
-def vista_login_veterinario(request: Request, error: Optional[str] = None):
+def vista_login_veterinario(request: Request, error: Optional[str] = None, db: Session = Depends(get_db)):
+    current_user = obtener_veterinario_actual(request, db)
+    if current_user:
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/login.html",
@@ -1096,7 +1100,11 @@ async def procesar_login_veterinario(request: Request, db: Session = Depends(get
 
 
 @router.get("/registro", response_class=HTMLResponse, summary="Vista Registro Veterinario")
-def vista_registro_veterinario(request: Request, error: Optional[str] = None):
+def vista_registro_veterinario(request: Request, error: Optional[str] = None, db: Session = Depends(get_db)):
+    current_user = obtener_veterinario_actual(request, db)
+    if current_user:
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/registro.html",
@@ -1344,8 +1352,10 @@ def vista_dashboard(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+    target_clinica_id = current_user.clinica_id
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
@@ -1506,7 +1516,10 @@ def vista_lista_pacientes(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    target_clinica_id = current_user.clinica_id
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
 
@@ -1598,7 +1611,10 @@ def vista_nuevo_paciente(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    target_clinica_id = current_user.clinica_id
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id).first()
     especies = db.query(Especie).order_by(Especie.nombre.asc()).all()
@@ -1623,13 +1639,14 @@ def vista_ficha_mascota(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     mascota_query = db.query(Mascota).filter(
         Mascota.id == mascota_id,
-        Mascota.is_deleted == False
+        Mascota.is_deleted == False,
+        Mascota.clinica_id == current_user.clinica_id
     )
-    if current_user:
-        mascota_query = mascota_query.filter(Mascota.clinica_id == current_user.clinica_id)
 
     mascota = mascota_query.first()
 
@@ -1692,12 +1709,15 @@ def vista_configuracion_clinica(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
-    if current_user and current_user.rol in ["VET", "VETERINARIO"]:
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    if current_user.rol in ["VET", "VETERINARIO"]:
         current_user.rol = "ADMIN"
         db.commit()
         db.refresh(current_user)
 
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     clinica = db.query(Clinica).filter(
         Clinica.id == target_clinica_id,
@@ -1738,7 +1758,10 @@ def vista_agenda_citas(
 ):
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    target_clinica_id = current_user.clinica_id
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
 

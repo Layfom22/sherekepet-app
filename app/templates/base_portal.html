@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}Portal del Dueño - SherekePet{% endblock %}</title>
     
-    <!-- PWA Meta -->
+    <!-- PWA Meta & Icons -->
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon.png">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -113,9 +116,13 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer Mobile Discreto -->
-    <footer class="py-6 text-center text-[11px] text-slate-400 mt-auto">
-        <p>SherekePet &bull; Carnet Digital y Seguimiento de Mascotas</p>
+    <!-- Footer Mobile Discreto con Branding SherekePet -->
+    <footer class="py-6 text-center text-xs text-slate-400 mt-auto flex flex-col items-center justify-center space-y-1.5">
+        <div class="flex items-center space-x-1.5 opacity-75 hover:opacity-100 transition-opacity">
+            <img src="/static/img/icon-sherekepet.png" alt="SherekePet" class="w-4 h-4 rounded-md object-contain">
+            <span class="font-extrabold text-slate-600">SherekePet</span>
+        </div>
+        <p class="text-[11px]">Carnet Digital y Seguimiento de Mascotas</p>
     </footer>
 
     {% block scripts %}{% endblock %}

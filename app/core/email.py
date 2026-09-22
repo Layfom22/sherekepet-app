@@ -67,8 +67,13 @@ https://sherekepet-app.onrender.com
 </head>
 <body>
   <div class="card">
-    <div class="badge">🐾 SherekePet SaaS Veterinario</div>
-    <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 20px;">Verifica tu Cuenta</h2>
+    <div style="text-align: center; margin-bottom: 16px;">
+      <img src="https://sherekepet-app.onrender.com/static/img/logo_sherekepet.png" alt="SherekePet" style="max-height: 52px; width: auto; border: 0;" />
+    </div>
+    <div style="text-align: center;">
+      <div class="badge">SaaS Veterinario</div>
+    </div>
+    <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 20px; text-align: center;">Verifica tu Cuenta</h2>
     <p style="font-size: 14px; color: #64748b; line-height: 1.5; margin: 0 0 16px 0;">
       Hola<strong>{saludo_nombre}</strong>, ingresa este código de 6 dígitos en la pantalla de verificación para activar tu clínica y comenzar tus 14 días de prueba gratis.
     </p>
@@ -165,8 +170,13 @@ https://sherekepet-app.onrender.com/dashboard#seccionCitasPendientes
 </head>
 <body>
   <div class="card">
-    <div class="badge">🔔 Nueva Solicitud de Cita</div>
-    <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px;">Cita Agendada por Propietario</h2>
+    <div style="text-align: center; margin-bottom: 16px;">
+      <img src="https://sherekepet-app.onrender.com/static/img/logo_sherekepet.png" alt="SherekePet" style="max-height: 48px; width: auto; border: 0;" />
+    </div>
+    <div style="text-align: center;">
+      <div class="badge">🔔 Nueva Solicitud de Cita</div>
+    </div>
+    <h2 style="margin: 0 0 8px 0; color: #0f172a; font-size: 18px; text-align: center;">Cita Agendada por Propietario</h2>
     <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0 0 16px 0;">
       El propietario <strong>{cliente_nombre}</strong> ha programado una cita desde el portal para su mascota <strong>{mascota_nombre}</strong>.
     </p>

@@ -50,12 +50,12 @@ def get_manifest():
         "theme_color": "#0d9488",
         "icons": [
             {
-                "src": "https://img.icons8.com/fluency/192/veterinarian.png",
+                "src": "/static/img/icon-192.png",
                 "sizes": "192x192",
                 "type": "image/png"
             },
             {
-                "src": "https://img.icons8.com/fluency/512/veterinarian.png",
+                "src": "/static/img/icon-512.png",
                 "sizes": "512x512",
                 "type": "image/png"
             }

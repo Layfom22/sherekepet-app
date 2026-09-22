@@ -37,6 +37,11 @@
             justify-content: center;
         }
     </style>
+    <!-- Favicon & Brand Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon.png">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white">
@@ -45,25 +50,15 @@
     <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16 gap-4">
-                <!-- Brand / Logo con fallback seguro contra imágenes rotas -->
+                <!-- Brand / Logo SherekePet SaaS -->
                 <a href="/dashboard" class="flex items-center space-x-2.5 group flex-shrink-0">
-                    {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
                     <img 
-                        src="{{ clinica.logo_url or clinica.logo_b64 }}" 
-                        alt="{{ clinica.nombre }}" 
-                        class="w-10 h-10 rounded-xl object-cover bg-white shadow-xs border border-slate-200 group-hover:scale-105 transition-transform"
-                        onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');"
+                        src="/static/img/icon-sherekepet.png" 
+                        alt="SherekePet" 
+                        class="w-10 h-10 rounded-xl object-contain bg-white shadow-xs border border-teal-100 group-hover:scale-105 transition-transform"
                     >
-                    <div class="hidden w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-xs group-hover:scale-105 transition-transform">
-                        🏥
-                    </div>
-                    {% else %}
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center text-white text-xl shadow-xs group-hover:scale-105 transition-transform">
-                        🏥
-                    </div>
-                    {% endif %}
                     <div>
-                        <span class="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                        <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
                             SherekePet
                         </span>
                         <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">

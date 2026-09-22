@@ -36,9 +36,11 @@ app.add_middleware(
 import os
 from fastapi.staticfiles import StaticFiles
 
-# Asegurar y montar directorio para archivos subidos localmente
+# Asegurar y montar directorio para archivos subidos localmente y assets estáticos
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+os.makedirs("app/static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Registrar rutas
 app.include_router(google_router)

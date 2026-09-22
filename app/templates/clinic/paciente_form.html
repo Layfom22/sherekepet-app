@@ -68,11 +68,27 @@
                 <h2 class="text-base font-bold text-slate-900">1. Datos del Dueño / Titular</h2>
             </div>
 
-            <!-- DNI con Autocompletado Inteligente -->
-            <div>
-                <label for="dni" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    DNI del Cliente *
-                </label>
+            <!-- Selector de Tipo de Documento y Número con Búsqueda Inteligente -->
+            <div class="space-y-2">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label for="dni" id="lblDocumento" class="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                        Documento del Cliente *
+                    </label>
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-[11px] font-semibold text-slate-400">Tipo:</span>
+                        <select 
+                            id="tipo_documento" 
+                            class="px-2.5 py-1 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer transition-colors"
+                            onchange="cambiarTipoDocumento(this.value)"
+                        >
+                            <option value="DNI" selected>DNI (Perú - 8 dígitos)</option>
+                            <option value="CE">Carné de Extranjería (C.E.)</option>
+                            <option value="PASAPORTE">Pasaporte</option>
+                            <option value="OTRO">Otro Documento</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="flex gap-2">
                     <div class="relative flex-1">
                         <input 
@@ -93,7 +109,7 @@
                         onclick="ejecutarBusquedaDni()"
                         class="btn-touch px-5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors whitespace-nowrap"
                     >
-                        🔍 Buscar DNI
+                        🔍 Buscar
                     </button>
                 </div>
 
@@ -133,7 +149,7 @@
                             Nombres y Apellidos Completos *
                         </label>
                         <button type="button" id="btnDesbloquearDueno" onclick="desbloquearCamposDueno()" class="hidden text-[11px] font-bold text-teal-700 hover:underline">
-                            ✏️ Editar Datos
+                            ✏️ Editar Nombre
                         </button>
                     </div>
                     <input 
@@ -146,20 +162,23 @@
                 </div>
 
                 <div>
-                    <label for="telefono" class="block text-xs font-semibold text-slate-700 mb-1">
-                        Teléfono / WhatsApp *
-                    </label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label for="telefono" class="block text-xs font-semibold text-slate-700">
+                            Teléfono / WhatsApp *
+                        </label>
+                        <span class="text-[10px] text-teal-700 font-bold">Siempre editable</span>
+                    </div>
                     <div class="relative">
                         <span class="absolute left-3.5 top-3 text-emerald-600 font-bold text-sm">💬</span>
                         <input 
                             type="tel" 
                             id="telefono" 
                             placeholder="Ej: 987654321" 
-                            class="w-full pl-10 pr-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono transition-colors"
+                            class="w-full pl-10 pr-4 py-3 text-sm bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 font-mono transition-colors"
                             required
                         >
                     </div>
-                    <span class="text-[11px] text-slate-400">Usado para recordatorios y carnet digital</span>
+                    <span class="text-[11px] text-slate-400">Puedes cambiar o actualizar este número si el cliente cambió de WhatsApp.</span>
                 </div>
             </div>
         </div>
@@ -417,41 +436,99 @@ function toggleAlergias(checked) {
     }
 }
 
-// Listener de DNI (auto-búsqueda al completar 8 dígitos o al perder el foco blur)
+// Cambiar tipo de documento (DNI, CE, Pasaporte)
+function cambiarTipoDocumento(tipo) {
+    const inputDni = document.getElementById('dni');
+    const lblDoc = document.getElementById('lblDocumento');
+    const statusMsg = document.getElementById('reniecStatus');
+    const alertaRed = document.getElementById('alertaRedShereke');
+    
+    if (statusMsg) statusMsg.textContent = '';
+    if (alertaRed) alertaRed.classList.add('hidden');
+    document.getElementById('contenedorMascotasExistentes')?.classList.add('hidden');
+    desbloquearCamposDueno();
+
+    if (tipo === 'DNI') {
+        if (lblDoc) lblDoc.textContent = 'DNI del Cliente *';
+        inputDni.maxLength = 8;
+        inputDni.placeholder = 'Ingrese 8 dígitos...';
+    } else if (tipo === 'CE') {
+        if (lblDoc) lblDoc.textContent = 'Carné de Extranjería (C.E.) *';
+        inputDni.maxLength = 20;
+        inputDni.placeholder = 'Ingrese N° de C.E...';
+    } else if (tipo === 'PASAPORTE') {
+        if (lblDoc) lblDoc.textContent = 'Pasaporte del Cliente *';
+        inputDni.maxLength = 20;
+        inputDni.placeholder = 'Ingrese N° de Pasaporte...';
+    } else {
+        if (lblDoc) lblDoc.textContent = 'Documento de Identidad *';
+        inputDni.maxLength = 20;
+        inputDni.placeholder = 'Ingrese N° de Documento...';
+    }
+}
+
+// Listener de Documento (auto-búsqueda para DNI de 8 dígitos y reset al cambiar)
 const inputDni = document.getElementById('dni');
+let ultimoDocBuscado = '';
+
 inputDni.addEventListener('input', function(e) {
-    if (this.value.length === 8) {
+    const tipo = document.getElementById('tipo_documento')?.value || 'DNI';
+    // Si cambia el documento, limpiar avisos anteriores y desbloquear nombre
+    if (this.value.trim() !== ultimoDocBuscado) {
+        document.getElementById('alertaRedShereke')?.classList.add('hidden');
+        document.getElementById('reniecStatus').textContent = '';
+        document.getElementById('contenedorMascotasExistentes')?.classList.add('hidden');
+        const inputNom = document.getElementById('nombre_completo');
+        if (inputNom.readOnly) {
+            inputNom.readOnly = false;
+            inputNom.classList.remove('bg-slate-100', 'cursor-not-allowed');
+            document.getElementById('btnDesbloquearDueno')?.classList.add('hidden');
+        }
+    }
+    if (tipo === 'DNI' && this.value.length === 8) {
         ejecutarBusquedaDni();
     }
 });
+
 inputDni.addEventListener('blur', function(e) {
-    if (this.value.trim().length === 8) {
+    const tipo = document.getElementById('tipo_documento')?.value || 'DNI';
+    if (tipo === 'DNI' && this.value.trim().length === 8) {
         ejecutarBusquedaDni();
     }
 });
 
 // Búsqueda Inteligente: Primero Red SherekePet (Cross-Tenant), luego RENIEC
 async function ejecutarBusquedaDni() {
-    const dni = inputDni.value.trim();
+    const doc = inputDni.value.trim();
+    const tipo = document.getElementById('tipo_documento')?.value || 'DNI';
     const statusMsg = document.getElementById('reniecStatus');
     const loader = document.getElementById('loaderReniec');
     const btn = document.getElementById('btnBuscarDni');
     const alertaRed = document.getElementById('alertaRedShereke');
 
-    if (dni.length !== 8 || !/^\d{8}$/.test(dni)) {
-        statusMsg.className = "text-xs mt-1.5 font-medium text-rose-600";
-        statusMsg.textContent = "Ingrese un DNI válido de 8 dígitos numéricos.";
-        return;
+    if (tipo === 'DNI') {
+        if (doc.length !== 8 || !/^\d{8}$/.test(doc)) {
+            statusMsg.className = "text-xs mt-1.5 font-medium text-rose-600";
+            statusMsg.textContent = "Ingrese un DNI válido de 8 dígitos numéricos.";
+            return;
+        }
+    } else {
+        if (doc.length < 3) {
+            statusMsg.className = "text-xs mt-1.5 font-medium text-rose-600";
+            statusMsg.textContent = "Ingrese un documento válido (mínimo 3 caracteres).";
+            return;
+        }
     }
 
+    ultimoDocBuscado = doc;
     loader.classList.remove('hidden');
     btn.disabled = true;
     statusMsg.className = "text-xs mt-1.5 font-medium text-teal-600";
-    statusMsg.textContent = "Buscando en red SherekePet y registros oficiales...";
+    statusMsg.textContent = "Buscando en red SherekePet...";
 
     try {
         // 1. Paso 1: Búsqueda Global en SherekePet
-        const respRed = await fetch(`/api/clinic/buscar-dni/${dni}`);
+        const respRed = await fetch(`/api/clinic/buscar-dni/${encodeURIComponent(doc)}`);
         if (respRed.ok) {
             const dataRed = await respRed.json();
             if (dataRed.encontrado) {
@@ -463,13 +540,17 @@ async function ejecutarBusquedaDni() {
                 const inputNom = document.getElementById('nombre_completo');
                 const inputTel = document.getElementById('telefono');
                 inputNom.value = dataRed.cliente.nombre_completo || '';
-                inputTel.value = dataRed.cliente.telefono || '';
 
-                // Bloquear para evitar sobreescrituras accidentales
+                // El teléfono SIEMPRE permanece editable para poder actualizarlo
+                if (dataRed.cliente.telefono) {
+                    inputTel.value = dataRed.cliente.telefono;
+                }
+                inputTel.readOnly = false;
+                inputTel.classList.remove('bg-slate-100', 'cursor-not-allowed');
+
+                // Proteger nombre con botón para editar
                 inputNom.readOnly = true;
-                inputTel.readOnly = true;
                 inputNom.classList.add('bg-slate-100', 'cursor-not-allowed');
-                inputTel.classList.add('bg-slate-100', 'cursor-not-allowed');
                 document.getElementById('btnDesbloquearDueno').classList.remove('hidden');
 
                 // Mostrar mascotas existentes si tiene
@@ -482,20 +563,26 @@ async function ejecutarBusquedaDni() {
             }
         }
 
-        // Si no está en SherekePet, ocultar alerta de red y consultar RENIEC
+        // Si no está en SherekePet, ocultar alerta de red
         alertaRed.classList.add('hidden');
         document.getElementById('contenedorMascotasExistentes').classList.add('hidden');
 
-        // 2. Paso 2: Consulta RENIEC
-        const respReniec = await fetch(`/api/reniec/dni/${dni}`);
-        if (respReniec.ok) {
-            const dataReniec = await respReniec.json();
-            document.getElementById('nombre_completo').value = dataReniec.nombre_completo;
-            statusMsg.className = "text-xs mt-1.5 font-medium text-emerald-600";
-            statusMsg.textContent = `✓ Datos encontrados en RENIEC: ${dataReniec.nombre_completo}`;
+        // 2. Paso 2: Consulta RENIEC si es DNI
+        if (tipo === 'DNI') {
+            statusMsg.textContent = "Consultando RENIEC...";
+            const respReniec = await fetch(`/api/reniec/dni/${doc}`);
+            if (respReniec.ok) {
+                const dataReniec = await respReniec.json();
+                document.getElementById('nombre_completo').value = dataReniec.nombre_completo;
+                statusMsg.className = "text-xs mt-1.5 font-medium text-emerald-600";
+                statusMsg.textContent = `✓ Datos encontrados en RENIEC: ${dataReniec.nombre_completo}`;
+            } else {
+                statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
+                statusMsg.textContent = "DNI no registrado previamente. Complete los datos manualmente.";
+            }
         } else {
-            statusMsg.className = "text-xs mt-1.5 font-medium text-amber-600";
-            statusMsg.textContent = "DNI no registrado previamente. Complete los datos manualmente.";
+            statusMsg.className = "text-xs mt-1.5 font-medium text-slate-500";
+            statusMsg.textContent = "Documento no registrado previamente. Ingrese los datos del titular.";
         }
     } catch (e) {
         console.error(e);
@@ -515,6 +602,7 @@ function desbloquearCamposDueno() {
     inputTel.readOnly = false;
     inputNom.classList.remove('bg-slate-100', 'cursor-not-allowed');
     inputTel.classList.remove('bg-slate-100', 'cursor-not-allowed');
+    document.getElementById('btnDesbloquearDueno')?.classList.add('hidden');
     inputNom.focus();
 }
 
@@ -697,6 +785,7 @@ document.getElementById('formPaciente').addEventListener('submit', async functio
 
     const payload = {
         clinica_id: parseInt(document.getElementById('clinica_id').value),
+        tipo_documento: document.getElementById('tipo_documento') ? document.getElementById('tipo_documento').value : "DNI",
         dni: document.getElementById('dni').value.trim(),
         nombre_completo: document.getElementById('nombre_completo').value.trim(),
         telefono: document.getElementById('telefono').value.trim(),

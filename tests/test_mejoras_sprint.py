@@ -356,7 +356,7 @@ def test_resetear_pin_cliente(client, test_clinica, db_session):
 
 
 def test_multi_clinica_selector(client, db_session):
-    """Verifica el paso intermedio cuando un DNI está registrado en múltiples clínicas."""
+    """Verifica que un dueño con DNI en múltiples clínicas ingrese directamente a su dashboard unificado sin pasar por selección de clínica."""
     from app.core.models import Clinica
     clinica1 = Clinica(nombre="Veterinaria Norte", zona_horaria="America/Lima", plan_activo="solo")
     clinica2 = Clinica(nombre="Veterinaria Sur", zona_horaria="America/Lima", plan_activo="solo")
@@ -368,12 +368,10 @@ def test_multi_clinica_selector(client, db_session):
     db_session.add_all([c1, c2])
     db_session.commit()
 
-    # Intento de login sin indicar clinica_seleccionada
-    resp = client.post("/portal/login", data={"dni": "99887766", "pin": "1234"})
-    assert resp.status_code == 200
-    assert "Elige tu Clínica" in resp.text
-    assert "Veterinaria Norte" in resp.text
-    assert "Veterinaria Sur" in resp.text
+    # Intento de login: accede directamente al dashboard de mascotas unificadas
+    resp = client.post("/portal/login", data={"dni": "99887766", "pin": "1234"}, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/portal/dashboard"
 
 
 def test_catalogo_extendido_con_especies_y_razas(client, db_session):

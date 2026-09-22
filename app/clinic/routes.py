@@ -383,8 +383,8 @@ def buscar_cliente_global_por_dni(
 ):
     verificar_acceso_veterinario(request)
     dni_limpio = dni.strip()
-    if not dni_limpio or len(dni_limpio) != 8 or not dni_limpio.isdigit():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El DNI debe tener 8 dígitos numéricos.")
+    if not dni_limpio or len(dni_limpio) < 4 or len(dni_limpio) > 20:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El documento debe tener entre 4 y 20 caracteres.")
 
     cliente = db.query(Cliente).filter(
         Cliente.dni == dni_limpio,
@@ -655,10 +655,10 @@ def registrar_paciente_rapido(
         db.flush()
     else:
         # Si ya existe el cliente en la red, actualizar datos de contacto si fueron provistos
-        if nombre_completo and not cliente.nombre_completo:
-            cliente.nombre_completo = nombre_completo
-        if payload.telefono and not cliente.telefono:
-            cliente.telefono = payload.telefono
+        if nombre_completo and nombre_completo.strip():
+            cliente.nombre_completo = nombre_completo.strip()
+        if payload.telefono and payload.telefono.strip():
+            cliente.telefono = payload.telefono.strip()
         db.flush()
 
     # 3. Resolver nombres de Especie y Raza desde Catálogo si se enviaron IDs

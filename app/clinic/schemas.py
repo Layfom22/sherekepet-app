@@ -28,7 +28,8 @@ class EspecieConRazas(BaseModel):
 
 class PacienteRapidoRequest(BaseModel):
     clinica_id: int = Field(..., description="ID de la clínica veterinaria")
-    dni: str = Field(..., min_length=8, max_length=8, description="DNI de 8 dígitos del cliente")
+    tipo_documento: Optional[str] = Field("DNI", description="Tipo de documento (DNI, CE, PASAPORTE, OTRO)")
+    dni: str = Field(..., min_length=3, max_length=20, description="DNI o Documento de Identidad del cliente (DNI, CE, Pasaporte)")
     nombres: Optional[str] = Field(None, description="Nombres del cliente")
     apellido_paterno: Optional[str] = Field(None, description="Apellido paterno")
     apellido_materno: Optional[str] = Field(None, description="Apellido materno")
@@ -54,8 +55,8 @@ class PacienteRapidoRequest(BaseModel):
     @classmethod
     def validate_dni(cls, v: str) -> str:
         v = v.strip()
-        if not v.isdigit() or len(v) != 8:
-            raise ValueError("El DNI debe tener exactamente 8 dígitos numéricos.")
+        if len(v) < 3 or len(v) > 20:
+            raise ValueError("El número de documento debe tener entre 3 y 20 caracteres.")
         return v
 
 

@@ -13,7 +13,8 @@ from app.core.security import decode_access_token
 from app.core.storage import upload_image_to_r2
 from app.database import get_db
 from app.core.models import Clinica
-from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita
+from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita, AtencionClinica, Veterinario
+from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
 from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
 from app.follow_up.schemas import (
     MedicationPlanCreateRequest,
@@ -318,27 +319,6 @@ async def portal_login_post(request: Request, db: Session = Depends(get_db)):
             }
         )
 
-    if len(clientes_con_dni) > 1 and not form.get("clinica_seleccionada"):
-        # Redirigir al selector intermedio
-        registros = []
-        for c in clientes_con_dni:
-            total_mascotas = db.query(Mascota).filter(Mascota.cliente_id == c.id, Mascota.is_deleted == False).count()
-            registros.append({
-                "cliente": c,
-                "clinica": c.clinica,
-                "total_mascotas": total_mascotas
-            })
-        return templates.TemplateResponse(
-            request=request,
-            name="client/seleccionar_clinica.html",
-            context={
-                "dni": dni,
-                "pin": nuevo_pin or pin,
-                "registros": registros,
-                "clinica": clientes_con_dni[0].clinica
-            }
-        )
-
     if form_clinica_id:
         try:
             clinica_id = int(form_clinica_id)
@@ -418,6 +398,30 @@ def portal_dashboard(
         Mascota.is_deleted == False
     ).order_by(Mascota.created_at.desc()).all()
 
+    # Adjuntar última atención y veterinario tratante a cada mascota para visualización directa
+    for m in mascotas:
+        ult_at = db.query(AtencionClinica).filter(
+            AtencionClinica.mascota_id == m.id,
+            AtencionClinica.is_deleted == False
+        ).order_by(AtencionClinica.created_at.desc()).first()
+        if ult_at:
+            v_nom = ult_at.veterinario.nombre if (ult_at.veterinario and ult_at.veterinario.nombre) else "Médico Veterinario"
+            c_nom = (ult_at.clinica.nombre_comercial or ult_at.clinica.nombre) if ult_at.clinica else "Veterinaria"
+            m.ultimo_vet_info = {
+                "veterinario": v_nom,
+                "clinica": c_nom,
+                "fecha": ult_at.created_at.strftime("%d/%m/%Y"),
+                "motivo": ult_at.motivo
+            }
+        else:
+            cli_n = (m.clinica.nombre_comercial or m.clinica.nombre) if m.clinica else "SherekePet"
+            m.ultimo_vet_info = {
+                "veterinario": "Equipo Veterinario",
+                "clinica": cli_n,
+                "fecha": None,
+                "motivo": "Registrado en clínica"
+            }
+
     # Obtener veterinarias asociadas al cliente y sus mascotas para agendamiento centralizado
     clinica_ids = {m.clinica_id for m in mascotas}
     if cliente.clinica_id:
@@ -486,13 +490,77 @@ def portal_carnet_mascota(
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
 
-    # Vacunas (solo lectura)
+    # 1. Atenciones clínicas veterinarias ordenadas cronológicamente (la más reciente primero)
+    atenciones = db.query(AtencionClinica).filter(
+        AtencionClinica.mascota_id == mascota_id,
+        AtencionClinica.is_deleted == False
+    ).order_by(AtencionClinica.created_at.desc()).all()
+
+    atenciones_info = []
+    for at in atenciones:
+        vet = at.veterinario
+        cli = db.query(Clinica).filter(Clinica.id == at.clinica_id).first() if at.clinica_id else None
+        
+        vet_nombre = vet.nombre if (vet and vet.nombre) else "Médico Veterinario"
+        vet_foto = vet.foto_perfil if vet else None
+        cli_nombre = (cli.nombre_comercial or cli.nombre) if cli else "Clínica Veterinaria"
+        cli_telefono = cli.telefono if cli else None
+
+        enlace_wa = None
+        if cli_telefono:
+            msg = f"Hola {cli_nombre}, te escribo como dueño de {mascota.nombre} sobre la atención del {at.created_at.strftime('%d/%m/%Y')}."
+            enlace_wa = generar_enlace_whatsapp(cli_telefono, msg)
+
+        atenciones_info.append({
+            "id": at.id,
+            "fecha": at.created_at,
+            "tipo": at.tipo_atencion,
+            "motivo": at.motivo,
+            "diagnostico": at.diagnostico,
+            "tratamiento": at.tratamiento,
+            "peso_kg": at.peso_actual_kg,
+            "vet_nombre": vet_nombre,
+            "vet_foto": vet_foto,
+            "clinica_nombre": cli_nombre,
+            "clinica_telefono": cli_telefono,
+            "enlace_whatsapp": enlace_wa
+        })
+
+    ultimo_veterinario = None
+    otras_atenciones = []
+    if atenciones_info:
+        ultimo_veterinario = atenciones_info[0]
+        otras_atenciones = atenciones_info[1:]
+    else:
+        cli_reg = mascota.clinica or (mascota.cliente.clinica if mascota.cliente else None)
+        if cli_reg:
+            primer_vet = cli_reg.veterinarios[0] if (cli_reg.veterinarios and len(cli_reg.veterinarios) > 0) else None
+            vet_nom = primer_vet.nombre if (primer_vet and primer_vet.nombre) else "Médico Veterinario Asignado"
+            enlace_wa = None
+            if cli_reg.telefono:
+                enlace_wa = generar_enlace_whatsapp(cli_reg.telefono, f"Hola {cli_reg.nombre}, me comunico como dueño de {mascota.nombre}.")
+            ultimo_veterinario = {
+                "id": 0,
+                "fecha": None,
+                "tipo": "Médico de Cabecera",
+                "motivo": "Clínica de Registro Oficial",
+                "diagnostico": None,
+                "tratamiento": None,
+                "peso_kg": mascota.peso,
+                "vet_nombre": vet_nom,
+                "vet_foto": primer_vet.foto_perfil if primer_vet else None,
+                "clinica_nombre": cli_reg.nombre_comercial or cli_reg.nombre,
+                "clinica_telefono": cli_reg.telefono,
+                "enlace_whatsapp": enlace_wa
+            }
+
+    # 2. Vacunas (solo lectura)
     vacunas = db.query(RegistroVacuna).filter(
         RegistroVacuna.mascota_id == mascota_id,
         RegistroVacuna.is_deleted == False
     ).order_by(RegistroVacuna.fecha_aplicacion.desc()).all()
 
-    # Planes de medicación y su próxima dosis pendiente
+    # 3. Planes de medicación y su próxima dosis pendiente
     planes = db.query(MedicationPlan).filter(
         MedicationPlan.pet_id == mascota_id,
         MedicationPlan.is_deleted == False
@@ -524,6 +592,9 @@ def portal_carnet_mascota(
             "mascota": mascota,
             "cliente": mascota.cliente,
             "clinica": mascota.clinica or mascota.cliente.clinica,
+            "ultimo_veterinario": ultimo_veterinario,
+            "otras_atenciones": otras_atenciones,
+            "total_atenciones": len(atenciones_info),
             "vacunas": vacunas,
             "planes": planes_info,
             "ahora": get_lima_now()

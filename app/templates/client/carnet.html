@@ -147,6 +147,145 @@
 
     </div>
 
+    <!-- SECCIÓN: VETERINARIO TRATANTE E HISTORIAL CLÍNICO -->
+    <div class="space-y-3">
+        <div class="flex items-center justify-between px-1">
+            <h2 class="text-sm font-black uppercase tracking-wider text-slate-800 flex items-center space-x-1.5">
+                <span>🩺</span>
+                <span>Veterinario Tratante</span>
+            </h2>
+            {% if total_atenciones and total_atenciones > 0 %}
+            <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
+                {{ total_atenciones }} atención{{ 'es' if total_atenciones != 1 else '' }}
+            </span>
+            {% endif %}
+        </div>
+
+        {% if ultimo_veterinario %}
+        <!-- Tarjeta del Último Veterinario Tratante (Más reciente) -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-center space-x-3.5 min-w-0">
+                    <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-2xl shrink-0 overflow-hidden shadow-2xs">
+                        {% if ultimo_veterinario.vet_foto %}
+                        <img src="{{ ultimo_veterinario.vet_foto }}" alt="{{ ultimo_veterinario.vet_nombre }}" class="w-full h-full object-cover">
+                        {% else %}
+                        <span>👨‍⚕️</span>
+                        {% endif %}
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-[10px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                                {% if ultimo_veterinario.fecha %}Última Atención{% else %}Médico Asignado{% endif %}
+                            </span>
+                            {% if ultimo_veterinario.fecha %}
+                            <span class="text-xs font-bold text-slate-400 font-mono">
+                                {{ ultimo_veterinario.fecha.strftime('%d/%m/%Y') }}
+                            </span>
+                            {% endif %}
+                        </div>
+                        <h3 class="text-base font-black text-slate-900 mt-1 truncate">
+                            {{ ultimo_veterinario.vet_nombre }}
+                        </h3>
+                        <p class="text-xs text-slate-500 font-medium truncate">
+                            🏥 {{ ultimo_veterinario.clinica_nombre }}
+                        </p>
+                    </div>
+                </div>
+
+                {% if ultimo_veterinario.enlace_whatsapp %}
+                <a 
+                    href="{{ ultimo_veterinario.enlace_whatsapp }}" 
+                    target="_blank"
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0 flex items-center space-x-1"
+                    title="Contactar al equipo veterinario por WhatsApp"
+                >
+                    <span>💬</span>
+                    <span class="hidden sm:inline">WhatsApp</span>
+                </a>
+                {% endif %}
+            </div>
+
+            {% if ultimo_veterinario.motivo %}
+            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
+                <div class="flex items-center space-x-1.5 text-slate-800 font-bold">
+                    <span class="text-teal-600">📌</span>
+                    <span>Motivo: {{ ultimo_veterinario.motivo }}</span>
+                </div>
+                {% if ultimo_veterinario.diagnostico %}
+                <div class="text-slate-600 pt-1 border-t border-slate-200/60">
+                    <strong class="text-slate-800">Diagnóstico:</strong> {{ ultimo_veterinario.diagnostico }}
+                </div>
+                {% endif %}
+                {% if ultimo_veterinario.tratamiento %}
+                <div class="text-slate-600">
+                    <strong class="text-slate-800">Tratamiento Indicado:</strong> {{ ultimo_veterinario.tratamiento }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Botón para Expandir/Contraer Otros Veterinarios y Atenciones Anteriores -->
+            {% if otras_atenciones and otras_atenciones|length > 0 %}
+            <div class="pt-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    id="btnToggleOtrosVets"
+                    onclick="toggleOtrosVeterinarios()"
+                    class="btn-touch w-full py-2.5 px-4 text-xs font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/80 rounded-2xl transition-all flex items-center justify-between"
+                >
+                    <span class="flex items-center space-x-1.5">
+                        <span>📂</span>
+                        <span>Ver otros veterinarios y atenciones anteriores ({{ otras_atenciones|length }})</span>
+                    </span>
+                    <span id="iconoToggleVets" class="text-xs transition-transform duration-200 font-mono">▼</span>
+                </button>
+
+                <!-- Contenedor Desplegable -->
+                <div id="contenedorOtrosVets" class="hidden mt-3 space-y-3 pt-1">
+                    {% for at in otras_atenciones %}
+                    <div class="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-2 text-xs">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-base">👨‍⚕️</span>
+                                <span class="font-black text-slate-900">{{ at.vet_nombre }}</span>
+                            </div>
+                            <span class="text-[11px] font-bold text-slate-500 font-mono">
+                                {{ at.fecha.strftime('%d/%m/%Y') }}
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-teal-700 font-semibold">
+                            🏥 {{ at.clinica_nombre }} &bull; <span class="text-slate-500 font-normal">{{ at.tipo }}</span>
+                        </p>
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+                            <p class="text-slate-700"><strong>Motivo:</strong> {{ at.motivo }}</p>
+                            {% if at.diagnostico %}
+                            <p class="text-slate-600"><strong>Diagnóstico:</strong> {{ at.diagnostico }}</p>
+                            {% endif %}
+                            {% if at.tratamiento %}
+                            <p class="text-slate-600"><strong>Tratamiento:</strong> {{ at.tratamiento }}</p>
+                            {% endif %}
+                        </div>
+                        {% if at.enlace_whatsapp %}
+                        <div class="flex justify-end pt-1">
+                            <a 
+                                href="{{ at.enlace_whatsapp }}" 
+                                target="_blank" 
+                                class="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center space-x-1"
+                            >
+                                <span>💬 Consultar sobre esta atención</span>
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
     <!-- SECCIÓN 1: PANEL INTERACTIVO DE MEDICACIÓN DINÁMICA -->
     <div class="space-y-3">
         <div class="flex items-center justify-between px-1">
@@ -766,6 +905,19 @@ function cambiarTemaDni(tema) {
             btnOscuro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all bg-indigo-900 text-white shadow-xs font-black";
             btnClaro.className = "px-3.5 py-1.5 rounded-full flex items-center space-x-1.5 transition-all text-slate-600 hover:text-slate-900 font-medium";
         }
+    }
+}
+
+function toggleOtrosVeterinarios() {
+    const contenedor = document.getElementById('contenedorOtrosVets');
+    const icono = document.getElementById('iconoToggleVets');
+    if (!contenedor) return;
+    if (contenedor.classList.contains('hidden')) {
+        contenedor.classList.remove('hidden');
+        if (icono) icono.textContent = '▲';
+    } else {
+        contenedor.classList.add('hidden');
+        if (icono) icono.textContent = '▼';
     }
 }
 </script>

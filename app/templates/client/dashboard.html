@@ -185,8 +185,19 @@
                         <p class="text-xs text-slate-500 mt-1 truncate">
                             {{ m.raza or 'Mestizo' }} &bull; {{ m.sexo or 'No especificado' }}
                         </p>
+                        {% if m.ultimo_vet_info and m.ultimo_vet_info.fecha %}
+                        <div class="mt-1.5 flex items-center space-x-1.5 text-[11px] text-teal-800 font-semibold truncate bg-teal-50/90 px-2 py-0.5 rounded-lg border border-teal-200">
+                            <span>🩺</span>
+                            <span class="truncate">{{ m.ultimo_vet_info.veterinario }} &bull; {{ m.ultimo_vet_info.fecha }}</span>
+                        </div>
+                        {% elif m.ultimo_vet_info %}
+                        <div class="mt-1.5 flex items-center space-x-1.5 text-[11px] text-slate-600 font-medium truncate bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-200">
+                            <span>🏥</span>
+                            <span class="truncate">{{ m.ultimo_vet_info.clinica }}</span>
+                        </div>
+                        {% endif %}
                         <div class="mt-2.5 flex items-center space-x-1.5 text-xs font-bold text-indigo-600 group-hover:text-indigo-700">
-                            <span>Ver Carnet & Medicinas</span>
+                            <span>Ver Carnet & Veterinario</span>
                             <span>➜</span>
                         </div>
                     </div>

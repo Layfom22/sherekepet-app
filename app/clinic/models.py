@@ -228,6 +228,7 @@ class AtencionClinica(Base, SoftDeleteMixin, TimestampMixin):
     # Relaciones
     mascota = relationship("Mascota", back_populates="atenciones")
     veterinario = relationship("Veterinario", back_populates="atenciones")
+    clinica = relationship("Clinica")
     vacunas = relationship("RegistroVacuna", back_populates="atencion")
 
     def __repr__(self) -> str:

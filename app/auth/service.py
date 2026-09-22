@@ -295,24 +295,31 @@ class AuthService:
     def login_cliente(db: Session, request: ClientLoginRequest) -> ClientLoginResponse:
         """
         Autenticación de clientes/dueños de mascotas por DNI y PIN de 4 dígitos.
+        Unificación Global por DNI: El dueño accede con un solo PIN y ve todas sus mascotas sin importar la clínica.
         - Si es primer ingreso (pin_hash es NULL), exige crear un PIN de 4 dígitos.
         - Si ya posee PIN, valida DNI + PIN para retornar el JWT.
         """
-        # Multi-tenant: buscar cliente en su clínica omitiendo eliminados
-        cliente = db.query(Cliente).filter(
-            Cliente.clinica_id == request.clinica_id,
-            Cliente.dni == request.dni,
+        # Multi-tenant inteligente: buscar registros del cliente por su DNI
+        dni_clean = request.dni.strip()
+        clientes = db.query(Cliente).filter(
+            Cliente.dni == dni_clean,
             Cliente.is_deleted == False
-        ).first()
+        ).all()
 
-        if not cliente:
+        if not clientes:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cliente no registrado con ese DNI en esta clínica."
+                detail="Cliente no registrado con ese documento en el sistema."
             )
 
-        # CASO 1: Primer ingreso (pin_hash es NULL o vacío)
-        if not cliente.pin_hash or not str(cliente.pin_hash).strip():
+        # Seleccionar cliente principal (preferir coincidencia con clinica_id o el primero)
+        cliente = next((c for c in clientes if c.clinica_id == request.clinica_id), clientes[0])
+
+        # Verificar si algún registro con este DNI ya tiene PIN configurado
+        cliente_con_pin = next((c for c in clientes if c.pin_hash and str(c.pin_hash).strip()), None)
+
+        # CASO 1: Primer ingreso (ningún registro con este DNI tiene PIN)
+        if not cliente_con_pin:
             pin_a_establecer = request.nuevo_pin or request.pin
             if not pin_a_establecer:
                 return ClientLoginResponse(
@@ -330,8 +337,10 @@ class AuthService:
                     detail="El PIN debe constar exactamente de 4 dígitos numéricos."
                 )
 
-            # Establecer y encriptar nuevo PIN (bcrypt)
-            cliente.pin_hash = hash_pin(pin_clean)
+            # Establecer y encriptar nuevo PIN para TODOS los registros de este DNI
+            nuevo_pin_hash = hash_pin(pin_clean)
+            for c in clientes:
+                c.pin_hash = nuevo_pin_hash
             db.commit()
             db.refresh(cliente)
 
@@ -359,11 +368,17 @@ class AuthService:
                 detail="Debe ingresar su PIN de 4 dígitos para acceder."
             )
 
-        if not verify_pin(request.pin, cliente.pin_hash):
+        if not verify_pin(request.pin, cliente_con_pin.pin_hash):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="PIN incorrecto."
             )
+
+        # Sincronizar pin_hash a todos los registros del mismo DNI si alguno le faltaba
+        for c in clientes:
+            if not c.pin_hash:
+                c.pin_hash = cliente_con_pin.pin_hash
+        db.commit()
 
         # Emitir JWT al validar DNI + PIN
         token_payload = {

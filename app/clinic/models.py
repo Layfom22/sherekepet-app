@@ -360,3 +360,34 @@ class Cita(Base, SoftDeleteMixin, TimestampMixin):
     def __repr__(self) -> str:
         return f"<Cita(id={self.id}, fecha={self.fecha}, hora={self.hora}, estado='{self.estado}', mascota_id={self.mascota_id})>"
 
+
+class HorarioAtencion(Base, SoftDeleteMixin, TimestampMixin):
+    """Modelo de Configuración de Horarios de Atención por Día para la Clínica."""
+    __tablename__ = "sp_horarios_atencion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    clinica_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clinicas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    dia_semana: Mapped[int] = mapped_column(Integer, nullable=False, index=True)  # 0=Lunes, 1=Martes, ..., 6=Domingo
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Turno 1 (Mañana o Turno Principal)
+    hora_inicio_1: Mapped[time] = mapped_column(Time, default=time(9, 0), nullable=False)
+    hora_fin_1: Mapped[time] = mapped_column(Time, default=time(13, 0), nullable=False)
+
+    # Turno 2 (Tarde / Post refrigerio opcional)
+    hora_inicio_2: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+    hora_fin_2: Mapped[Optional[time]] = mapped_column(Time, nullable=True)
+
+    intervalo_minutos: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+
+    # Relaciones
+    clinica = relationship("Clinica", back_populates="horarios")
+
+    def __repr__(self) -> str:
+        return f"<HorarioAtencion(clinica_id={self.clinica_id}, dia={self.dia_semana}, activo={self.activo})>"
+

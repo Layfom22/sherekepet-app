@@ -1,6 +1,6 @@
 import base64
 import urllib.parse
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 import json
 from typing import List, Optional
 from pydantic import BaseModel
@@ -30,7 +30,8 @@ from app.clinic.models import (
     AtencionClinica,
     RegistroVacuna,
     SeguimientoNotificacion,
-    Cita
+    Cita,
+    HorarioAtencion
 )
 from app.core.storage import upload_image_to_r2
 from app.clinic.schemas import (
@@ -44,7 +45,10 @@ from app.clinic.schemas import (
     AtencionResponse,
     SeguimientoUpdateResponse,
     LogoUploadResponse,
-    MascotaFotoResponse
+    MascotaFotoResponse,
+    DiaHorarioItem,
+    HorariosConfigRequest,
+    HorariosConfigResponse
 )
 from app.clinic.services.reniec_service import consultar_dni_reniec
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
@@ -268,6 +272,153 @@ def actualizar_configuracion_clinica(
             "logo_url": clinica.logo_url
         }
     }
+
+
+# ==========================================
+# HORARIOS Y TURNOS DE ATENCIÓN DE LA CLÍNICA
+# ==========================================
+
+DIAS_SEMANA_NOMBRES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+
+
+def obtener_o_inicializar_horarios(clinica_id: int, db: Session) -> List[HorarioAtencion]:
+    """
+    Retorna los 7 registros de horarios de atención (Lunes a Domingo) para la clínica.
+    Si la clínica no tiene horarios configurados aún, inicializa la plantilla por defecto:
+    - Lun - Vie: 09:00 - 13:00 y 15:00 - 18:00 (activo=True)
+    - Sáb: 09:00 - 13:00 (activo=True)
+    - Dom: Inactivo (activo=False)
+    """
+    horarios = db.query(HorarioAtencion).filter(
+        HorarioAtencion.clinica_id == clinica_id,
+        HorarioAtencion.is_deleted == False
+    ).order_by(HorarioAtencion.dia_semana.asc()).all()
+
+    if len(horarios) == 7:
+        return horarios
+
+    dias_existentes = {h.dia_semana: h for h in horarios}
+    horarios_nuevos = []
+    for d in range(7):
+        if d in dias_existentes:
+            continue
+        h = HorarioAtencion(
+            clinica_id=clinica_id,
+            dia_semana=d,
+            activo=True,
+            hora_inicio_1=time(8, 30),
+            hora_fin_1=time(13, 0),
+            hora_inicio_2=time(14, 0) if d < 6 else None,
+            hora_fin_2=time(18, 0) if d < 6 else None,
+            intervalo_minutos=30
+        )
+        db.add(h)
+        horarios_nuevos.append(h)
+
+    if horarios_nuevos:
+        db.commit()
+
+    return db.query(HorarioAtencion).filter(
+        HorarioAtencion.clinica_id == clinica_id,
+        HorarioAtencion.is_deleted == False
+    ).order_by(HorarioAtencion.dia_semana.asc()).all()
+
+
+@router.get(
+    "/api/clinic/horarios",
+    response_model=HorariosConfigResponse,
+    summary="Obtener Horarios de Atención de la Clínica",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def get_horarios_clinica(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    horarios = obtener_o_inicializar_horarios(target_clinica_id, db)
+    intervalo = horarios[0].intervalo_minutos if horarios else 30
+
+    dias_response = []
+    for h in horarios:
+        dias_response.append(DiaHorarioItem(
+            dia_semana=h.dia_semana,
+            dia_nombre=DIAS_SEMANA_NOMBRES[h.dia_semana],
+            activo=h.activo,
+            hora_inicio_1=h.hora_inicio_1.strftime("%H:%M") if h.hora_inicio_1 else "09:00",
+            hora_fin_1=h.hora_fin_1.strftime("%H:%M") if h.hora_fin_1 else "13:00",
+            hora_inicio_2=h.hora_inicio_2.strftime("%H:%M") if h.hora_inicio_2 else None,
+            hora_fin_2=h.hora_fin_2.strftime("%H:%M") if h.hora_fin_2 else None,
+            intervalo_minutos=h.intervalo_minutos
+        ))
+
+    return HorariosConfigResponse(
+        mensaje="Horarios obtenidos correctamente.",
+        intervalo_minutos=intervalo,
+        dias=dias_response
+    )
+
+
+@router.put(
+    "/api/clinic/horarios",
+    response_model=HorariosConfigResponse,
+    summary="Guardar o Actualizar Horarios de Atención de la Clínica",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def update_horarios_clinica(
+    payload: HorariosConfigRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    # Asegurar que existan los 7 registros
+    horarios_actuales = {h.dia_semana: h for h in obtener_o_inicializar_horarios(target_clinica_id, db)}
+
+    def parse_time(val: Optional[str]) -> Optional[time]:
+        if not val or not val.strip():
+            return None
+        partes = val.strip().split(":")
+        return time(int(partes[0]), int(partes[1]))
+
+    for item in payload.dias:
+        if item.dia_semana in horarios_actuales:
+            h = horarios_actuales[item.dia_semana]
+            h.activo = item.activo
+            h.intervalo_minutos = payload.intervalo_minutos
+
+            t1_ini = parse_time(item.hora_inicio_1) or time(9, 0)
+            t1_fin = parse_time(item.hora_fin_1) or time(13, 0)
+            h.hora_inicio_1 = t1_ini
+            h.hora_fin_1 = t1_fin
+
+            h.hora_inicio_2 = parse_time(item.hora_inicio_2)
+            h.hora_fin_2 = parse_time(item.hora_fin_2)
+
+    db.commit()
+
+    # Recargar para respuesta
+    horarios_actualizados = obtener_o_inicializar_horarios(target_clinica_id, db)
+    dias_response = []
+    for h in horarios_actualizados:
+        dias_response.append(DiaHorarioItem(
+            dia_semana=h.dia_semana,
+            dia_nombre=DIAS_SEMANA_NOMBRES[h.dia_semana],
+            activo=h.activo,
+            hora_inicio_1=h.hora_inicio_1.strftime("%H:%M") if h.hora_inicio_1 else "09:00",
+            hora_fin_1=h.hora_fin_1.strftime("%H:%M") if h.hora_fin_1 else "13:00",
+            hora_inicio_2=h.hora_inicio_2.strftime("%H:%M") if h.hora_inicio_2 else None,
+            hora_fin_2=h.hora_fin_2.strftime("%H:%M") if h.hora_fin_2 else None,
+            intervalo_minutos=h.intervalo_minutos
+        ))
+
+    return HorariosConfigResponse(
+        mensaje="Horarios de atención guardados exitosamente.",
+        intervalo_minutos=payload.intervalo_minutos,
+        dias=dias_response
+    )
 
 
 class VeterinarioPerfilUpdate(BaseModel):

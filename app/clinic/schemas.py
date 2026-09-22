@@ -149,3 +149,29 @@ class MascotaFotoResponse(BaseModel):
     mensaje: str
     mascota_id: int
     foto_url: str
+
+
+# ==========================================
+# HORARIOS DE ATENCIÓN DE LA CLÍNICA
+# ==========================================
+
+class DiaHorarioItem(BaseModel):
+    dia_semana: int = Field(..., ge=0, le=6, description="0=Lunes, 1=Martes, ..., 6=Domingo")
+    dia_nombre: Optional[str] = None
+    activo: bool = True
+    hora_inicio_1: str = Field("09:00", description="Hora de inicio del turno 1 (HH:MM)")
+    hora_fin_1: str = Field("13:00", description="Hora de fin del turno 1 (HH:MM)")
+    hora_inicio_2: Optional[str] = Field(None, description="Hora de inicio del turno 2 (HH:MM)")
+    hora_fin_2: Optional[str] = Field(None, description="Hora de fin del turno 2 (HH:MM)")
+    intervalo_minutos: int = Field(30, ge=10, le=120, description="Duración de cada cita en minutos")
+
+
+class HorariosConfigRequest(BaseModel):
+    intervalo_minutos: int = Field(30, ge=10, le=120)
+    dias: List[DiaHorarioItem]
+
+
+class HorariosConfigResponse(BaseModel):
+    mensaje: str
+    intervalo_minutos: int
+    dias: List[DiaHorarioItem]

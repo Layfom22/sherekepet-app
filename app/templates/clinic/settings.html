@@ -23,7 +23,7 @@
                 type="button" 
                 id="tabBtnPerfil" 
                 onclick="cambiarTab('perfil')"
-                class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
             >
                 👤 Mi Perfil
             </button>
@@ -31,9 +31,17 @@
                 type="button" 
                 id="tabBtnClinica" 
                 onclick="cambiarTab('clinica')"
-                class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs"
             >
                 🏥 Mi Veterinaria
+            </button>
+            <button 
+                type="button" 
+                id="tabBtnHorarios" 
+                onclick="cambiarTab('horarios')"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+            >
+                🕒 Horarios
             </button>
         </div>
     </div>
@@ -382,6 +390,80 @@
 
     </div>
 
+    <!-- ======================================================== -->
+    <!-- TAB 3: HORARIOS DE ATENCIÓN DE LA CLÍNICA                -->
+    <!-- ======================================================== -->
+    <div id="tabContentHorarios" class="hidden space-y-6">
+        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 max-w-4xl mx-auto space-y-6">
+            
+            <!-- Encabezado del Tab -->
+            <div class="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        🕒 Horarios y Turnos de Atención
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Define tus días laborables y rangos horarios. Los dueños solo podrán agendar citas en estos turnos (respetando tus horas de almuerzo/receso).
+                    </p>
+                </div>
+                
+                <!-- Selector de intervalo de cita -->
+                <div class="flex items-center space-x-2 bg-slate-50 p-2 rounded-2xl border border-slate-200 shrink-0">
+                    <label for="selectIntervalo" class="text-xs font-bold text-slate-700 whitespace-nowrap">
+                        ⏱️ Duración de cita:
+                    </label>
+                    <select 
+                        id="selectIntervalo" 
+                        class="text-xs font-black text-teal-700 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                    >
+                        <option value="15">15 min</option>
+                        <option value="20">20 min</option>
+                        <option value="30" selected>30 min</option>
+                        <option value="45">45 min</option>
+                        <option value="60">60 min (1 hora)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Acciones rápidas -->
+            <div class="flex flex-wrap items-center justify-between gap-3 bg-teal-50/60 border border-teal-100 p-4 rounded-2xl">
+                <div class="flex items-center space-x-2 text-xs text-teal-900">
+                    <span class="text-base">💡</span>
+                    <span>Puedes configurar <strong>Turno Mañana</strong> y <strong>Turno Tarde</strong> para proteger tu hora de almuerzo.</span>
+                </div>
+                <button 
+                    type="button" 
+                    onclick="replicarLunesAViernes()" 
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-teal-700 hover:text-white bg-white hover:bg-teal-600 border border-teal-200 rounded-xl transition-all shadow-xs"
+                >
+                    ⚡ Replicar Lunes a toda la semana (Lun - Vie)
+                </button>
+            </div>
+
+            <!-- Contenedor dinámico de días -->
+            <form id="formHorarios" onsubmit="guardarHorarios(event)" class="space-y-4">
+                <div id="listaDiasContainer" class="space-y-3">
+                    <div class="p-8 text-center text-slate-400 text-xs">
+                        <span class="animate-spin inline-block text-lg mb-1">⏳</span>
+                        <p>Cargando horarios de atención...</p>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-end gap-3">
+                    <button 
+                        type="submit" 
+                        id="btnGuardarHorarios" 
+                        class="btn-touch w-full sm:w-auto px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-2"
+                    >
+                        <span>💾</span>
+                        <span>Guardar Horarios de Atención</span>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
 </div>
 {% endblock %}
 
@@ -391,29 +473,46 @@
 function cambiarTab(tab) {
     const btnPerfil = document.getElementById("tabBtnPerfil");
     const btnClinica = document.getElementById("tabBtnClinica");
+    const btnHorarios = document.getElementById("tabBtnHorarios");
     const contentPerfil = document.getElementById("tabContentPerfil");
     const contentClinica = document.getElementById("tabContentClinica");
+    const contentHorarios = document.getElementById("tabContentHorarios");
+
+    contentPerfil.classList.add("hidden");
+    contentClinica.classList.add("hidden");
+    if (contentHorarios) contentHorarios.classList.add("hidden");
+
+    const inactiveClass = "btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900";
+    const activeClass = "btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs";
+
+    btnPerfil.className = inactiveClass;
+    btnClinica.className = inactiveClass;
+    if (btnHorarios) btnHorarios.className = inactiveClass;
 
     if (tab === 'perfil') {
         contentPerfil.classList.remove("hidden");
-        contentClinica.classList.add("hidden");
-
-        btnPerfil.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs";
-        btnClinica.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900";
+        btnPerfil.className = activeClass;
         window.location.hash = "perfil";
+    } else if (tab === 'horarios') {
+        if (contentHorarios) contentHorarios.classList.remove("hidden");
+        if (btnHorarios) btnHorarios.className = activeClass;
+        window.location.hash = "horarios";
+        cargarHorarios();
     } else {
         contentClinica.classList.remove("hidden");
-        contentPerfil.classList.add("hidden");
-
-        btnClinica.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs";
-        btnPerfil.className = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900";
+        btnClinica.className = activeClass;
         window.location.hash = "clinica";
     }
 }
 
-// Inicializar tab según hash de URL
+// Inicializar tab según hash o query param de URL
 window.addEventListener("DOMContentLoaded", () => {
-    if (window.location.hash === "#perfil") {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tabParam = urlParams.get("tab");
+
+    if (tabParam === "horarios" || window.location.hash === "#horarios") {
+        cambiarTab("horarios");
+    } else if (tabParam === "perfil" || window.location.hash === "#perfil") {
         cambiarTab("perfil");
     } else {
         cambiarTab("clinica");
@@ -423,10 +522,13 @@ window.addEventListener("DOMContentLoaded", () => {
 window.addEventListener("hashchange", () => {
     if (window.location.hash === "#perfil") {
         cambiarTab("perfil");
+    } else if (window.location.hash === "#horarios") {
+        cambiarTab("horarios");
     } else if (window.location.hash === "#clinica") {
         cambiarTab("clinica");
     }
 });
+
 
 function actualizarMockupPreview() {
     const nombre = document.getElementById("inputNombre").value.trim();
@@ -702,6 +804,245 @@ async function guardarConfiguracion(event) {
         if (btn) {
             btn.disabled = false;
             btn.textContent = "💾 Guardar Cambios de Marca";
+        }
+    }
+}
+
+// ==========================================
+// GESTIÓN DE HORARIOS DE ATENCIÓN
+// ==========================================
+let cacheHorarios = [];
+
+async function cargarHorarios() {
+    const container = document.getElementById("listaDiasContainer");
+    if (!container) return;
+
+    try {
+        const resp = await fetch("/api/clinic/horarios");
+        if (!resp.ok) throw new Error("Error al obtener horarios");
+        const data = await resp.json();
+        cacheHorarios = data.dias || [];
+
+        const selIntervalo = document.getElementById("selectIntervalo");
+        if (selIntervalo && data.intervalo_minutos) {
+            selIntervalo.value = data.intervalo_minutos.toString();
+        }
+
+        renderizarDias(cacheHorarios);
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = `
+            <div class="p-6 text-center text-rose-600 text-xs bg-rose-50 rounded-2xl border border-rose-200">
+                ⚠️ Error al cargar los horarios. Intente recargar la página.
+            </div>
+        `;
+    }
+}
+
+function renderizarDias(dias) {
+    const container = document.getElementById("listaDiasContainer");
+    if (!container) return;
+
+    const nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+    container.innerHTML = dias.map(d => {
+        const idx = d.dia_semana;
+        const nombre = d.dia_nombre || nombres[idx] || `Día ${idx}`;
+        const activo = d.activo;
+        const t1_ini = d.hora_inicio_1 || "09:00";
+        const t1_fin = d.hora_fin_1 || "13:00";
+        const t2_ini = d.hora_inicio_2 || "";
+        const t2_fin = d.hora_fin_2 || "";
+
+        return `
+        <div id="diaCard_${idx}" class="p-4 sm:p-5 rounded-2xl border transition-all ${activo ? 'bg-white border-slate-200 shadow-2xs' : 'bg-slate-50/80 border-slate-200 opacity-60'}">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                
+                <!-- Día y Switch de Estado -->
+                <div class="flex items-center space-x-3 min-w-[160px]">
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            id="checkActivo_${idx}" 
+                            ${activo ? 'checked' : ''} 
+                            onchange="toggleDia(${idx})" 
+                            class="sr-only peer"
+                        >
+                        <div class="w-10 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                    </label>
+                    <div>
+                        <p class="text-sm font-black text-slate-900">${nombre}</p>
+                        <span id="badgeEstado_${idx}" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}">
+                            ${activo ? 'Atiende' : 'Cerrado'}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Turnos de atención -->
+                <div id="turnosContainer_${idx}" class="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 text-xs ${activo ? '' : 'pointer-events-none'}">
+                    
+                    <!-- Turno 1 (Mañana o Principal) -->
+                    <div class="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-1">
+                        <span class="text-slate-500 font-bold shrink-0">🌅 T1:</span>
+                        <input 
+                            type="time" 
+                            id="t1_ini_${idx}" 
+                            value="${t1_ini}" 
+                            class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-teal-500 w-full"
+                        >
+                        <span class="text-slate-400 font-medium">a</span>
+                        <input 
+                            type="time" 
+                            id="t1_fin_${idx}" 
+                            value="${t1_fin}" 
+                            class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-teal-500 w-full"
+                        >
+                    </div>
+
+                    <!-- Turno 2 (Tarde tras almuerzo) -->
+                    <div class="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-1">
+                        <span class="text-slate-500 font-bold shrink-0" title="Turno Tarde post-refrigerio">🌇 T2:</span>
+                        <input 
+                            type="time" 
+                            id="t2_ini_${idx}" 
+                            value="${t2_ini}" 
+                            placeholder="--:--" 
+                            class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-teal-500 w-full"
+                        >
+                        <span class="text-slate-400 font-medium">a</span>
+                        <input 
+                            type="time" 
+                            id="t2_fin_${idx}" 
+                            value="${t2_fin}" 
+                            placeholder="--:--" 
+                            class="px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-1 focus:ring-teal-500 w-full"
+                        >
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+        `;
+    }).join("");
+}
+
+function toggleDia(idx) {
+    const check = document.getElementById(`checkActivo_${idx}`);
+    const card = document.getElementById(`diaCard_${idx}`);
+    const badge = document.getElementById(`badgeEstado_${idx}`);
+    const turnos = document.getElementById(`turnosContainer_${idx}`);
+
+    if (!check) return;
+    const activo = check.checked;
+
+    if (badge) {
+        badge.textContent = activo ? 'Atiende' : 'Cerrado';
+        badge.className = `text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'}`;
+    }
+
+    if (card) {
+        if (activo) {
+            card.className = "p-4 sm:p-5 rounded-2xl border transition-all bg-white border-slate-200 shadow-2xs";
+        } else {
+            card.className = "p-4 sm:p-5 rounded-2xl border transition-all bg-slate-50/80 border-slate-200 opacity-60";
+        }
+    }
+
+    if (turnos) {
+        if (activo) {
+            turnos.classList.remove("pointer-events-none");
+        } else {
+            turnos.classList.add("pointer-events-none");
+        }
+    }
+}
+
+function replicarLunesAViernes() {
+    const l_check = document.getElementById("checkActivo_0")?.checked ?? true;
+    const l_t1_ini = document.getElementById("t1_ini_0")?.value || "09:00";
+    const l_t1_fin = document.getElementById("t1_fin_0")?.value || "13:00";
+    const l_t2_ini = document.getElementById("t2_ini_0")?.value || "";
+    const l_t2_fin = document.getElementById("t2_fin_0")?.value || "";
+
+    for (let d = 1; d <= 4; d++) {
+        const check = document.getElementById(`checkActivo_${d}`);
+        const t1_ini = document.getElementById(`t1_ini_${d}`);
+        const t1_fin = document.getElementById(`t1_fin_${d}`);
+        const t2_ini = document.getElementById(`t2_ini_${d}`);
+        const t2_fin = document.getElementById(`t2_fin_${d}`);
+
+        if (check) {
+            check.checked = l_check;
+            toggleDia(d);
+        }
+        if (t1_ini) t1_ini.value = l_t1_ini;
+        if (t1_fin) t1_fin.value = l_t1_fin;
+        if (t2_ini) t2_ini.value = l_t2_ini;
+        if (t2_fin) t2_fin.value = l_t2_fin;
+    }
+
+    mostrarAlerta(true, "⚡ Horario de Lunes replicado para toda la semana laboral (Mar - Vie). Haz clic en 'Guardar Horarios'.");
+}
+
+async function guardarHorarios(event) {
+    event.preventDefault();
+    const btn = document.getElementById("btnGuardarHorarios");
+    const selIntervalo = document.getElementById("selectIntervalo");
+    const intervalo = parseInt(selIntervalo ? selIntervalo.value : "30") || 30;
+
+    const diasPayload = [];
+    for (let d = 0; d < 7; d++) {
+        const check = document.getElementById(`checkActivo_${d}`);
+        const activo = check ? check.checked : false;
+        const t1_ini = document.getElementById(`t1_ini_${d}`)?.value.trim() || "09:00";
+        const t1_fin = document.getElementById(`t1_fin_${d}`)?.value.trim() || "13:00";
+        const t2_ini = document.getElementById(`t2_ini_${d}`)?.value.trim() || null;
+        const t2_fin = document.getElementById(`t2_fin_${d}`)?.value.trim() || null;
+
+        diasPayload.push({
+            dia_semana: d,
+            activo: activo,
+            hora_inicio_1: t1_ini,
+            hora_fin_1: t1_fin,
+            hora_inicio_2: (t2_ini && t2_fin) ? t2_ini : null,
+            hora_fin_2: (t2_ini && t2_fin) ? t2_fin : null,
+            intervalo_minutos: intervalo
+        });
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Guardando horarios...";
+    }
+
+    try {
+        const resp = await fetch("/api/clinic/horarios", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                intervalo_minutos: intervalo,
+                dias: diasPayload
+            })
+        });
+
+        const data = await resp.json();
+        if (resp.ok) {
+            mostrarAlerta(true, "¡Horarios de atención guardados exitosamente!");
+            cacheHorarios = data.dias || [];
+            renderizarDias(cacheHorarios);
+        } else {
+            mostrarAlerta(false, data.detail || "Error al guardar horarios.");
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarAlerta(false, "Error de comunicación con el servidor.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = "<span>💾</span><span>Guardar Horarios de Atención</span>";
         }
     }
 }

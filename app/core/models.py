@@ -61,6 +61,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     clientes = relationship("Cliente", back_populates="clinica", cascade="all, delete-orphan")
     mascotas = relationship("Mascota", back_populates="clinica", cascade="all, delete-orphan")
     citas = relationship("Cita", back_populates="clinica", cascade="all, delete-orphan")
+    horarios = relationship("HorarioAtencion", back_populates="clinica", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Clinica(id={self.id}, nombre='{self.nombre}', nombre_comercial='{self.nombre_comercial}', plan='{self.plan_activo}')>"

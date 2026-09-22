@@ -13,7 +13,8 @@ from app.core.security import decode_access_token
 from app.core.storage import upload_image_to_r2
 from app.database import get_db
 from app.core.models import Clinica
-from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita, AtencionClinica, Veterinario
+from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita, AtencionClinica, Veterinario, HorarioAtencion
+from app.clinic.routes import obtener_o_inicializar_horarios, DIAS_SEMANA_NOMBRES
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
 from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
 from app.follow_up.schemas import (
@@ -780,6 +781,36 @@ class CitaCreateRequest(BaseModel):
     motivo: str
 
 
+def generar_slots_horario(horario: HorarioAtencion) -> list:
+    """Genera lista de strings 'HH:MM' a partir de los turnos definidos en horario."""
+    if not horario or not horario.activo:
+        return []
+
+    intervalo = horario.intervalo_minutos or 30
+    slots = []
+
+    def agregar_rango(ini: time, fin: time):
+        if not ini or not fin or ini >= fin:
+            return
+        actual_min = ini.hour * 60 + ini.minute
+        fin_min = fin.hour * 60 + fin.minute
+        while actual_min < fin_min:
+            h = actual_min // 60
+            m = actual_min % 60
+            slots.append(f"{h:02d}:{m:02d}")
+            actual_min += intervalo
+
+    # Turno 1 (Mañana o Principal)
+    if horario.hora_inicio_1 and horario.hora_fin_1:
+        agregar_rango(horario.hora_inicio_1, horario.hora_fin_1)
+
+    # Turno 2 (Tarde opcional tras refrigerio)
+    if horario.hora_inicio_2 and horario.hora_fin_2:
+        agregar_rango(horario.hora_inicio_2, horario.hora_fin_2)
+
+    return slots
+
+
 @router.get(
     "/api/portal/clinica/{clinica_id}/disponibilidad",
     summary="Consultar Disponibilidad de Citas de una Clínica",
@@ -821,11 +852,26 @@ def get_disponibilidad_clinica(
 
     horas_ocupadas = [c.hora.strftime("%H:%M") for c in citas_existentes]
 
-    slots_base = [
-        "08:30", "09:00", "09:30", "10:00", "10:30", "11:00",
-        "11:30", "12:00", "12:30", "14:00", "14:30", "15:00",
-        "15:30", "16:00", "16:30", "17:00", "17:30", "18:00"
-    ]
+    # Obtener configuración de horarios para el día de la semana
+    horarios_semana = obtener_o_inicializar_horarios(clinica_id, db)
+    dia_semana_num = fecha_obj.weekday()  # 0=Lunes, 6=Domingo
+    horario_dia = next((h for h in horarios_semana if h.dia_semana == dia_semana_num), None)
+
+    if not horario_dia or not horario_dia.activo:
+        dia_nombre = DIAS_SEMANA_NOMBRES[dia_semana_num] if dia_semana_num < len(DIAS_SEMANA_NOMBRES) else "seleccionado"
+        return {
+            "clinica_id": clinica.id,
+            "clinica_nombre": clinica.nombre_comercial or clinica.nombre,
+            "fecha": fecha,
+            "horas_ocupadas": horas_ocupadas,
+            "horas_disponibles": [],
+            "hay_disponibilidad": False,
+            "mensaje": f"La veterinaria no atiende los días {dia_nombre}.",
+            "contacto_emergencia": clinica.telefono,
+            "telefono_urgencia": clinica.telefono
+        }
+
+    slots_base = generar_slots_horario(horario_dia)
 
     ahora_lima = get_lima_now()
     horas_disponibles = []
@@ -886,6 +932,28 @@ def agendar_cita_portal(
         hora_obj = time(hour=int(partes[0]), minute=int(partes[1]))
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de hora inválido (use HH:MM).")
+
+    hoy_lima = get_lima_now().date()
+    if payload.fecha < hoy_lima:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pueden agendar citas en fechas pasadas.")
+
+    # Validar que corresponda a un horario laborable del veterinario
+    horarios_semana = obtener_o_inicializar_horarios(payload.clinica_id, db)
+    horario_dia = next((h for h in horarios_semana if h.dia_semana == payload.fecha.weekday()), None)
+    if not horario_dia or not horario_dia.activo:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La clínica no atiende en el día seleccionado.")
+
+    slots_validos = generar_slots_horario(horario_dia)
+    hora_str = f"{hora_obj.hour:02d}:{hora_obj.minute:02d}"
+    if hora_str not in slots_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El horario seleccionado no corresponde a los turnos de atención del veterinario."
+        )
+
+    # Si es para hoy, validar que la hora no haya pasado
+    if payload.fecha == hoy_lima and hora_obj <= get_lima_now().time():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha pasado.")
 
     # Validar que el slot no esté ocupado
     conflicto = db.query(Cita).filter(

@@ -14,7 +14,8 @@ from app.clinic.models import (
     AtencionClinica,
     RegistroVacuna,
     SeguimientoNotificacion,
-    Cita
+    Cita,
+    HorarioAtencion
 )
 from app.follow_up.models import (
     MedicationPlan,
@@ -90,6 +91,10 @@ def run_auto_migrations(target_engine) -> None:
         # Crear sp_citas si no existe
         if "sp_citas" not in tables:
             Base.metadata.create_all(target_engine, tables=[Cita.__table__])
+
+        # Crear sp_horarios_atencion si no existe
+        if "sp_horarios_atencion" not in tables:
+            Base.metadata.create_all(target_engine, tables=[HorarioAtencion.__table__])
 
         # 2. sp_mascotas
         if "sp_mascotas" in tables:

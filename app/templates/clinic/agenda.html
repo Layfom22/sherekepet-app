@@ -17,21 +17,32 @@
             </p>
         </div>
 
-        <!-- Selector de Fecha -->
-        <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+        <!-- Acciones y Selector de Fecha -->
+        <div class="flex flex-wrap items-center gap-2.5">
             <a 
-                href="/agenda?fecha={{ hoy.strftime('%Y-%m-%d') }}" 
-                class="btn-touch px-3 py-1.5 text-xs font-bold rounded-xl transition-all {% if fecha_seleccionada == hoy %}bg-teal-600 text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-white{% endif %}"
+                href="/configuracion#horarios" 
+                class="btn-touch px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl transition-all shadow-2xs flex items-center space-x-1.5"
+                title="Configurar turnos y horarios de atención"
             >
-                Hoy
+                <span>🕒</span>
+                <span>Configurar Horarios</span>
             </a>
-            <input 
-                type="date" 
-                id="inputFechaAgenda"
-                value="{{ fecha_seleccionada.strftime('%Y-%m-%d') }}" 
-                class="px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500"
-                onchange="cambiarFechaAgenda(this.value)"
-            >
+
+            <div class="flex items-center space-x-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
+                <a 
+                    href="/agenda?fecha={{ hoy.strftime('%Y-%m-%d') }}" 
+                    class="btn-touch px-3 py-1.5 text-xs font-bold rounded-xl transition-all {% if fecha_seleccionada == hoy %}bg-teal-600 text-white shadow-xs{% else %}text-slate-600 hover:text-slate-900 hover:bg-white{% endif %}"
+                >
+                    Hoy
+                </a>
+                <input 
+                    type="date" 
+                    id="inputFechaAgenda" 
+                    value="{{ fecha_seleccionada.strftime('%Y-%m-%d') }}" 
+                    class="px-3 py-1.5 text-xs font-bold text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500" 
+                    onchange="cambiarFechaAgenda(this.value)"
+                >
+            </div>
         </div>
     </div>
 

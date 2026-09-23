@@ -257,6 +257,23 @@
                     >
                 </div>
 
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <label for="fecha_nacimiento" class="block text-xs font-semibold text-slate-700">
+                            Fecha de Nacimiento
+                        </label>
+                        <span id="badgeEdadCalculada" class="hidden text-[11px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200">
+                            <span id="textoEdadCalculada"></span>
+                        </span>
+                    </div>
+                    <input 
+                        type="date" 
+                        id="fecha_nacimiento" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-medium"
+                        onchange="calcularEdad(this.value)"
+                    >
+                </div>
+
                 <!-- Foto de la Mascota (Opcional con optimización automática) -->
                 <div class="sm:col-span-2 flex items-center gap-4 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
                     <div class="relative shrink-0">
@@ -685,10 +702,72 @@ async function vincularMascotaExistente(mascotaId) {
     }
 }
 
+// Cálculo reactivo de la edad de la mascota según fecha de nacimiento
+function calcularEdad(fechaStr) {
+    const badge = document.getElementById('badgeEdadCalculada');
+    const texto = document.getElementById('textoEdadCalculada');
+    if (!badge || !texto) return;
+
+    if (!fechaStr) {
+        badge.classList.add('hidden');
+        texto.textContent = '';
+        return;
+    }
+
+    const hoy = new Date();
+    const [y, m, d] = fechaStr.split('-').map(Number);
+    const nac = new Date(y, m - 1, d);
+
+    if (nac > hoy) {
+        badge.className = "text-[11px] font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200";
+        texto.textContent = "Fecha en el futuro";
+        badge.classList.remove('hidden');
+        return;
+    }
+
+    let anos = hoy.getFullYear() - nac.getFullYear();
+    let meses = hoy.getMonth() - nac.getMonth();
+    let dias = hoy.getDate() - nac.getDate();
+
+    if (dias < 0) {
+        meses--;
+        const ultimoDiaMesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0).getDate();
+        dias += ultimoDiaMesAnterior;
+    }
+
+    if (meses < 0) {
+        anos--;
+        meses += 12;
+    }
+
+    let resultado = "";
+    if (anos > 0) {
+        resultado = `${anos} año${anos > 1 ? 's' : ''}`;
+        if (meses > 0) {
+            resultado += `, ${meses} m`;
+        }
+    } else if (meses > 0) {
+        resultado = `${meses} mes${meses > 1 ? 'es' : ''}`;
+        if (dias > 0 && meses < 3) {
+            resultado += ` y ${dias} d`;
+        }
+    } else {
+        resultado = `${dias} día${dias != 1 ? 's' : ''} (Cachorro)`;
+    }
+
+    badge.className = "text-[11px] font-bold px-2 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200";
+    texto.textContent = `Edad: ${resultado}`;
+    badge.classList.remove('hidden');
+}
+
 // Preparar formulario para agregar nueva mascota para este dueño
 function prepararNuevaMascotaParaDueño() {
     document.getElementById('mascota_nombre').value = '';
     document.getElementById('mascota_peso').value = '';
+    if (document.getElementById('fecha_nacimiento')) {
+        document.getElementById('fecha_nacimiento').value = '';
+        document.getElementById('badgeEdadCalculada')?.classList.add('hidden');
+    }
     document.getElementById('tiene_alergias').checked = false;
     document.getElementById('seccionDetalleAlergias').classList.add('hidden');
     document.getElementById('detalle_alergias').value = '';
@@ -806,6 +885,7 @@ document.getElementById('formPaciente').addEventListener('submit', async functio
         mascota_especie: especieSelect.options[especieSelect.selectedIndex]?.text || "Canino",
         mascota_raza: razaSelect.options[razaSelect.selectedIndex]?.text || (razaSelect.value || null),
         mascota_peso: document.getElementById('mascota_peso').value ? parseFloat(document.getElementById('mascota_peso').value) : null,
+        fecha_nacimiento: document.getElementById('fecha_nacimiento')?.value || null,
         foto_url: foto_url,
         tiene_alergias: tieneAlergias,
         detalle_alergias: tieneAlergias ? detalleAlergias : null,

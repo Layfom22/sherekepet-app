@@ -186,6 +186,17 @@
                     </button>
                     {% endif %}
 
+                    {% if 'vacun' in c.motivo.lower() %}
+                    <a 
+                        href="/pacientes/{{ c.mascota.id }}?atencion=vacunacion" 
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition-all inline-flex items-center gap-1"
+                        title="Digitalizar dosis de vacuna en el carnet"
+                    >
+                        <i data-lucide="syringe" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Vacuna</span>
+                    </a>
+                    {% endif %}
+
                     {% if c.estado != 'CANCELADA' %}
                     <button 
                         type="button" 
@@ -207,7 +218,89 @@
         <div class="p-12 text-center text-slate-400 space-y-3">
             <i data-lucide="calendar-x-2" class="w-12 h-12 text-slate-300 mx-auto block" aria-hidden="true"></i>
             <p class="text-sm font-bold text-slate-600">No hay citas registradas para esta fecha.</p>
-            <p class="text-xs text-slate-400">Selecciona otra fecha en el calendario superior o espera solicitudes desde el Portal del Dueño.</p>
+            <p class="text-xs text-slate-400">Selecciona otra fecha en el calendario superior o revisa la lista de próximas citas a continuación.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- PRÓXIMAS 15-20 CITAS PROGRAMADAS (Agenda Extendida)       -->
+    <!-- ========================================================== -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+            <div class="flex items-center space-x-2.5">
+                <i data-lucide="calendar-range" class="w-5 h-5 text-teal-700" aria-hidden="true"></i>
+                <h3 class="text-sm font-black text-slate-900 tracking-tight">
+                    Próximas 15-20 Citas Programadas
+                </h3>
+            </div>
+            <span class="text-xs font-bold bg-white text-slate-700 px-3 py-1 rounded-xl border border-slate-200 shadow-2xs">
+                {{ proximas_citas|length if proximas_citas else 0 }} citas en cola
+            </span>
+        </div>
+
+        {% if proximas_citas %}
+        <div class="divide-y divide-slate-100">
+            {% for pc in proximas_citas %}
+            <div class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+                <!-- Fecha y Hora Destacada -->
+                <div class="flex items-center gap-3 shrink-0">
+                    <div class="px-3 py-2 rounded-xl bg-teal-50/80 border border-teal-200 text-center font-mono shrink-0">
+                        <span class="block text-xs font-black text-slate-900">{{ pc.fecha.strftime('%d/%m/%Y') }}</span>
+                        <span class="block text-[11px] font-extrabold text-teal-700">{{ pc.hora.strftime('%I:%M %p') }}</span>
+                    </div>
+                    {% if pc.fecha == hoy %}
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-teal-100 text-teal-800 border border-teal-200">Hoy</span>
+                    {% endif %}
+                </div>
+
+                <!-- Mascota & Dueño -->
+                <div class="flex-1 min-w-0 space-y-0.5">
+                    <div class="flex items-center space-x-2">
+                        <a href="/pacientes/{{ pc.mascota.id }}" class="font-black text-slate-900 hover:text-teal-700 text-sm truncate">
+                            {{ pc.mascota.nombre }}
+                        </a>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                            {{ pc.mascota.especie }}
+                        </span>
+                    </div>
+                    <div class="flex items-center space-x-2 text-slate-500">
+                        <span>Dueño: {{ pc.cliente.nombre_completo or pc.cliente.dni }}</span>
+                        {% if pc.cliente.telefono %}
+                        <span>&bull;</span>
+                        <a href="https://wa.me/51{{ pc.cliente.telefono|replace(' ', '')|replace('-', '') }}" target="_blank" class="text-emerald-600 hover:underline inline-flex items-center gap-0.5 font-bold">
+                            <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                            <span>{{ pc.cliente.telefono }}</span>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Motivo y Acciones -->
+                <div class="flex items-center gap-2 flex-wrap shrink-0">
+                    <span class="text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 font-medium max-w-xs truncate" title="{{ pc.motivo }}">
+                        {{ pc.motivo }}
+                    </span>
+                    <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full {% if pc.estado == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif pc.estado == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                        {{ pc.estado }}
+                    </span>
+                    {% if 'vacun' in pc.motivo.lower() %}
+                    <a 
+                        href="/pacientes/{{ pc.mascota.id }}?atencion=vacunacion" 
+                        class="btn-touch px-2.5 py-1 text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg inline-flex items-center gap-1"
+                        title="Digitalizar dosis de vacuna en el carnet"
+                    >
+                        <i data-lucide="syringe" class="w-3.5 h-3.5 text-teal-600"></i>
+                        <span>Vacunar</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-slate-400 text-xs">
+            No hay citas futuras registradas en la agenda de la clínica.
         </div>
         {% endif %}
     </div>

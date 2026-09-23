@@ -31,7 +31,9 @@ from app.clinic.models import (
     RegistroVacuna,
     SeguimientoNotificacion,
     Cita,
-    HorarioAtencion
+    HorarioAtencion,
+    Producto,
+    ServicioBano
 )
 from app.core.storage import upload_image_to_r2
 from app.clinic.schemas import (
@@ -43,6 +45,10 @@ from app.clinic.schemas import (
     MascotaSummary,
     AtencionCreateRequest,
     AtencionResponse,
+    ProductoItem,
+    ServicioBanoItem,
+    ServicioBanoCreateRequest,
+    ProductoStockUpdateRequest,
     SeguimientoUpdateResponse,
     LogoUploadResponse,
     MascotaFotoResponse,
@@ -419,6 +425,247 @@ def update_horarios_clinica(
         intervalo_minutos=payload.intervalo_minutos,
         dias=dias_response
     )
+
+
+# ==========================================
+# MINI-ERP: SERVICIOS DE BAÑO E INVENTARIO
+# ==========================================
+
+def obtener_o_inicializar_servicios_bano(clinica_id: int, db: Session) -> List[ServicioBano]:
+    """Obtiene los servicios de baño de la clínica o inicializa los 3 tipos por defecto con inventario."""
+    servicios = db.query(ServicioBano).filter(
+        ServicioBano.clinica_id == clinica_id,
+        ServicioBano.is_deleted == False
+    ).order_by(ServicioBano.id.asc()).all()
+
+    if not servicios:
+        # 1. Crear productos estándar de shampoo si no existen
+        shampoo_neutro = db.query(Producto).filter(
+            Producto.clinica_id == clinica_id,
+            Producto.nombre.ilike("%Shampoo Básico%"),
+            Producto.is_deleted == False
+        ).first()
+        if not shampoo_neutro:
+            shampoo_neutro = Producto(
+                clinica_id=clinica_id,
+                nombre="Shampoo Básico Neutro",
+                stock_actual=2500.0,
+                unidad_medida="ml",
+                stock_minimo=250.0,
+                precio_costo=35.0,
+                precio_venta=0.0
+            )
+            db.add(shampoo_neutro)
+            db.flush()
+
+        shampoo_hipo = db.query(Producto).filter(
+            Producto.clinica_id == clinica_id,
+            Producto.nombre.ilike("%Hipoalergénico%"),
+            Producto.is_deleted == False
+        ).first()
+        if not shampoo_hipo:
+            shampoo_hipo = Producto(
+                clinica_id=clinica_id,
+                nombre="Shampoo Hipoalergénico Avena",
+                stock_actual=1500.0,
+                unidad_medida="ml",
+                stock_minimo=200.0,
+                precio_costo=50.0,
+                precio_venta=0.0
+            )
+            db.add(shampoo_hipo)
+            db.flush()
+
+        shampoo_med = db.query(Producto).filter(
+            Producto.clinica_id == clinica_id,
+            Producto.nombre.ilike("%Medicado%"),
+            Producto.is_deleted == False
+        ).first()
+        if not shampoo_med:
+            shampoo_med = Producto(
+                clinica_id=clinica_id,
+                nombre="Shampoo Medicado Clorhexidina",
+                stock_actual=1200.0,
+                unidad_medida="ml",
+                stock_minimo=150.0,
+                precio_costo=65.0,
+                precio_venta=0.0
+            )
+            db.add(shampoo_med)
+            db.flush()
+
+        # 2. Crear los 3 servicios estándar
+        s1 = ServicioBano(
+            clinica_id=clinica_id,
+            nombre="Baño Normal / Básico",
+            descripcion="Baño relajante con shampoo neutro, secado y cepillado",
+            precio=35.0,
+            producto_id=shampoo_neutro.id,
+            cantidad_consumo=50.0,
+            activo=True
+        )
+        s2 = ServicioBano(
+            clinica_id=clinica_id,
+            nombre="Baño Hipoalergénico",
+            descripcion="Para pieles sensibles o atópicas con extracto de avena",
+            precio=50.0,
+            producto_id=shampoo_hipo.id,
+            cantidad_consumo=50.0,
+            activo=True
+        )
+        s3 = ServicioBano(
+            clinica_id=clinica_id,
+            nombre="Baño Medicado",
+            descripcion="Tratamiento dérmico antiséptico y fungicida",
+            precio=65.0,
+            producto_id=shampoo_med.id,
+            cantidad_consumo=50.0,
+            activo=True
+        )
+        db.add_all([s1, s2, s3])
+        db.commit()
+
+        servicios = db.query(ServicioBano).filter(
+            ServicioBano.clinica_id == clinica_id,
+            ServicioBano.is_deleted == False
+        ).order_by(ServicioBano.id.asc()).all()
+
+    return servicios
+
+
+@router.get(
+    "/api/clinic/servicios-bano",
+    response_model=List[ServicioBanoItem],
+    summary="Listar Servicios de Baño y Consumo de Insumos",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def get_servicios_bano(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    servicios = obtener_o_inicializar_servicios_bano(target_clinica_id, db)
+    resultado = []
+    for s in servicios:
+        item = ServicioBanoItem(
+            id=s.id,
+            clinica_id=s.clinica_id,
+            nombre=s.nombre,
+            precio=s.precio,
+            producto_id=s.producto_id,
+            cantidad_consumo=s.cantidad_consumo,
+            activo=s.activo,
+            producto_nombre=s.producto.nombre if s.producto else None,
+            stock_actual=s.producto.stock_actual if s.producto else None,
+            unidad_medida=s.producto.unidad_medida if s.producto else None
+        )
+        resultado.append(item)
+    return resultado
+
+
+@router.post(
+    "/api/clinic/servicios-bano",
+    response_model=ServicioBanoItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear o Registrar Tipo de Baño",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def create_servicio_bano(
+    payload: ServicioBanoCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else payload.clinica_id
+
+    sb = ServicioBano(
+        clinica_id=target_clinica_id,
+        nombre=payload.nombre.strip(),
+        precio=payload.precio,
+        producto_id=payload.producto_id,
+        cantidad_consumo=payload.cantidad_consumo,
+        activo=payload.activo
+    )
+    db.add(sb)
+    db.commit()
+    db.refresh(sb)
+
+    return ServicioBanoItem(
+        id=sb.id,
+        clinica_id=sb.clinica_id,
+        nombre=sb.nombre,
+        precio=sb.precio,
+        producto_id=sb.producto_id,
+        cantidad_consumo=sb.cantidad_consumo,
+        activo=sb.activo,
+        producto_nombre=sb.producto.nombre if sb.producto else None,
+        stock_actual=sb.producto.stock_actual if sb.producto else None,
+        unidad_medida=sb.producto.unidad_medida if sb.producto else None
+    )
+
+
+@router.get(
+    "/api/clinic/productos",
+    response_model=List[ProductoItem],
+    summary="Listar Productos e Insumos de Inventario",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def get_productos_inventario(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    # Asegurar que se inicialicen los insumos por defecto si la clínica es nueva
+    obtener_o_inicializar_servicios_bano(target_clinica_id, db)
+
+    productos = db.query(Producto).filter(
+        Producto.clinica_id == target_clinica_id,
+        Producto.is_deleted == False
+    ).order_by(Producto.nombre.asc()).all()
+
+    return [ProductoItem.model_validate(p) for p in productos]
+
+
+@router.put(
+    "/api/clinic/productos/{producto_id}/stock",
+    response_model=ProductoItem,
+    summary="Actualizar o Reabastecer Stock de un Producto",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def update_stock_producto(
+    producto_id: int,
+    payload: ProductoStockUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    prod = db.query(Producto).filter(
+        Producto.id == producto_id,
+        Producto.clinica_id == target_clinica_id,
+        Producto.is_deleted == False
+    ).first()
+
+    if not prod:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Producto no encontrado en esta clínica."
+        )
+
+    prod.stock_actual = payload.stock_actual
+    if payload.stock_minimo is not None:
+        prod.stock_minimo = payload.stock_minimo
+    if payload.unidad_medida:
+        prod.unidad_medida = payload.unidad_medida.strip()
+
+    db.commit()
+    db.refresh(prod)
+    return ProductoItem.model_validate(prod)
 
 
 class VeterinarioPerfilUpdate(BaseModel):
@@ -837,6 +1084,7 @@ def registrar_paciente_rapido(
         especie=nombre_especie,
         raza=nombre_raza,
         peso=payload.mascota_peso,
+        fecha_nacimiento=payload.fecha_nacimiento,
         foto_url=payload.foto_url,
         tiene_alergias=payload.tiene_alergias,
         detalle_alergias=payload.detalle_alergias if payload.tiene_alergias else None,
@@ -946,6 +1194,73 @@ def registrar_atencion(
         db.flush()
         seguimiento_id = seguimiento.id
 
+    # Lógica para Prescripción Médica / Receta (Validación Estricta)
+    plan_medicacion_id = None
+    if payload.receta_medicamento and payload.receta_medicamento.strip():
+        med_nombre = payload.receta_medicamento.strip()
+        frec_texto = (payload.receta_frecuencia or "").strip()
+        dosis_texto = (payload.receta_dosis or "").strip()
+
+        detalle_receta = f"💊 Prescripción Médica: {med_nombre} | Frecuencia: {frec_texto} | Cantidad/Dosis: {dosis_texto}"
+        if atencion.tratamiento:
+            atencion.tratamiento = f"{atencion.tratamiento}\n{detalle_receta}"
+        else:
+            atencion.tratamiento = detalle_receta
+
+        try:
+            from app.follow_up.services import crear_plan_medicacion
+            frec_h = payload.receta_frecuencia_horas or 8
+            tot_d = payload.receta_total_dosis or 10
+            plan_obj, _ = crear_plan_medicacion(
+                db=db,
+                pet_id=mascota.id,
+                clinic_id=payload.clinica_id,
+                medicamento=med_nombre,
+                frecuencia_horas=frec_h,
+                total_dosis=tot_d,
+                es_estricto=False,
+                hora_inicio=get_lima_now()
+            )
+            plan_medicacion_id = plan_obj.id
+        except Exception as e:
+            logger.warning(f"No se pudo crear el plan de medicación automático: {e}")
+
+    # Lógica para Descuento de Inventario en Grooming / Baños (Mini-ERP)
+    stock_descontado = None
+    insumo_nombre = None
+    stock_restante = None
+
+    if payload.tipo_atencion == "GROOMING":
+        servicio_bano = None
+        if payload.servicio_bano_id:
+            servicio_bano = db.query(ServicioBano).filter(
+                ServicioBano.id == payload.servicio_bano_id,
+                ServicioBano.clinica_id == payload.clinica_id,
+                ServicioBano.is_deleted == False
+            ).first()
+
+        if not servicio_bano:
+            # Buscar el servicio de baño por defecto o primer activo
+            servicio_bano = db.query(ServicioBano).filter(
+                ServicioBano.clinica_id == payload.clinica_id,
+                ServicioBano.activo == True,
+                ServicioBano.is_deleted == False
+            ).first()
+
+        if servicio_bano and servicio_bano.producto_id:
+            producto = db.query(Producto).filter(
+                Producto.id == servicio_bano.producto_id,
+                Producto.clinica_id == payload.clinica_id,
+                Producto.is_deleted == False
+            ).first()
+            if producto:
+                consumo = servicio_bano.cantidad_consumo or 50.0
+                producto.stock_actual = max(0.0, round(float(producto.stock_actual) - float(consumo), 2))
+                stock_descontado = consumo
+                insumo_nombre = producto.nombre
+                stock_restante = producto.stock_actual
+                db.flush()
+
     db.commit()
 
     return AtencionResponse(
@@ -956,6 +1271,10 @@ def registrar_atencion(
         vacuna_id=vacuna_id,
         seguimiento_id=seguimiento_id,
         enfermedades_cubiertas=enfermedades_lista,
+        plan_medicacion_id=plan_medicacion_id,
+        stock_descontado=stock_descontado,
+        insumo_nombre=insumo_nombre,
+        stock_restante=stock_restante,
         mensaje="Atención registrada correctamente."
     )
 
@@ -1550,11 +1869,17 @@ def vista_lista_pacientes(
     propietarios_data = []
 
     for c in propietarios_unicos:
-        # Todas las mascotas vinculadas a este DNI unificado
-        todas_mascotas = db.query(Mascota).join(Cliente).filter(
+        # Todas las mascotas vinculadas a este DNI unificado (deduplicadas por Mascota.id)
+        mascotas_query = db.query(Mascota).join(Cliente).filter(
             Cliente.dni == c.dni,
             Mascota.is_deleted == False
         ).order_by(Mascota.nombre.asc()).all()
+
+        mascotas_dict = {}
+        for m in mascotas_query:
+            if m.id not in mascotas_dict:
+                mascotas_dict[m.id] = m
+        todas_mascotas = list(mascotas_dict.values())
 
         if not todas_mascotas:
             continue
@@ -1816,6 +2141,14 @@ def vista_agenda_citas(
         Cita.fecha >= hoy
     ).count()
 
+    # Próximas 15 a 20 citas futuras (ordenadas cronológicamente para panel avanzado)
+    proximas_citas = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False,
+        Cita.fecha >= hoy,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"])
+    ).order_by(Cita.fecha.asc(), Cita.hora.asc()).limit(20).all()
+
     return templates.TemplateResponse(
         request=request,
         name="clinic/agenda.html",
@@ -1823,6 +2156,7 @@ def vista_agenda_citas(
             "clinica": clinica,
             "current_user": current_user,
             "citas": citas,
+            "proximas_citas": proximas_citas,
             "fecha_seleccionada": fecha_filtro,
             "hoy": hoy,
             "total_hoy": total_hoy,
@@ -1899,6 +2233,68 @@ def cancelar_cita_veterinario(
     return {
         "mensaje": "Cita cancelada.",
         "cita_id": cita.id,
+        "estado": cita.estado
+    }
+
+
+class CitaCreateVetRequest(BaseModel):
+    clinica_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    mascota_id: int
+    fecha: date
+    hora: str
+    motivo: str = "Próximo Baño y Grooming (Recurrencia)"
+    estado: str = "CONFIRMADA"
+
+
+@router.post(
+    "/api/clinic/citas",
+    summary="Registrar Cita desde el Panel del Veterinario",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def crear_cita_veterinario(
+    payload: CitaCreateVetRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else (payload.clinica_id or 1)
+
+    mascota = db.query(Mascota).filter(
+        Mascota.id == payload.mascota_id,
+        Mascota.clinica_id == target_clinica_id,
+        Mascota.is_deleted == False
+    ).first()
+    if not mascota:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mascota no encontrada en esta clínica."
+        )
+
+    resolved_cliente_id = payload.cliente_id or mascota.cliente_id
+
+    # Parse hora "HH:MM"
+    partes = payload.hora.strip().split(":")
+    hora_obj = time(int(partes[0]), int(partes[1]))
+
+    cita = Cita(
+        clinica_id=target_clinica_id,
+        cliente_id=resolved_cliente_id,
+        mascota_id=payload.mascota_id,
+        fecha=payload.fecha,
+        hora=hora_obj,
+        motivo=payload.motivo,
+        estado=payload.estado
+    )
+    db.add(cita)
+    db.commit()
+    db.refresh(cita)
+
+    return {
+        "mensaje": "Cita agendada exitosamente.",
+        "cita_id": cita.id,
+        "fecha": str(cita.fecha),
+        "hora": cita.hora.strftime("%H:%M"),
         "estado": cita.estado
     }
 

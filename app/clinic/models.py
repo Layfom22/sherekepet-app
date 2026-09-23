@@ -391,3 +391,60 @@ class HorarioAtencion(Base, SoftDeleteMixin, TimestampMixin):
     def __repr__(self) -> str:
         return f"<HorarioAtencion(clinica_id={self.clinica_id}, dia={self.dia_semana}, activo={self.activo})>"
 
+
+class Producto(Base, SoftDeleteMixin, TimestampMixin):
+    """Modelo de Inventario e Insumos de la Clínica."""
+    __tablename__ = "sp_productos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    clinica_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clinicas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    codigo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    stock_actual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    unidad_medida: Mapped[str] = mapped_column(String(30), default="ml", nullable=False)
+    stock_minimo: Mapped[float] = mapped_column(Float, default=100.0, nullable=False)
+    precio_costo: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    precio_venta: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # Relaciones
+    clinica = relationship("Clinica")
+
+    def __repr__(self) -> str:
+        return f"<Producto(id={self.id}, nombre='{self.nombre}', stock={self.stock_actual}{self.unidad_medida})>"
+
+
+class ServicioBano(Base, SoftDeleteMixin, TimestampMixin):
+    """Modelo de Catálogo de Servicios de Baño y Grooming con Insumo de Consumo."""
+    __tablename__ = "sp_servicios_bano"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    clinica_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clinicas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    precio: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    producto_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("sp_productos.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    cantidad_consumo: Mapped[float] = mapped_column(Float, default=50.0, nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Relaciones
+    clinica = relationship("Clinica")
+    producto = relationship("Producto")
+
+    def __repr__(self) -> str:
+        return f"<ServicioBano(id={self.id}, nombre='{self.nombre}', precio={self.precio})>"
+

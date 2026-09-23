@@ -52,111 +52,337 @@
 
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white">
+<body class="h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-slate-50">
 
-    <!-- Header / Navbar Mobile-First -->
-    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16 gap-4">
-                <!-- Brand / Logo SherekePet SaaS -->
-                <a href="/dashboard" class="flex items-center space-x-2.5 group flex-shrink-0">
+    {% set p_count = citas_pendientes_count or (current_user.citas_pendientes_count if current_user else 0) %}
+
+    <!-- ========================================================== -->
+    <!-- 1. SIDEBAR FIJO DESKTOP (md:flex)                          -->
+    <!-- ========================================================== -->
+    <aside class="hidden md:flex flex-col fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 z-30 select-none shadow-xs">
+        <!-- Brand Header -->
+        <div class="h-16 px-5 flex items-center border-b border-slate-100 gap-3">
+            <a href="/dashboard" class="flex items-center space-x-2.5 group">
+                <img 
+                    src="/static/img/icon-sherekepet.png" 
+                    alt="SherekePet" 
+                    class="w-9 h-9 object-contain drop-shadow-xs group-hover:scale-105 transition-transform"
+                >
+                <div>
+                    <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                        SherekePet
+                    </span>
+                    <span class="block text-[10px] font-extrabold uppercase tracking-wider text-teal-700">
+                        Panel Veterinario
+                    </span>
+                </div>
+            </a>
+        </div>
+
+        <!-- Botón Rápido: Nuevo Paciente -->
+        <div class="p-4 pb-2">
+            <a 
+                href="/pacientes/nuevo" 
+                class="btn-touch w-full px-4 py-2.5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 group"
+            >
+                <i data-lucide="plus-circle" class="w-4 h-4 transition-transform group-hover:rotate-90" aria-hidden="true"></i>
+                <span>Nuevo Paciente</span>
+            </a>
+        </div>
+
+        <!-- Navigation Links -->
+        <nav class="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
+            <a 
+                href="/dashboard" 
+                class="btn-touch w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50/70 transition-all flex items-center justify-start gap-3"
+            >
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a 
+                href="/pacientes" 
+                class="btn-touch w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50/70 transition-all flex items-center justify-start gap-3"
+            >
+                <i data-lucide="paw-print" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Pacientes</span>
+            </a>
+
+            <a 
+                href="/agenda" 
+                class="btn-touch w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50/70 transition-all flex items-center justify-between"
+            >
+                <div class="flex items-center gap-3">
+                    <i data-lucide="calendar-days" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                    <span>Agenda</span>
+                </div>
+                {% if p_count and p_count > 0 %}
+                <span class="px-2 py-0.5 text-[10px] font-black bg-amber-500 text-white rounded-full animate-pulse shadow-2xs" title="{{ p_count }} cita(s) pendiente(s)">
+                    {{ p_count }}
+                </span>
+                {% endif %}
+            </a>
+
+            <a 
+                href="/configuracion" 
+                class="btn-touch w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50/70 transition-all flex items-center justify-start gap-3"
+                title="Configuración de Clínica y Perfil"
+            >
+                <i data-lucide="settings" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Configuración</span>
+            </a>
+        </nav>
+
+        <!-- Bloque Inferior: Perfil Veterinario & Salir -->
+        <div class="p-3 border-t border-slate-200 bg-slate-50/80 space-y-2">
+            {% if current_user %}
+            <a 
+                href="/configuracion#perfil" 
+                class="flex items-center gap-3 p-2 rounded-xl hover:bg-white transition-all group border border-transparent hover:border-slate-200"
+                title="Ver o editar mi Perfil Profesional"
+            >
+                <div class="w-10 h-10 rounded-xl overflow-hidden bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs shadow-2xs border border-teal-200 shrink-0 group-hover:ring-2 group-hover:ring-teal-500 transition-all">
                     <img 
-                        src="/static/img/icon-sherekepet.png" 
-                        alt="SherekePet" 
-                        class="w-10 h-10 object-contain drop-shadow-xs group-hover:scale-105 transition-transform"
+                        id="sidebarVetFoto" 
+                        src="{{ current_user.foto_perfil or '' }}" 
+                        alt="{{ current_user.nombre or 'Veterinario' }}" 
+                        class="w-full h-full object-cover {% if not current_user.foto_perfil %}hidden{% endif %}"
+                        onerror="this.style.display='none'; document.getElementById('sidebarVetFotoFallback')?.classList.remove('hidden');"
                     >
-                    <div>
-                        <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
-                            SherekePet
-                        </span>
-                        <span class="hidden sm:inline-block ml-1.5 px-2 py-0.5 text-xs font-semibold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
-                            Veterinaria
-                        </span>
+                    <span id="sidebarVetFotoFallback" class="{% if current_user.foto_perfil %}hidden{% endif %}">
+                        {{ (current_user.nombre or current_user.email or 'U')[0] | upper }}
+                    </span>
+                </div>
+                <div class="flex-1 min-w-0 text-left">
+                    <div class="flex items-center gap-1.5">
+                        <p class="text-xs font-bold text-slate-900 truncate group-hover:text-teal-700 transition-colors">
+                            {{ current_user.nombre or current_user.username or 'Usuario' }}
+                        </p>
                     </div>
-                </a>
+                    <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md inline-block {% if current_user.rol in ['ADMIN', 'VETERINARIO', 'VET'] %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                        {{ current_user.rol }}
+                    </span>
+                </div>
+            </a>
+            {% endif %}
 
-                <!-- Navigation Links & Quick Actions -->
-                <nav class="flex items-center space-x-2 sm:space-x-3 ml-auto">
-                    <a href="/dashboard" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5">
-                        <i data-lucide="layout-dashboard" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
-                        <span class="hidden sm:inline">Dashboard</span>
-                    </a>
-                    <a href="/pacientes" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5">
-                        <i data-lucide="paw-print" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
-                        <span class="hidden sm:inline">Pacientes</span>
-                    </a>
-                    <a href="/agenda" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors relative inline-flex items-center gap-1.5">
-                        <i data-lucide="calendar-days" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
-                        <span class="hidden sm:inline">Agenda</span>
-                        {% set p_count = citas_pendientes_count or (current_user.citas_pendientes_count if current_user else 0) %}
-                        {% if p_count and p_count > 0 %}
-                        <span class="ml-1.5 px-2 py-0.5 text-[10px] font-black bg-amber-500 text-white rounded-full animate-pulse shadow-2xs" title="{{ p_count }} cita(s) pendiente(s) por confirmar">
-                            {{ p_count }}
-                        </span>
-                        {% endif %}
-                    </a>
-                    <a href="/configuracion" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5" title="Configuración de Perfil y Clínica">
-                        <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
-                        <span class="hidden sm:inline">Configuración</span>
-                    </a>
-                    <a href="/pacientes/nuevo" class="btn-touch ml-1 sm:ml-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all inline-flex items-center gap-1.5">
-                        <i data-lucide="plus" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
-                        <span class="whitespace-nowrap">Nuevo Paciente</span>
-                    </a>
-                    {% if current_user %}
-                    <a 
-                        href="/configuracion#perfil" 
-                        class="hidden sm:flex items-center space-x-2.5 mr-1 border-l border-slate-200 pl-3 ml-1 hover:bg-slate-100 p-1.5 rounded-2xl transition-all cursor-pointer group"
-                        title="Clic para editar mi Perfil Profesional"
-                    >
-                        <div class="w-9 h-9 rounded-xl overflow-hidden bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs shadow-sm border border-teal-200 shrink-0 group-hover:ring-2 group-hover:ring-teal-500 transition-all">
-                            <img 
-                                id="navbarVetFoto" 
-                                src="{{ current_user.foto_perfil or '' }}" 
-                                alt="{{ current_user.nombre or 'Veterinario' }}" 
-                                class="w-full h-full object-cover {% if not current_user.foto_perfil %}hidden{% endif %}"
-                                onerror="this.style.display='none'; document.getElementById('navbarVetFotoFallback')?.classList.remove('hidden');"
-                            >
-                            <span id="navbarVetFotoFallback" class="{% if current_user.foto_perfil %}hidden{% endif %}">
-                                {{ (current_user.nombre or current_user.email or 'U')[0] | upper }}
-                            </span>
-                        </div>
-                        <div class="flex flex-col items-start text-left leading-tight">
-                            <div class="flex items-center space-x-1.5">
-                                <span id="navbarVetNombre" class="text-xs font-bold text-slate-800 truncate max-w-[130px] group-hover:text-teal-700 transition-colors">{{ current_user.nombre or current_user.username or 'Usuario' }}</span>
-                                <span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md {% if current_user.rol in ['ADMIN', 'VETERINARIO', 'VET'] %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
-                                    {{ current_user.rol }}
-                                </span>
-                            </div>
-                            <span class="text-[11px] text-slate-400 truncate max-w-[140px]" title="{{ current_user.email or current_user.username }}">
-                                {{ current_user.email or current_user.username }}
-                            </span>
-                        </div>
-                    </a>
-                    {% endif %}
-                    <a href="/logout" class="btn-touch ml-1 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors inline-flex items-center gap-1.5" title="Cerrar Sesión">
-                        <i data-lucide="log-out" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
-                        <span class="hidden md:inline">Salir</span>
-                    </a>
-                </nav>
-            </div>
+            <a 
+                href="/logout" 
+                class="btn-touch w-full px-3 py-2 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center justify-center gap-2"
+                title="Cerrar Sesión Segura"
+            >
+                <i data-lucide="log-out" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+                <span>Cerrar Sesión</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ========================================================== -->
+    <!-- 2. BARRA SUPERIOR MÓVIL (md:hidden)                       -->
+    <!-- ========================================================== -->
+    <header class="md:hidden sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200 px-4 py-2.5 flex items-center justify-between shadow-2xs">
+        <a href="/dashboard" class="flex items-center space-x-2">
+            <img 
+                src="/static/img/icon-sherekepet.png" 
+                alt="SherekePet" 
+                class="w-8 h-8 object-contain"
+            >
+            <span class="text-lg font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                SherekePet
+            </span>
+        </a>
+
+        <div class="flex items-center gap-2">
+            <a 
+                href="/pacientes/nuevo" 
+                class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-teal-600 active:bg-teal-700 rounded-xl flex items-center gap-1 shadow-2xs"
+                title="Nuevo Paciente"
+            >
+                <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
+                <span class="hidden sm:inline">Nuevo</span>
+            </a>
+
+            <button 
+                type="button" 
+                id="btnToggleMobileMenu"
+                onclick="toggleMobileSidebar()" 
+                class="btn-touch p-2 text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors"
+                aria-label="Abrir menú de navegación"
+            >
+                <i data-lucide="menu" class="w-6 h-6" aria-hidden="true"></i>
+            </button>
         </div>
     </header>
 
-    <!-- Main Content Area -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {% block content %}{% endblock %}
-    </main>
+    <!-- ========================================================== -->
+    <!-- 3. DRAWER MÓVIL RESPONSIVO (md:hidden)                    -->
+    <!-- ========================================================== -->
+    <!-- Backdrop oscuro -->
+    <div 
+        id="mobileOverlay" 
+        class="fixed inset-0 bg-slate-900/50 backdrop-blur-2xs z-40 hidden md:hidden transition-opacity duration-300"
+        onclick="toggleMobileSidebar()"
+    ></div>
 
-    <!-- Footer -->
-    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
-        <div class="max-w-7xl mx-auto px-4">
-            SherekePet SaaS Veterinario &bull; Zona Horaria: America/Lima &bull; Multi-Tenant Seguro
+    <!-- Panel Lateral Deslizante -->
+    <aside 
+        id="mobileSidebar" 
+        class="fixed inset-y-0 left-0 w-72 bg-white z-50 transform -translate-x-full md:hidden transition-transform duration-300 ease-in-out flex flex-col shadow-2xl"
+    >
+        <!-- Header Drawer -->
+        <div class="h-16 px-5 flex items-center justify-between border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <img 
+                    src="/static/img/icon-sherekepet.png" 
+                    alt="SherekePet" 
+                    class="w-8 h-8 object-contain"
+                >
+                <span class="text-lg font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                    SherekePet
+                </span>
+            </div>
+            <button 
+                type="button" 
+                onclick="toggleMobileSidebar()" 
+                class="btn-touch p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl"
+                aria-label="Cerrar menú"
+            >
+                <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+            </button>
         </div>
-    </footer>
 
-    <!-- Inicialización de Lucide Icons -->
+        <!-- Botón Acción Móvil -->
+        <div class="p-4 pb-2">
+            <a 
+                href="/pacientes/nuevo" 
+                class="btn-touch w-full px-4 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm flex items-center justify-center gap-2"
+                onclick="toggleMobileSidebar()"
+            >
+                <i data-lucide="plus-circle" class="w-5 h-5" aria-hidden="true"></i>
+                <span>Nuevo Paciente</span>
+            </a>
+        </div>
+
+        <!-- Links Drawer -->
+        <nav class="flex-1 px-3 py-2 space-y-1.5 overflow-y-auto">
+            <a 
+                href="/dashboard" 
+                class="btn-touch w-full px-3.5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-start gap-3"
+                onclick="toggleMobileSidebar()"
+            >
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <a 
+                href="/pacientes" 
+                class="btn-touch w-full px-3.5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-start gap-3"
+                onclick="toggleMobileSidebar()"
+            >
+                <i data-lucide="paw-print" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Pacientes</span>
+            </a>
+
+            <a 
+                href="/agenda" 
+                class="btn-touch w-full px-3.5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-between"
+                onclick="toggleMobileSidebar()"
+            >
+                <div class="flex items-center gap-3">
+                    <i data-lucide="calendar-days" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                    <span>Agenda</span>
+                </div>
+                {% if p_count and p_count > 0 %}
+                <span class="px-2 py-0.5 text-xs font-black bg-amber-500 text-white rounded-full animate-pulse shadow-2xs">
+                    {{ p_count }}
+                </span>
+                {% endif %}
+            </a>
+
+            <a 
+                href="/configuracion" 
+                class="btn-touch w-full px-3.5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-start gap-3"
+                onclick="toggleMobileSidebar()"
+            >
+                <i data-lucide="settings" class="w-5 h-5 text-slate-500 shrink-0" aria-hidden="true"></i>
+                <span>Configuración</span>
+            </a>
+        </nav>
+
+        <!-- Bloque Perfil Móvil -->
+        <div class="p-4 border-t border-slate-200 bg-slate-50/90 space-y-2">
+            {% if current_user %}
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl overflow-hidden bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs shadow-2xs border border-teal-200 shrink-0">
+                    <img 
+                        src="{{ current_user.foto_perfil or '' }}" 
+                        alt="{{ current_user.nombre or 'Veterinario' }}" 
+                        class="w-full h-full object-cover {% if not current_user.foto_perfil %}hidden{% endif %}"
+                        onerror="this.style.display='none';"
+                    >
+                    {% if not current_user.foto_perfil %}
+                    <span>{{ (current_user.nombre or current_user.email or 'U')[0] | upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-bold text-slate-900 truncate">
+                        {{ current_user.nombre or current_user.username or 'Usuario' }}
+                    </p>
+                    <span class="text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded-md inline-block {% if current_user.rol in ['ADMIN', 'VETERINARIO', 'VET'] %}bg-amber-100 text-amber-800 border border-amber-200{% else %}bg-slate-100 text-slate-600 border border-slate-200{% endif %}">
+                        {{ current_user.rol }}
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+
+            <a 
+                href="/logout" 
+                class="btn-touch w-full px-3 py-2.5 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl transition-colors flex items-center justify-center gap-2 border border-rose-200"
+            >
+                <i data-lucide="log-out" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+                <span>Cerrar Sesión</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ========================================================== -->
+    <!-- 4. CONTENIDO PRINCIPAL (Desktop: con margen md:pl-64)       -->
+    <!-- ========================================================== -->
+    <div class="md:pl-64 flex flex-col min-h-screen">
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
+            <div class="max-w-7xl mx-auto px-4">
+                SherekePet SaaS Veterinario &bull; Zona Horaria: America/Lima &bull; Multi-Tenant Seguro
+            </div>
+        </footer>
+    </div>
+
+    <!-- Script para control del Drawer Móvil y Lucide Icons -->
     <script>
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('mobileSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            if (!sidebar || !overlay) return;
+
+            const isClosed = sidebar.classList.contains('-translate-x-full');
+            if (isClosed) {
+                sidebar.classList.remove('-translate-x-full');
+                sidebar.classList.add('translate-x-0');
+                overlay.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            } else {
+                sidebar.classList.add('-translate-x-full');
+                sidebar.classList.remove('translate-x-0');
+                overlay.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+        }
+
         function initLucideIcons() {
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
                 window.lucide.createIcons({

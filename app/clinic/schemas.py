@@ -1,6 +1,6 @@
 from datetime import date
 from typing import Optional, List
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ReniecResponse(BaseModel):
@@ -43,6 +43,7 @@ class PacienteRapidoRequest(BaseModel):
     mascota_especie: Optional[str] = Field("Canino", description="Texto de especie (fallback/legacy)")
     mascota_raza: Optional[str] = Field(None, description="Texto de raza (fallback/legacy)")
     mascota_peso: Optional[float] = Field(None, ge=0, description="Peso actual en kg")
+    fecha_nacimiento: Optional[date] = Field(None, description="Fecha de nacimiento estimada o exacta de la mascota")
     
     # Salud y alergias
     tiene_alergias: bool = Field(False, description="¿Tiene alergias conocidas?")
@@ -78,6 +79,7 @@ class MascotaSummary(BaseModel):
     especie: str
     raza: Optional[str]
     peso: Optional[float]
+    fecha_nacimiento: Optional[date] = None
     foto_url: Optional[str] = None
     especie_id: Optional[int] = None
     raza_id: Optional[int] = None
@@ -112,6 +114,16 @@ class AtencionCreateRequest(BaseModel):
     fecha_proximo_refuerzo: Optional[date] = Field(None, description="Fecha estimada del próximo refuerzo")
     enfermedades_cubiertas: Optional[List[str]] = Field(None, description="Lista de enfermedades cubiertas por esta dosis")
 
+    # Prescripción Médica / Receta (Validación Estricta)
+    receta_medicamento: Optional[str] = Field(None, description="Nombre del medicamento/pastilla")
+    receta_frecuencia: Optional[str] = Field(None, description="Frecuencia (ej: Cada 8 horas)")
+    receta_dosis: Optional[str] = Field(None, description="Cantidad/Dosis (ej: 1 tableta / 15 dosis)")
+    receta_frecuencia_horas: Optional[int] = Field(None, ge=1, le=72, description="Frecuencia en horas para plan automatizado")
+    receta_total_dosis: Optional[int] = Field(None, ge=1, le=100, description="Total de dosis programadas")
+
+    # Mini-ERP: Selección de Tipo de Baño para descuento de stock
+    servicio_bano_id: Optional[int] = Field(None, description="ID del servicio de baño para descontar insumo")
+
     @field_validator("tipo_atencion")
     @classmethod
     def validate_tipo_atencion(cls, v: str) -> str:
@@ -120,6 +132,18 @@ class AtencionCreateRequest(BaseModel):
         if v_upper not in validos:
             raise ValueError(f"tipo_atencion debe ser uno de: {', '.join(validos)}")
         return v_upper
+
+    @model_validator(mode="after")
+    def validate_receta_estricta(self):
+        med = (self.receta_medicamento or "").strip()
+        frec = (self.receta_frecuencia or "").strip()
+        dosis = (self.receta_dosis or "").strip()
+        if med:
+            if not frec:
+                raise ValueError("El campo 'Frecuencia' (ej. Cada 8 horas) es estrictamente obligatorio al recetar un medicamento.")
+            if not dosis:
+                raise ValueError("El campo 'Cantidad / Dosis' es estrictamente obligatorio al recetar un medicamento.")
+        return self
 
 
 class AtencionResponse(BaseModel):
@@ -130,6 +154,10 @@ class AtencionResponse(BaseModel):
     vacuna_id: Optional[int] = None
     seguimiento_id: Optional[int] = None
     enfermedades_cubiertas: Optional[List[str]] = None
+    plan_medicacion_id: Optional[int] = None
+    stock_descontado: Optional[float] = None
+    insumo_nombre: Optional[str] = None
+    stock_restante: Optional[float] = None
     mensaje: str
 
 
@@ -175,3 +203,48 @@ class HorariosConfigResponse(BaseModel):
     mensaje: str
     intervalo_minutos: int
     dias: List[DiaHorarioItem]
+
+
+# ==========================================
+# MINI-ERP: CATÁLOGO DE BAÑOS E INVENTARIO
+# ==========================================
+
+class ProductoItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    clinica_id: int
+    nombre: str
+    stock_actual: float
+    unidad_medida: str
+    stock_minimo: float
+
+
+class ServicioBanoItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    clinica_id: int
+    nombre: str
+    precio: float
+    producto_id: Optional[int] = None
+    cantidad_consumo: float
+    activo: bool
+    producto_nombre: Optional[str] = None
+    stock_actual: Optional[float] = None
+    unidad_medida: Optional[str] = None
+
+
+class ServicioBanoCreateRequest(BaseModel):
+    clinica_id: Optional[int] = None
+    nombre: str = Field(..., min_length=2, max_length=100)
+    precio: float = Field(..., ge=0)
+    producto_id: Optional[int] = None
+    cantidad_consumo: float = Field(default=50.0, ge=0)
+    activo: bool = True
+
+
+class ProductoStockUpdateRequest(BaseModel):
+    stock_actual: float = Field(..., ge=0)
+    stock_minimo: Optional[float] = Field(default=None, ge=0)
+    unidad_medida: Optional[str] = None

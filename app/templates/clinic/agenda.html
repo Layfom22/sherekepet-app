@@ -9,7 +9,7 @@
     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center space-x-2.5">
-                <span class="text-2xl">📅</span>
+                <i data-lucide="calendar-days" class="w-7 h-7 text-teal-700" aria-hidden="true"></i>
                 <h1 class="text-2xl font-black text-slate-900 tracking-tight">Agenda de Citas</h1>
             </div>
             <p class="text-xs text-slate-500 mt-1">
@@ -24,7 +24,7 @@
                 class="btn-touch px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl transition-all shadow-2xs flex items-center space-x-1.5"
                 title="Configurar turnos y horarios de atención"
             >
-                <span>🕒</span>
+                <i data-lucide="clock-3" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span>Configurar Horarios</span>
             </a>
 
@@ -50,7 +50,7 @@
     {% if otras_fechas_pendientes %}
     <div class="p-4 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-white border border-amber-300 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
         <div class="flex items-center space-x-3">
-            <span class="text-2xl shrink-0 animate-bounce">🔔</span>
+            <i data-lucide="bell" class="w-6 h-6 shrink-0 animate-bounce text-amber-600" aria-hidden="true"></i>
             <div>
                 <p class="text-xs font-black text-amber-950">Tienes citas pendientes de confirmación en otras fechas:</p>
                 <p class="text-[11px] text-amber-800">Haz clic en una fecha para abrirla en tu agenda y confirmarla de inmediato:</p>
@@ -63,9 +63,10 @@
                 class="btn-touch inline-flex items-center space-x-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all"
                 title="Ver citas del {{ item.label }}"
             >
-                <span>📅 {{ item.label }}</span>
+                <i data-lucide="calendar-days" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>{{ item.label }}</span>
                 <span class="bg-white/30 text-white px-1.5 py-0.2 rounded-full text-[10px] font-black">{{ item.cantidad }}</span>
-                <span>➜</span>
+                <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
             </a>
             {% endfor %}
         </div>
@@ -96,7 +97,7 @@
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
         <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                <span>🕒</span>
+                <i data-lucide="clock-3" class="w-5 h-5 text-slate-700" aria-hidden="true"></i>
                 <span>Citas para el {{ fecha_seleccionada.strftime('%d/%m/%Y') }}</span>
             </h2>
             <span class="text-xs text-slate-400 font-medium">Orden cronológico</span>
@@ -117,12 +118,12 @@
 
                     <!-- Avatar Mascota y Datos -->
                     <div class="flex items-center space-x-3 min-w-0">
-                        <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-2xl overflow-hidden shrink-0">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center text-teal-700 overflow-hidden shrink-0">
                             {% if c.mascota.foto_url %}
                             <img src="{{ c.mascota.foto_url }}" alt="{{ c.mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
-                            <span class="hidden">{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                            <span class="hidden"><i data-lucide="paw-print" class="w-6 h-6" aria-hidden="true"></i></span>
                             {% else %}
-                            <span>{% if 'felino' in (c.mascota.especie|default('')|lower) %}🐱{% elif 'canino' in (c.mascota.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                            <span><i data-lucide="paw-print" class="w-6 h-6" aria-hidden="true"></i></span>
                             {% endif %}
                         </div>
 
@@ -150,10 +151,11 @@
                         <a 
                             href="https://wa.me/51{{ c.cliente.telefono|replace(' ', '')|replace('-', '') }}?text={{ ('Hola ' ~ (c.cliente.nombre_completo or '') ~ ', te escribimos de ' ~ (clinica.nombre_comercial or clinica.nombre) ~ ' para confirmar la cita de ' ~ c.mascota.nombre ~ ' a las ' ~ c.hora.strftime('%I:%M %p'))|urlencode }}" 
                             target="_blank" 
-                            class="inline-flex items-center text-emerald-600 font-bold hover:underline"
+                            class="inline-flex items-center gap-1 text-emerald-600 font-bold hover:underline"
                             title="Conversar por WhatsApp"
                         >
-                            💬 {{ c.cliente.telefono }}
+                            <i data-lucide="message-circle" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>{{ c.cliente.telefono }}</span>
                         </a>
                         {% else %}
                         <span class="text-slate-400 italic">Sin teléfono</span>
@@ -179,7 +181,7 @@
                         class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-xs transition-all flex items-center space-x-1"
                         title="Confirmar cita"
                     >
-                        <span>✓</span>
+                        <i data-lucide="check" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         <span>Confirmar</span>
                     </button>
                     {% endif %}
@@ -189,10 +191,11 @@
                         type="button" 
                         id="btn-cancelar-{{ c.id }}"
                         onclick="cambiarEstadoCita({{ c.id }}, 'cancelar')"
-                        class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-xl transition-all"
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-xl transition-all inline-flex items-center gap-1"
                         title="Cancelar cita"
                     >
-                        <span>✕ Cancelar</span>
+                        <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                        <span>Cancelar</span>
                     </button>
                     {% endif %}
                 </div>
@@ -202,7 +205,7 @@
         </div>
         {% else %}
         <div class="p-12 text-center text-slate-400 space-y-3">
-            <span class="text-4xl block">🏖️</span>
+            <i data-lucide="calendar-x-2" class="w-12 h-12 text-slate-300 mx-auto block" aria-hidden="true"></i>
             <p class="text-sm font-bold text-slate-600">No hay citas registradas para esta fecha.</p>
             <p class="text-xs text-slate-400">Selecciona otra fecha en el calendario superior o espera solicitudes desde el Portal del Dueño.</p>
         </div>

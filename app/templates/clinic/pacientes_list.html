@@ -10,7 +10,7 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
                 <div class="flex items-center space-x-3">
-                    <span class="text-3xl">🐾</span>
+                    <i data-lucide="paw-print" class="w-8 h-8 text-teal-700 shrink-0" aria-hidden="true"></i>
                     <div>
                         <h1 class="text-2xl font-black text-slate-900 tracking-tight">Directorio de Pacientes</h1>
                         <p class="text-xs text-slate-500 mt-0.5">
@@ -30,11 +30,13 @@
                         placeholder="Buscar por mascota, dueño o DNI..." 
                         class="w-full pl-10 pr-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
                     >
-                    <div class="absolute left-3 top-2.5 text-slate-400 text-base pointer-events-none">
-                        🔍
+                    <div class="absolute left-3 top-3 text-slate-400 pointer-events-none flex items-center">
+                        <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
                     </div>
                     {% if busqueda %}
-                    <a href="/pacientes" class="absolute right-3 top-2.5 text-xs font-bold text-slate-400 hover:text-slate-600">✕</a>
+                    <a href="/pacientes" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 flex items-center" aria-label="Limpiar búsqueda">
+                        <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+                    </a>
                     {% endif %}
                 </form>
 
@@ -42,7 +44,7 @@
                     href="/pacientes/nuevo" 
                     class="btn-touch px-4 py-2.5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-1.5"
                 >
-                    <span class="text-base font-bold">+</span>
+                    <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
                     <span>Nuevo Paciente</span>
                 </a>
             </div>
@@ -72,8 +74,8 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
                     <div class="flex items-center space-x-3.5 min-w-0">
                         <!-- Avatar del Dueño -->
-                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center text-xl shadow-xs shrink-0">
-                            👤
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                            <i data-lucide="user-round" class="w-6 h-6" aria-hidden="true"></i>
                         </div>
                         <div class="min-w-0">
                             <div class="flex items-center space-x-2 flex-wrap">
@@ -85,10 +87,16 @@
                                 </span>
                             </div>
                             <div class="flex items-center space-x-3 text-xs text-slate-500 mt-0.5 flex-wrap gap-y-1">
-                                <span>🪪 <strong>DNI:</strong> <span class="font-mono font-bold text-slate-700">{{ p.cliente.dni }}</span></span>
+                                <span class="inline-flex items-center gap-1">
+                                    <i data-lucide="id-card" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
+                                    <span><strong>DNI:</strong> <span class="font-mono font-bold text-slate-700">{{ p.cliente.dni }}</span></span>
+                                </span>
                                 {% if p.cliente.telefono %}
                                 <span class="text-slate-300">•</span>
-                                <span>📞 <span class="text-slate-700 font-medium">{{ p.cliente.telefono }}</span></span>
+                                <span class="inline-flex items-center gap-1">
+                                    <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
+                                    <span class="text-slate-700 font-medium">{{ p.cliente.telefono }}</span>
+                                </span>
                                 {% endif %}
                             </div>
                         </div>
@@ -103,13 +111,14 @@
                             class="btn-touch px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200 rounded-xl transition-colors flex items-center space-x-1.5"
                             title="Contactar al dueño por WhatsApp"
                         >
-                            <span>💬</span>
+                            <i data-lucide="message-circle" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span>WhatsApp</span>
                         </a>
                         {% endif %}
 
-                        <span class="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-50 text-teal-800 border border-teal-200">
-                            🐾 {{ p.mascotas|length }} mascota{{ 's' if p.mascotas|length != 1 else '' }}
+                        <span class="px-3 py-1.5 rounded-xl text-xs font-black bg-teal-50 text-teal-800 border border-teal-200 inline-flex items-center gap-1">
+                            <i data-lucide="paw-print" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>{{ p.mascotas|length }} mascota{{ 's' if p.mascotas|length != 1 else '' }}</span>
                         </span>
                     </div>
                 </div>
@@ -126,19 +135,19 @@
                             <!-- Avatar y Datos de la Mascota -->
                             <div class="flex items-center space-x-3 min-w-0">
                                 <div class="relative group/avatar shrink-0">
-                                    <div id="petAvatarBox_{{ m.id }}" class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-2xl shadow-2xs overflow-hidden relative">
+                                    <div id="petAvatarBox_{{ m.id }}" class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-teal-700 shadow-2xs overflow-hidden relative">
                                         {% if m.foto_url %}
                                         <img src="{{ m.foto_url }}" alt="{{ m.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
-                                        <span class="hidden">{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                        <span class="hidden"><i data-lucide="paw-print" class="w-6 h-6" aria-hidden="true"></i></span>
                                         {% else %}
-                                        <span>{% if 'felino' in (m.especie|default('')|lower) %}🐱{% elif 'canino' in (m.especie|default('')|lower) %}🐶{% else %}🐾{% endif %}</span>
+                                        <span><i data-lucide="paw-print" class="w-6 h-6" aria-hidden="true"></i></span>
                                         {% endif %}
                                         <div id="avatarLoader_{{ m.id }}" class="hidden absolute inset-0 bg-slate-900/70 flex items-center justify-center text-white text-[10px]">
-                                            <span class="animate-spin text-xs">⏳</span>
+                                            <i data-lucide="loader-2" class="w-4 h-4 animate-spin" aria-hidden="true"></i>
                                         </div>
                                     </div>
-                                    <label for="fotoInput_{{ m.id }}" class="cursor-pointer absolute -bottom-1 -right-1 w-5 h-5 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-[10px] shadow transition-transform hover:scale-110" title="Subir o cambiar foto de {{ m.nombre }}">
-                                        📷
+                                    <label for="fotoInput_{{ m.id }}" class="cursor-pointer absolute -bottom-1 -right-1 w-5 h-5 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center shadow transition-transform hover:scale-110" title="Subir o cambiar foto de {{ m.nombre }}" aria-label="Subir foto de {{ m.nombre }}">
+                                        <i data-lucide="camera" class="w-3 h-3" aria-hidden="true"></i>
                                     </label>
                                     <input type="file" id="fotoInput_{{ m.id }}" accept="image/*" class="hidden" onchange="subirFotoDirecta(this, {{ m.id }})">
                                 </div>
@@ -156,18 +165,21 @@
                                     <!-- Badge de Afiliación Clínica -->
                                     <div class="mt-1 flex items-center gap-1.5 flex-wrap">
                                         {% if m.clinica_id == clinica.id %}
-                                        <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                            🏥 Paciente de tu Clínica
+                                        <span class="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 inline-flex items-center gap-1">
+                                            <i data-lucide="hospital" class="w-3 h-3 text-emerald-700" aria-hidden="true"></i>
+                                            <span>Paciente de tu Clínica</span>
                                         </span>
                                         {% else %}
-                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700" title="Registrada por el dueño o en otra sede de la red">
-                                            🐾 Mascota del Propietario
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 inline-flex items-center gap-1" title="Registrada por el dueño o en otra sede de la red">
+                                            <i data-lucide="paw-print" class="w-3 h-3 text-slate-500" aria-hidden="true"></i>
+                                            <span>Mascota del Propietario</span>
                                         </span>
                                         {% endif %}
 
                                         {% if m.tiene_alergias or m.detalle_alergias or m.alergias %}
-                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
-                                            ⚠️ Alergias
+                                        <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200 inline-flex items-center gap-1">
+                                            <i data-lucide="triangle-alert" class="w-3 h-3 text-rose-600" aria-hidden="true"></i>
+                                            <span>Alergias</span>
                                         </span>
                                         {% endif %}
                                     </div>
@@ -177,11 +189,11 @@
                             <!-- Botón Ficha Clínica de la Mascota -->
                             <a 
                                 href="/pacientes/{{ m.id }}" 
-                                class="btn-touch px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center space-x-1 shrink-0"
+                                class="btn-touch px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center space-x-1.5 shrink-0"
                                 title="Ver Ficha Médica e Historial"
                             >
                                 <span>Ver Ficha</span>
-                                <span>→</span>
+                                <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             </a>
 
                         </div>
@@ -194,7 +206,7 @@
         </div>
         {% else %}
         <div class="bg-white p-12 text-center space-y-3 rounded-3xl border border-slate-200 shadow-sm">
-            <span class="text-4xl block">🔍</span>
+            <i data-lucide="search" class="w-10 h-10 text-slate-300 mx-auto block" aria-hidden="true"></i>
             <h3 class="text-base font-bold text-slate-800">No se encontraron propietarios ni pacientes</h3>
             <p class="text-xs text-slate-500 max-w-sm mx-auto">
                 {% if busqueda %}
@@ -204,8 +216,9 @@
                 {% endif %}
             </p>
             <div class="pt-2">
-                <a href="/pacientes/nuevo" class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-sm">
-                    + Registrar Paciente
+                <a href="/pacientes/nuevo" class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-sm inline-flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
+                    <span>Registrar Paciente</span>
                 </a>
             </div>
         </div>
@@ -271,9 +284,10 @@ async function subirFotoDirecta(input, mascotaId) {
                 box.innerHTML = `
                     <img src="${data.foto_url}" alt="Mascota" class="w-full h-full object-cover">
                     <div id="avatarLoader_${mascotaId}" class="hidden absolute inset-0 bg-slate-900/70 flex items-center justify-center text-white text-[10px]">
-                        <span class="animate-spin text-xs">⏳</span>
+                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-white"></i>
                     </div>
                 `;
+                window.initLucideIcons?.();
             }
         } else {
             const err = await resp.json().catch(() => ({}));

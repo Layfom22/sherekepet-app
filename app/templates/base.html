@@ -42,6 +42,14 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon.png">
     <link rel="apple-touch-icon" href="/static/img/icon-192.png">
 
+    <!-- Lucide Icons (Local + CDN fallback) -->
+    <script src="/static/js/lucide.min.js"></script>
+    <script>
+        if (!window.lucide) {
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white">
@@ -69,14 +77,17 @@
 
                 <!-- Navigation Links & Quick Actions -->
                 <nav class="flex items-center space-x-2 sm:space-x-3 ml-auto">
-                    <a href="/dashboard" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors">
-                        📊 <span class="hidden sm:inline ml-1">Dashboard</span>
+                    <a href="/dashboard" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5">
+                        <i data-lucide="layout-dashboard" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Dashboard</span>
                     </a>
-                    <a href="/pacientes" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors">
-                        🐾 <span class="hidden sm:inline ml-1">Pacientes</span>
+                    <a href="/pacientes" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5">
+                        <i data-lucide="paw-print" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Pacientes</span>
                     </a>
-                    <a href="/agenda" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors relative inline-flex items-center">
-                        📅 <span class="hidden sm:inline ml-1">Agenda</span>
+                    <a href="/agenda" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors relative inline-flex items-center gap-1.5">
+                        <i data-lucide="calendar-days" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Agenda</span>
                         {% set p_count = citas_pendientes_count or (current_user.citas_pendientes_count if current_user else 0) %}
                         {% if p_count and p_count > 0 %}
                         <span class="ml-1.5 px-2 py-0.5 text-[10px] font-black bg-amber-500 text-white rounded-full animate-pulse shadow-2xs" title="{{ p_count }} cita(s) pendiente(s) por confirmar">
@@ -84,11 +95,12 @@
                         </span>
                         {% endif %}
                     </a>
-                    <a href="/configuracion" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors" title="Configuración de Perfil y Clínica">
-                        ⚙️ <span class="hidden sm:inline ml-1">Configuración</span>
+                    <a href="/configuracion" class="btn-touch px-3 py-2 text-sm font-semibold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-colors inline-flex items-center gap-1.5" title="Configuración de Perfil y Clínica">
+                        <i data-lucide="settings" class="w-[18px] h-[18px] shrink-0" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">Configuración</span>
                     </a>
-                    <a href="/pacientes/nuevo" class="btn-touch ml-1 sm:ml-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center">
-                        <span class="text-base mr-1 font-bold">+</span>
+                    <a href="/pacientes/nuevo" class="btn-touch ml-1 sm:ml-2 px-4 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all inline-flex items-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
                         <span class="whitespace-nowrap">Nuevo Paciente</span>
                     </a>
                     {% if current_user %}
@@ -122,8 +134,9 @@
                         </div>
                     </a>
                     {% endif %}
-                    <a href="/logout" class="btn-touch ml-1 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors" title="Cerrar Sesión">
-                        🚪 <span class="hidden md:inline ml-0.5">Salir</span>
+                    <a href="/logout" class="btn-touch ml-1 px-3 py-2 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors inline-flex items-center gap-1.5" title="Cerrar Sesión">
+                        <i data-lucide="log-out" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
+                        <span class="hidden md:inline">Salir</span>
                     </a>
                 </nav>
             </div>
@@ -141,6 +154,22 @@
             SherekePet SaaS Veterinario &bull; Zona Horaria: America/Lima &bull; Multi-Tenant Seguro
         </div>
     </footer>
+
+    <!-- Inicialización de Lucide Icons -->
+    <script>
+        function initLucideIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({
+                    attrs: {
+                        'stroke-width': 1.8,
+                        'aria-hidden': 'true'
+                    }
+                });
+            }
+        }
+        document.addEventListener('DOMContentLoaded', initLucideIcons);
+        window.initLucideIcons = initLucideIcons;
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

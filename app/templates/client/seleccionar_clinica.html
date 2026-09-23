@@ -6,8 +6,8 @@
 <div class="max-w-md mx-auto py-8 px-4 space-y-6">
 
     <div class="text-center space-y-2">
-        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/20">
-            🏥
+        <div class="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <i data-lucide="hospital" class="w-8 h-8 text-white" aria-hidden="true"></i>
         </div>
         <h1 class="text-2xl font-black text-slate-900 tracking-tight">Elige tu Clínica</h1>
         <p class="text-xs text-slate-500">
@@ -34,8 +34,8 @@
                         class="w-12 h-12 rounded-xl object-cover border border-slate-100 flex-shrink-0"
                     >
                     {% else %}
-                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center text-2xl font-bold flex-shrink-0">
-                        🏥
+                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="hospital" class="w-6 h-6 text-indigo-600" aria-hidden="true"></i>
                     </div>
                     {% endif %}
                     <div class="min-w-0">
@@ -47,15 +47,16 @@
                         </p>
                     </div>
                 </div>
-                <span class="text-indigo-600 font-bold text-sm ml-2">➜</span>
+                <i data-lucide="chevron-right" class="w-5 h-5 text-indigo-600 group-hover:translate-x-0.5 transition-transform flex-shrink-0 ml-2" aria-hidden="true"></i>
             </button>
         </form>
         {% endfor %}
     </div>
 
     <div class="text-center pt-2">
-        <a href="/portal/login" class="text-xs text-indigo-600 hover:underline font-semibold">
-            ← Volver a ingresar DNI
+        <a href="/portal/login" class="inline-flex items-center text-xs text-indigo-600 hover:underline font-semibold">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5 mr-1" aria-hidden="true"></i>
+            Volver a ingresar DNI
         </a>
     </div>
 

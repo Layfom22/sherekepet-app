@@ -9,7 +9,7 @@
     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <div class="flex items-center space-x-2">
-                <span class="text-2xl">⚙️</span>
+                <i data-lucide="settings" class="w-6 h-6 text-teal-600" aria-hidden="true"></i>
                 <h1 class="text-2xl font-black text-slate-900 tracking-tight">Panel de Configuración</h1>
             </div>
             <p class="text-xs text-slate-500 mt-1">
@@ -23,37 +23,40 @@
                 type="button" 
                 id="tabBtnPerfil" 
                 onclick="cambiarTab('perfil')"
-                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center space-x-1.5"
             >
-                👤 Mi Perfil
+                <i data-lucide="user-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>Mi Perfil</span>
             </button>
             <button 
                 type="button" 
                 id="tabBtnClinica" 
                 onclick="cambiarTab('clinica')"
-                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs inline-flex items-center space-x-1.5"
             >
-                🏥 Mi Veterinaria
+                <i data-lucide="hospital" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>Mi Veterinaria</span>
             </button>
             <button 
                 type="button" 
                 id="tabBtnHorarios" 
                 onclick="cambiarTab('horarios')"
-                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900"
+                class="btn-touch px-3 sm:px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center space-x-1.5"
             >
-                🕒 Horarios
+                <i data-lucide="clock-3" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>Horarios</span>
             </button>
         </div>
     </div>
 
     <!-- Banner de Alertas / Feedback -->
     <div id="alertSuccess" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
-        <span class="text-base">✅</span>
+        <i data-lucide="circle-check" class="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true"></i>
         <p id="alertSuccessMsg">¡Cambios guardados exitosamente!</p>
     </div>
 
     <div id="alertError" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
-        <span class="text-base">⚠️</span>
+        <i data-lucide="triangle-alert" class="w-5 h-5 text-rose-600 shrink-0" aria-hidden="true"></i>
         <p id="alertErrorMsg">Ocurrió un error al guardar los cambios.</p>
     </div>
 
@@ -65,7 +68,8 @@
             <div class="border-b border-slate-100 pb-4 flex items-center justify-between">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        👤 Mi Perfil Profesional
+                        <i data-lucide="user-round" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Mi Perfil Profesional</span>
                     </h2>
                     <p class="text-xs text-slate-500 mt-0.5">
                         Actualiza tu información personal, fotografía y datos de acceso.
@@ -96,13 +100,13 @@
 
                         <!-- Loader visual durante upload -->
                         <div id="vetFotoLoader" class="hidden absolute inset-0 bg-slate-900/75 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-1 text-center">
-                            <span class="animate-spin text-base mb-1">⏳</span>
+                            <svg class="animate-spin w-4 h-4 mb-1 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                             <span>Subiendo...</span>
                         </div>
                     </div>
 
-                    <label for="vetFotoInput" id="lblVetFotoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Subir foto de perfil">
-                        📷
+                    <label for="vetFotoInput" id="lblVetFotoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Subir foto de perfil" aria-label="Subir foto de perfil">
+                        <i data-lucide="camera" class="w-4 h-4" aria-hidden="true"></i>
                     </label>
                     <input type="file" id="vetFotoInput" accept="image/*" class="hidden" onchange="subirFotoPerfil(this)">
                 </div>
@@ -117,9 +121,10 @@
                     <button 
                         type="button" 
                         onclick="document.getElementById('vetFotoInput').click()" 
-                        class="btn-touch px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 border border-teal-200 rounded-xl transition-colors mt-2"
+                        class="btn-touch px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 border border-teal-200 rounded-xl transition-colors mt-2 inline-flex items-center space-x-1.5"
                     >
-                        Cambiar Fotografía...
+                        <i data-lucide="camera" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                        <span>Cambiar Fotografía...</span>
                     </button>
                 </div>
             </div>
@@ -163,9 +168,10 @@
                     <button 
                         type="submit" 
                         id="btnGuardarPerfil"
-                        class="btn-touch w-full py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all"
+                        class="btn-touch w-full py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5"
                     >
-                        💾 Guardar Datos del Perfil
+                        <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
+                        <span>Guardar Datos del Perfil</span>
                     </button>
                 </div>
             </form>
@@ -185,7 +191,8 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5">
                 <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
                     <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        🏥 Nombre e Identidad
+                        <i data-lucide="hospital" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Nombre e Identidad</span>
                     </h2>
                     <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
                         Multi-tenant
@@ -228,7 +235,7 @@
                             {% if current_user and current_user.rol == 'ASISTENTE' %}disabled{% endif %}
                         >
                         <p class="text-[11px] text-teal-700 font-medium mt-1">
-                            ✨ Este nombre será el que verán tus clientes en el encabezado del Portal PWA, el Carnet Digital y los mensajes automáticos. Si lo dejas vacío, se usará la Razón Social.
+                            Este nombre será el que verán tus clientes en el encabezado del Portal PWA, el Carnet Digital y los mensajes automáticos. Si lo dejas vacío, se usará la Razón Social.
                         </p>
                     </div>
 
@@ -237,14 +244,16 @@
                         <button 
                             type="submit" 
                             id="btnGuardarConfig"
-                            class="btn-touch w-full py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all"
+                            class="btn-touch w-full py-3 px-4 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all flex items-center justify-center space-x-1.5"
                         >
-                            💾 Guardar Cambios de Marca
+                            <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
+                            <span>Guardar Cambios de Marca</span>
                         </button>
                     </div>
                     {% else %}
-                    <p class="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200">
-                        🔒 Tu usuario tiene rol ASISTENTE. Solo el Administrador o Veterinario titular de la clínica puede modificar estos datos.
+                    <p class="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center">
+                        <i data-lucide="lock" class="w-4 h-4 mr-2 text-slate-400 shrink-0" aria-hidden="true"></i>
+                        Tu usuario tiene rol ASISTENTE. Solo el Administrador o Veterinario titular de la clínica puede modificar estos datos.
                     </p>
                     {% endif %}
                 </form>
@@ -254,7 +263,8 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
                 <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
                     <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        🎨 Logo de la Clínica
+                        <i data-lucide="image" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Logo de la Clínica</span>
                     </h2>
                     <span class="text-xs text-slate-400">Formato WebP / PNG / JPG</span>
                 </div>
@@ -271,21 +281,25 @@
                                 class="w-full h-full object-cover"
                                 onerror="this.style.display='none'; document.getElementById('settingsLogoPlaceholder')?.classList.remove('hidden');"
                             >
-                            <span id="settingsLogoPlaceholder" class="hidden text-4xl">🏥</span>
+                            <span id="settingsLogoPlaceholder" class="hidden text-teal-400">
+                                <i data-lucide="hospital" class="w-10 h-10" aria-hidden="true"></i>
+                            </span>
                             {% else %}
-                            <span id="settingsLogoPlaceholder" class="text-4xl">🏥</span>
+                            <span id="settingsLogoPlaceholder" class="text-teal-400">
+                                <i data-lucide="hospital" class="w-10 h-10" aria-hidden="true"></i>
+                            </span>
                             {% endif %}
                             
                             <!-- Loader visual de subida -->
                             <div id="settingsLogoLoader" class="hidden absolute inset-0 bg-slate-900/75 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold p-1 text-center">
-                                <span class="animate-spin text-lg mb-1">⏳</span>
+                                <svg class="animate-spin w-5 h-5 mb-1 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                                 <span>Subiendo logo...</span>
                             </div>
                         </div>
 
                         {% if not current_user or current_user.rol != 'ASISTENTE' %}
-                        <label for="settingsLogoInput" id="lblSettingsLogoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Seleccionar nueva imagen de logo">
-                            📷
+                        <label for="settingsLogoInput" id="lblSettingsLogoInput" class="absolute -bottom-1 -right-1 w-8 h-8 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-sm shadow-md cursor-pointer transition-transform group-hover:scale-110" title="Seleccionar nueva imagen de logo" aria-label="Seleccionar nueva imagen de logo">
+                            <i data-lucide="camera" class="w-4 h-4" aria-hidden="true"></i>
                         </label>
                         <input type="file" id="settingsLogoInput" accept="image/*" class="hidden" onchange="subirLogoSettings(this)">
                         {% endif %}
@@ -302,9 +316,10 @@
                         <button 
                             type="button" 
                             onclick="document.getElementById('settingsLogoInput').click()" 
-                            class="btn-touch px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 border border-teal-200 rounded-xl transition-colors mt-2"
+                            class="btn-touch px-3 py-1.5 text-xs font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 border border-teal-200 rounded-xl transition-colors mt-2 inline-flex items-center space-x-1.5"
                         >
-                            Seleccionar Archivo...
+                            <i data-lucide="upload" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>Seleccionar Archivo...</span>
                         </button>
                         {% endif %}
                     </div>
@@ -318,7 +333,8 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 sticky top-24 space-y-4">
                 <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
                     <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
-                        📱 Vista Previa PWA Dueños
+                        <i data-lucide="smartphone" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Vista Previa PWA Dueños</span>
                     </h2>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                         En Vivo
@@ -347,7 +363,9 @@
                                     class="w-full h-full object-cover {% if not (clinica.logo_url or clinica.logo_b64) %}hidden{% endif %}"
                                     onerror="this.style.display='none'; document.getElementById('mockupLogoPlaceholder')?.classList.remove('hidden');"
                                 >
-                                <span id="mockupLogoPlaceholder" class="text-lg {% if clinica.logo_url or clinica.logo_b64 %}hidden{% endif %}">🐾</span>
+                                <span id="mockupLogoPlaceholder" class="text-white/80 {% if clinica.logo_url or clinica.logo_b64 %}hidden{% endif %}">
+                                    <i data-lucide="paw-print" class="w-5 h-5" aria-hidden="true"></i>
+                                </span>
                             </div>
                             <div class="min-w-0">
                                 <div class="flex items-center space-x-1">
@@ -356,7 +374,7 @@
                                     </span>
                                 </div>
                                 <p class="text-[9px] text-indigo-100 font-medium">
-                                    📱 Portal del Dueño
+                                    Portal del Dueño
                                 </p>
                             </div>
                         </div>
@@ -368,16 +386,17 @@
                     <!-- Contenido Simulado del Celular -->
                     <div class="p-4 space-y-2.5 bg-slate-50 min-h-[160px]">
                         <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs flex items-center space-x-2.5">
-                            <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center text-lg">
-                                🐶
+                            <div class="w-10 h-10 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center">
+                                <i data-lucide="paw-print" class="w-5 h-5" aria-hidden="true"></i>
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-slate-800">Firulais</p>
                                 <p class="text-[10px] text-slate-500">Carnet Digital &bull; Vacunas al día</p>
                             </div>
                         </div>
-                        <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-[10px] text-emerald-800 font-medium text-center">
-                            🟢 Canal WhatsApp Activo
+                        <div class="bg-emerald-50 border border-emerald-200 p-2.5 rounded-xl text-[10px] text-emerald-800 font-medium text-center flex items-center justify-center space-x-1.5">
+                            <i data-lucide="message-circle" class="w-3.5 h-3.5 text-emerald-600" aria-hidden="true"></i>
+                            <span>Canal WhatsApp Activo</span>
                         </div>
                     </div>
                 </div>
@@ -400,7 +419,8 @@
             <div class="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        🕒 Horarios y Turnos de Atención
+                        <i data-lucide="clock-3" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Horarios y Turnos de Atención</span>
                     </h2>
                     <p class="text-xs text-slate-500 mt-0.5">
                         Define tus días laborables y rangos horarios. Los dueños solo podrán agendar citas en estos turnos (respetando tus horas de almuerzo/receso).
@@ -409,8 +429,9 @@
                 
                 <!-- Selector de intervalo de cita -->
                 <div class="flex items-center space-x-2 bg-slate-50 p-2 rounded-2xl border border-slate-200 shrink-0">
-                    <label for="selectIntervalo" class="text-xs font-bold text-slate-700 whitespace-nowrap">
-                        ⏱️ Duración de cita:
+                    <label for="selectIntervalo" class="text-xs font-bold text-slate-700 whitespace-nowrap flex items-center space-x-1">
+                        <i data-lucide="timer" class="w-3.5 h-3.5 text-slate-500" aria-hidden="true"></i>
+                        <span>Duración de cita:</span>
                     </label>
                     <select 
                         id="selectIntervalo" 
@@ -428,15 +449,16 @@
             <!-- Acciones rápidas -->
             <div class="flex flex-wrap items-center justify-between gap-3 bg-teal-50/60 border border-teal-100 p-4 rounded-2xl">
                 <div class="flex items-center space-x-2 text-xs text-teal-900">
-                    <span class="text-base">💡</span>
+                    <i data-lucide="sparkles" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i>
                     <span>Puedes configurar <strong>Turno Mañana</strong> y <strong>Turno Tarde</strong> para proteger tu hora de almuerzo.</span>
                 </div>
                 <button 
                     type="button" 
                     onclick="replicarLunesAViernes()" 
-                    class="btn-touch px-3 py-1.5 text-xs font-bold text-teal-700 hover:text-white bg-white hover:bg-teal-600 border border-teal-200 rounded-xl transition-all shadow-xs"
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-teal-700 hover:text-white bg-white hover:bg-teal-600 border border-teal-200 rounded-xl transition-all shadow-xs inline-flex items-center space-x-1.5"
                 >
-                    ⚡ Replicar Lunes a toda la semana (Lun - Vie)
+                    <i data-lucide="copy" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                    <span>Replicar Lunes a toda la semana (Lun - Vie)</span>
                 </button>
             </div>
 
@@ -444,7 +466,7 @@
             <form id="formHorarios" onsubmit="guardarHorarios(event)" class="space-y-4">
                 <div id="listaDiasContainer" class="space-y-3">
                     <div class="p-8 text-center text-slate-400 text-xs">
-                        <span class="animate-spin inline-block text-lg mb-1">⏳</span>
+                        <svg class="animate-spin w-5 h-5 mx-auto mb-1 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                         <p>Cargando horarios de atención...</p>
                     </div>
                 </div>
@@ -455,7 +477,7 @@
                         id="btnGuardarHorarios" 
                         class="btn-touch w-full sm:w-auto px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-bold text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-2"
                     >
-                        <span>💾</span>
+                        <i data-lucide="save" class="w-4 h-4" aria-hidden="true"></i>
                         <span>Guardar Horarios de Atención</span>
                     </button>
                 </div>
@@ -688,7 +710,8 @@ async function guardarPerfilVet(event) {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.textContent = "💾 Guardar Datos del Perfil";
+            btn.innerHTML = '<i data-lucide="save" class="w-4 h-4 mr-2"></i><span>Guardar Datos del Perfil</span>';
+            window.initLucideIcons?.();
         }
     }
 }
@@ -803,7 +826,8 @@ async function guardarConfiguracion(event) {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.textContent = "💾 Guardar Cambios de Marca";
+            btn.innerHTML = '<i data-lucide="save" class="w-4 h-4 mr-2"></i><span>Guardar Cambios de Marca</span>';
+            window.initLucideIcons?.();
         }
     }
 }
@@ -832,10 +856,12 @@ async function cargarHorarios() {
     } catch (e) {
         console.error(e);
         container.innerHTML = `
-            <div class="p-6 text-center text-rose-600 text-xs bg-rose-50 rounded-2xl border border-rose-200">
-                ⚠️ Error al cargar los horarios. Intente recargar la página.
+            <div class="p-6 text-center text-rose-600 text-xs bg-rose-50 rounded-2xl border border-rose-200 flex items-center justify-center space-x-1.5">
+                <i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600"></i>
+                <span>Error al cargar los horarios. Intente recargar la página.</span>
             </div>
         `;
+        window.initLucideIcons?.();
     }
 }
 
@@ -883,7 +909,7 @@ function renderizarDias(dias) {
                     
                     <!-- Turno 1 (Mañana o Principal) -->
                     <div class="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-1">
-                        <span class="text-slate-500 font-bold shrink-0">🌅 T1:</span>
+                        <span class="text-slate-500 font-bold shrink-0">T1:</span>
                         <input 
                             type="time" 
                             id="t1_ini_${idx}" 
@@ -901,7 +927,7 @@ function renderizarDias(dias) {
 
                     <!-- Turno 2 (Tarde tras almuerzo) -->
                     <div class="flex items-center space-x-1.5 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-1">
-                        <span class="text-slate-500 font-bold shrink-0" title="Turno Tarde post-refrigerio">🌇 T2:</span>
+                        <span class="text-slate-500 font-bold shrink-0" title="Turno Tarde post-refrigerio">T2:</span>
                         <input 
                             type="time" 
                             id="t2_ini_${idx}" 
@@ -982,7 +1008,7 @@ function replicarLunesAViernes() {
         if (t2_fin) t2_fin.value = l_t2_fin;
     }
 
-    mostrarAlerta(true, "⚡ Horario de Lunes replicado para toda la semana laboral (Mar - Vie). Haz clic en 'Guardar Horarios'.");
+    mostrarAlerta(true, "Horario de Lunes replicado para toda la semana laboral (Mar - Vie). Haz clic en 'Guardar Horarios'.");
 }
 
 async function guardarHorarios(event) {
@@ -1042,7 +1068,8 @@ async function guardarHorarios(event) {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.innerHTML = "<span>💾</span><span>Guardar Horarios de Atención</span>";
+            btn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i><span>Guardar Horarios de Atención</span>';
+            window.initLucideIcons?.();
         }
     }
 }

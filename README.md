@@ -116,4 +116,69 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 pytest -v
 ```
-*(22 pruebas unitarias y de integración pasando al 100%)*
+*(70 pruebas unitarias y de integración pasando al 100%)*
+
+---
+
+## 🎨 Sistema de Iconografía y Consistencia Visual (Lucide Icons)
+
+SherekePet utiliza **exclusivamente [Lucide Icons](https://lucide.dev/)** para garantizar una estética veterinaria profesional, moderna, limpia y semánticamente coherente en todas sus vistas (Clínica y Portal del Cliente). Está **estrictamente prohibido el uso de emojis, iconos de Windows o flechas Unicode** en componentes de interfaz.
+
+### 1. Carga y Rendimiento
+- **Distribución local / offline-first**: El bundle se sirve desde `app/static/js/lucide.min.js`, sin depender de CDNs externas durante la renderización en producción ni fallar en conexiones lentas.
+- **Inicialización centralizada**:
+  ```javascript
+  window.initLucideIcons = function() {
+      if (window.lucide) {
+          lucide.createIcons({
+              attrs: {
+                  'stroke-width': 1.8,
+                  'stroke-linecap': 'round',
+                  'stroke-linejoin': 'round'
+              }
+          });
+      }
+  };
+  ```
+- **Contenido dinámico**: Toda función JavaScript que inyecte HTML con `data-lucide` debe invocar `window.initLucideIcons?.()` inmediatamente después de la inserción en el DOM.
+
+### 2. Estándares Visuales y Dimensiones
+| Tipo de Elemento | Clases de Tamaño Tailwind | Dimensiones | Grosor de Trazo |
+| :--- | :--- | :--- | :--- |
+| **Navegación / Header** | `w-[18px] h-[18px]` | 18×18 px | `1.8` |
+| **Botones Principales (Touch)** | `w-[18px] h-[18px]` o `w-5 h-5` | 18–20 px | `1.8` |
+| **Badges / Botones de Tabla** | `w-3.5 h-3.5` o `w-4 h-4` | 14–16 px | `1.8` |
+| **Encabezados de Tarjeta** | `w-5 h-5` | 20×20 px | `1.8` |
+| **Empty States / Hero** | `w-10 h-10` a `w-12 h-12` | 40–48 px | `1.8` |
+
+### 3. Mapeo Semántico Obligatorio
+| Entidad / Función | Icono Lucide (`data-lucide`) | Justificación Semántica |
+| :--- | :--- | :--- |
+| **Dashboard / Panel Principal** | `layout-dashboard` | Representa la vista integral de métricas y tarjetas. |
+| **Mascota / Paciente / Especie** | `paw-print` | Huella veterinaria universal y distintiva. |
+| **Dueño / Cliente / Perfil** | `user-round` o `user` | Representación humana limpia para clientes y veterinarios. |
+| **Clínica / Veterinaria** | `hospital` o `building-2` | Establecimiento de salud médica veterinaria. |
+| **Agenda / Calendario / Cita** | `calendar-days` o `calendar` | Organización temporal y citas programadas. |
+| **Atención / Historial Clínico** | `stethoscope` o `file-text` | Práctica médica clínica y expediente veterinario. |
+| **Vacunas / Inmunizaciones** | `syringe` | Procedimiento de vacunación biológica. |
+| **Tratamiento / Medicación** | `pill` | Administración de fármacos y dosificación. |
+| **WhatsApp / Mensajería** | `message-circle` | Comunicación directa por chat o WhatsApp wa.me. |
+| **Horarios / Tiempo / Duración** | `clock-3` o `clock` | Intervalos horarios y tiempos de espera. |
+| **Configuración / Ajustes** | `settings` | Panel de opciones administrativas y parámetros. |
+| **Búsqueda** | `search` | Exploración de registros en listas y tablas. |
+| **Filtros** | `filter` | Segmentación y filtrado de datos. |
+| **Acción Crear / Agregar** | `plus` | Incorporación de nuevos registros. |
+| **Acción Guardar** | `save` | Persistencia de datos en formularios. |
+| **Acción Editar** | `pencil` | Modificación de registros existentes. |
+| **Acción Eliminar / Descartar** | `trash-2` | Borrado lógico o confirmación destructiva. |
+| **Acción Cancelar / Cerrar** | `x` | Cierre de modales y descarte de diálogos. |
+| **Confirmación / Éxito** | `check` o `circle-check` | Estados completados o verificados con éxito. |
+| **Alertas / Advertencias** | `triangle-alert` | Notificaciones preventivas o de atención médica. |
+| **Navegación / Flujo** | `arrow-left`, `arrow-right`, `chevron-right` | Dirección y avance de pantallas. |
+| **Carga Asíncrona** | `loader-2` (con `animate-spin`) | Indicador de espera o petición en curso. |
+| **Cerrar Sesión** | `log-out` | Salida de la sesión activa. |
+
+### 4. Accesibilidad (A11y)
+- Todo icono decorativo incluye `aria-hidden="true"`.
+- Los botones sin texto descriptivo incluyen `aria-label="..."` y `title="..."` explícito.
+

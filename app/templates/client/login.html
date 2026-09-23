@@ -18,13 +18,13 @@
 
     <!-- Alerta de Error del Servidor (si viene de redirect o fallo) -->
     <div id="serverAlert" class="{% if not error %}hidden{% endif %} p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
-        <span class="text-base">⚠️</span>
+        <i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i>
         <p id="serverAlertMsg">{{ error or '' }}</p>
     </div>
 
     <!-- Alerta Dinámica de JS -->
     <div id="jsAlert" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in">
-        <span class="text-base">⚠️</span>
+        <i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i>
         <p id="jsAlertMsg"></p>
     </div>
 
@@ -65,8 +65,11 @@
                     onclick="verificarDniPaso1()"
                     class="btn-touch w-full py-3.5 px-4 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-2"
                 >
-                    <span id="btnPaso1Texto">Continuar ➜</span>
-                    <span id="btnPaso1Loader" class="hidden animate-spin text-base">⏳</span>
+                    <span id="btnPaso1Texto" class="inline-flex items-center space-x-1.5">
+                        <span>Continuar</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
+                    </span>
+                    <svg id="btnPaso1Loader" class="hidden animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                 </button>
             </div>
 
@@ -79,7 +82,7 @@
                 <div class="p-3.5 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-center justify-between">
                     <div class="min-w-0">
                         <p class="text-xs font-bold text-indigo-950 truncate">
-                            👋 <span id="saludoNombre">Hola</span>
+                            <span id="saludoNombre">Hola</span>
                         </p>
                         <p id="subtituloClinica" class="text-[10px] text-indigo-700 truncate">
                             DNI: <span id="displayDni" class="font-mono font-semibold"></span>
@@ -114,16 +117,18 @@
                     <button 
                         type="submit" 
                         id="btnEntrarNormal"
-                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-md shadow-indigo-600/20 transition-all"
+                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-2xl shadow-md shadow-indigo-600/20 transition-all flex items-center justify-center space-x-1.5"
                     >
-                        Ingresar a mi Portal ➜
+                        <span>Ingresar a mi Portal</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
                     </button>
                 </div>
 
                 <!-- SUB-PASO B: Primer Ingreso (needs_pin = TRUE) -->
                 <div id="subpasoCrearPin" class="hidden space-y-4">
-                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium">
-                        ✨ <strong>Primer ingreso detectado:</strong> Crea un código PIN numérico de 4 dígitos para proteger el historial médico de tus mascotas.
+                    <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-800 font-medium flex items-center space-x-1.5">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-amber-600 shrink-0" aria-hidden="true"></i>
+                        <span><strong>Primer ingreso detectado:</strong> Crea un código PIN numérico de 4 dígitos para proteger el historial médico de tus mascotas.</span>
                     </div>
 
                     <div>
@@ -159,9 +164,10 @@
                     <button 
                         type="submit" 
                         id="btnCrearYEntrar"
-                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-2xl shadow-md shadow-teal-600/20 transition-all"
+                        class="btn-touch w-full py-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-2xl shadow-md shadow-teal-600/20 transition-all flex items-center justify-center space-x-1.5"
                     >
-                        Crear PIN y Entrar ➜
+                        <span>Crear PIN y Entrar</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
                     </button>
                 </div>
 
@@ -173,8 +179,9 @@
 
     <!-- PWA Install Hint -->
     <div class="text-center space-y-1">
-        <p class="text-[11px] text-slate-400">
-            📱 Puedes instalar SherekePet como una App en la pantalla de inicio de tu celular.
+        <p class="text-[11px] text-slate-400 flex items-center justify-center space-x-1">
+            <i data-lucide="smartphone" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
+            <span>Puedes instalar SherekePet como una App en la pantalla de inicio de tu celular.</span>
         </p>
     </div>
 
@@ -249,7 +256,8 @@ async function verificarDniPaso1() {
         mostrarErrorJs("Error de conexión al verificar el DNI. Revisa tu acceso a internet.");
     } finally {
         btn.disabled = false;
-        texto.textContent = "Continuar ➜";
+        texto.innerHTML = '<span>Continuar</span><i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>';
+        window.initLucideIcons?.();
         loader.classList.add("hidden");
     }
 }
@@ -265,7 +273,7 @@ function activarPaso2(dni, data) {
 
     const subClinica = document.getElementById("subtituloClinica");
     if (data.clinica_nombre) {
-        subClinica.innerHTML = `DNI: <span class="font-mono font-semibold">${dni}</span> &bull; 🏥 ${data.clinica_nombre}`;
+        subClinica.innerHTML = `DNI: <span class="font-mono font-semibold">${dni}</span> &bull; ${data.clinica_nombre}`;
     }
 
     // Ocultar Paso 1 y Mostrar Paso 2

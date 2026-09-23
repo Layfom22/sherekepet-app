@@ -19,14 +19,14 @@
     <!-- Feedback / Alertas -->
     {% if mensaje %}
     <div class="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200">
-        <span class="text-base">✅</span>
+        <i data-lucide="circle-check" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i>
         <p>{{ mensaje }}</p>
     </div>
     {% endif %}
 
     {% if error %}
     <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200">
-        <span class="text-base">⚠️</span>
+        <i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i>
         <p>{{ error }}</p>
     </div>
     {% endif %}
@@ -123,16 +123,19 @@ async function solicitarReenvioOtp() {
 
         if (resp.ok) {
             alertDiv.classList.add("bg-teal-50", "border", "border-teal-200", "text-teal-800");
-            alertDiv.innerHTML = `<span>✅</span><p>${data.mensaje || 'Código reenviado con éxito.'}</p>`;
+            alertDiv.innerHTML = `<i data-lucide="circle-check" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i><p>${data.mensaje || 'Código reenviado con éxito.'}</p>`;
+            window.initLucideIcons?.();
         } else {
             alertDiv.classList.add("bg-rose-50", "border", "border-rose-200", "text-rose-700");
-            alertDiv.innerHTML = `<span>⚠️</span><p>${data.detail || 'Error al reenviar el código.'}</p>`;
+            alertDiv.innerHTML = `<i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i><p>${data.detail || 'Error al reenviar el código.'}</p>`;
+            window.initLucideIcons?.();
         }
     } catch (e) {
         console.error(e);
         alertDiv.classList.remove("hidden");
         alertDiv.classList.add("bg-rose-50", "border", "border-rose-200", "text-rose-700");
-        alertDiv.innerHTML = `<span>⚠️</span><p>Error de conexión al reenviar.</p>`;
+        alertDiv.innerHTML = `<i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i><p>Error de conexión al reenviar.</p>`;
+        window.initLucideIcons?.();
     } finally {
         btn.disabled = false;
         btn.textContent = "¿No recibiste el código? Reenviar OTP";

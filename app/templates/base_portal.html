@@ -47,6 +47,14 @@
             justify-content: center;
         }
     </style>
+    <!-- Lucide Icons (Local + CDN fallback) -->
+    <script src="/static/js/lucide.min.js"></script>
+    <script>
+        if (!window.lucide) {
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+
     {% block extra_head %}{% endblock %}
 </head>
 <body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white pb-12 sm:pb-0">
@@ -63,7 +71,7 @@
                         class="btn-touch px-3 py-1.5 rounded-xl text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 shadow-sm transition-all flex items-center space-x-1.5"
                         title="Ir a Mis Mascotas"
                     >
-                        <span class="text-base">🐾</span>
+                        <i data-lucide="paw-print" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
                         <span class="text-xs font-black hidden sm:inline">Inicio</span>
                         <span class="sr-only">Mis Mascotas</span>
                     </a>
@@ -90,18 +98,20 @@
                 <div class="flex items-center justify-end space-x-2">
                     <a 
                         href="/portal/dashboard#seccionPerfil" 
-                        class="btn-touch p-2 rounded-xl text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 shadow-sm transition-all" 
+                        class="btn-touch p-2 rounded-xl text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 shadow-sm transition-all inline-flex items-center justify-center" 
                         title="Mi Perfil de Dueño"
+                        aria-label="Mi Perfil de Dueño"
                     >
-                        <span class="text-base">👤</span>
+                        <i data-lucide="user-round" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
                         <span class="sr-only">Mi Perfil</span>
                     </a>
                     <a 
                         href="/portal/logout" 
                         class="btn-touch px-2.5 py-1.5 rounded-xl text-rose-100 hover:text-white bg-rose-600/30 hover:bg-rose-600/50 active:scale-95 border border-rose-400/40 shadow-sm transition-all flex items-center space-x-1"
                         title="Cerrar sesión"
+                        aria-label="Cerrar sesión"
                     >
-                        <span class="text-base">🚪</span>
+                        <i data-lucide="log-out" class="w-4 h-4 shrink-0" aria-hidden="true"></i>
                         <span class="text-[11px] font-bold hidden sm:inline">Salir</span>
                         <span class="sr-only">Cerrar sesión</span>
                     </a>
@@ -124,6 +134,22 @@
         </div>
         <p class="text-[11px]">Carnet Digital y Seguimiento de Mascotas</p>
     </footer>
+
+    <!-- Inicialización de Lucide Icons -->
+    <script>
+        function initLucideIcons() {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({
+                    attrs: {
+                        'stroke-width': 1.8,
+                        'aria-hidden': 'true'
+                    }
+                });
+            }
+        }
+        document.addEventListener('DOMContentLoaded', initLucideIcons);
+        window.initLucideIcons = initLucideIcons;
+    </script>
 
     {% block scripts %}{% endblock %}
 </body>

@@ -54,8 +54,10 @@
 </head>
 <body class="h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-slate-50">
 
+    {% set show_sidebar = current_user and not hide_sidebar %}
     {% set p_count = citas_pendientes_count or (current_user.citas_pendientes_count if current_user else 0) %}
 
+    {% if show_sidebar %}
     <!-- ========================================================== -->
     <!-- 1. SIDEBAR FIJO DESKTOP (md:flex)                          -->
     <!-- ========================================================== -->
@@ -344,11 +346,39 @@
             </a>
         </div>
     </aside>
+    {% else %}
+    <!-- ========================================================== -->
+    <!-- HEADER PÚBLICO (Para Registro, Verificación o Login)      -->
+    <!-- ========================================================== -->
+    <header class="w-full bg-white/95 backdrop-blur border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <a href="/" class="flex items-center space-x-2.5 group">
+                <img 
+                    src="/static/img/icon-sherekepet.png" 
+                    alt="SherekePet" 
+                    class="w-9 h-9 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+                >
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                        SherekePet
+                    </span>
+                    <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
+                        SaaS Veterinario
+                    </span>
+                </div>
+            </a>
+            <div class="flex items-center space-x-3 text-xs font-bold">
+                <a href="/portal/login" class="text-slate-600 hover:text-teal-700">🐾 Portal Dueños</a>
+                <a href="/login" class="btn-touch px-3.5 py-1.5 text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-xl border border-teal-200 transition-all">Iniciar Sesión</a>
+            </div>
+        </div>
+    </header>
+    {% endif %}
 
     <!-- ========================================================== -->
-    <!-- 4. CONTENIDO PRINCIPAL (Desktop: con margen md:pl-64)       -->
+    <!-- 4. CONTENIDO PRINCIPAL (Desktop: con margen md:pl-64 sólo si hay sidebar) -->
     <!-- ========================================================== -->
-    <div class="md:pl-64 flex flex-col min-h-screen">
+    <div class="{% if show_sidebar %}md:pl-64{% endif %} flex flex-col min-h-screen">
         <!-- Main Content Area -->
         <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {% block content %}{% endblock %}
@@ -364,6 +394,7 @@
 
     <!-- Script para control del Drawer Móvil y Lucide Icons -->
     <script>
+        {% if show_sidebar %}
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('mobileSidebar');
             const overlay = document.getElementById('mobileOverlay');
@@ -382,6 +413,7 @@
                 document.body.classList.remove('overflow-hidden');
             }
         }
+        {% endif %}
 
         function initLucideIcons() {
             if (window.lucide && typeof window.lucide.createIcons === 'function') {

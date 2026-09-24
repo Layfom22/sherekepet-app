@@ -71,6 +71,40 @@ def test_landing_page_publica_y_redireccion_autenticada(client, db_session):
     assert resp_auth.headers["location"] == "/dashboard"
 
 
+def test_registro_y_auth_no_muestran_sidebar_privado(client):
+    """
+    Verifica que en las vistas públicas de creación de cuenta (/registro) y verificación (/verificar):
+    - NO se muestra el menú/sidebar lateral del panel administrativo (Nuevo Paciente, Agenda, Configuración, etc.)
+    - El formulario está limpio y centrado, sin opciones de navegación interna.
+    """
+    client.cookies.clear()
+
+    # 1. Página de Registro de Clínica
+    resp_reg = client.get("/registro")
+    assert resp_reg.status_code == 200
+    html_reg = resp_reg.text
+
+    assert "Nuevo Paciente" not in html_reg
+    assert "mobileSidebar" not in html_reg
+    assert 'href="/agenda"' not in html_reg
+    assert 'href="/configuracion"' not in html_reg
+    assert 'href="/logout"' not in html_reg
+    assert "Comienza tu periodo de prueba gratis" in html_reg
+    assert "Registrar Clínica y Entrar" in html_reg
+
+    # 2. Página de Verificación de Correo
+    resp_ver = client.get("/verificar?email=test@vet.com")
+    assert resp_ver.status_code == 200
+    html_ver = resp_ver.text
+
+    assert "Nuevo Paciente" not in html_ver
+    assert "mobileSidebar" not in html_ver
+    assert 'href="/agenda"' not in html_ver
+    assert 'href="/configuracion"' not in html_ver
+    assert 'href="/logout"' not in html_ver
+    assert "Verifica tu Correo" in html_ver
+
+
 def test_confirmacion_cita_sin_agujero_negro(client, db_session):
     """
     Verifica que PUT /api/citas/{id}/confirmar y PUT /api/clinic/citas/{id}/confirmar:

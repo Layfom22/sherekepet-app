@@ -33,6 +33,17 @@ database_url = settings.DATABASE_URL
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
+# Compatibilidad con Python 3.14+ y Render: si no hay driver explícito y psycopg2 no está disponible, usar psycopg (v3)
+if database_url.startswith("postgresql://") and "+" not in database_url.split("://")[0]:
+    try:
+        import psycopg2  # noqa: F401
+    except ImportError:
+        try:
+            import psycopg  # noqa: F401
+            database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        except ImportError:
+            pass
+
 connect_args = {}
 if database_url.startswith("sqlite"):
     connect_args["check_same_thread"] = False

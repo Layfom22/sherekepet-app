@@ -169,11 +169,11 @@
 
                 <!-- Estado y Botones de Acción -->
                 <div class="flex items-center space-x-2 sm:self-center shrink-0">
-                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if c.estado == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif c.estado == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if c.estado|upper == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif c.estado|upper == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                         {{ c.estado }}
                     </span>
 
-                    {% if c.estado != 'CONFIRMADA' %}
+                    {% if c.estado|upper != 'CONFIRMADA' %}
                     <button 
                         type="button" 
                         id="btn-confirmar-{{ c.id }}"
@@ -281,7 +281,7 @@
                     <span class="text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 font-medium max-w-xs truncate" title="{{ pc.motivo }}">
                         {{ pc.motivo }}
                     </span>
-                    <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full {% if pc.estado == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif pc.estado == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                    <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full {% if pc.estado|upper == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif pc.estado|upper == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                         {{ pc.estado }}
                     </span>
                     {% if 'vacun' in pc.motivo.lower() %}
@@ -335,10 +335,11 @@ async function cambiarEstadoCita(citaId, accion) {
 
             if (badge) {
                 badge.textContent = data.estado;
-                if (data.estado === 'CONFIRMADA') {
+                const estUpper = (data.estado || "").toUpperCase();
+                if (estUpper === 'CONFIRMADA') {
                     badge.className = "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200";
                     if (btnConfirmar) btnConfirmar.remove();
-                } else if (data.estado === 'CANCELADA') {
+                } else if (estUpper === 'CANCELADA') {
                     badge.className = "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
                     if (btnCancelar) btnCancelar.remove();
                     if (btnConfirmar) btnConfirmar.remove();

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SherekePet - Software Integral para Clínicas Veterinarias</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pet: {
+                            50: '#f0fdf9',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    minHeight: {
+                        'touch': '44px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .btn-touch {
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    <!-- Favicon & Brand Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon.png">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+
+    <!-- Lucide Icons -->
+    <script src="/static/js/lucide.min.js"></script>
+    <script>
+        if (!window.lucide) {
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+</head>
+<body class="min-h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-gradient-to-br from-slate-50 via-teal-50/20 to-slate-100 flex flex-col justify-between">
+
+    <!-- Navbar Público Superior -->
+    <header class="w-full bg-white/80 backdrop-blur border-b border-slate-200/80 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand -->
+            <a href="/" class="flex items-center space-x-2.5 group">
+                <img 
+                    src="/static/img/icon-sherekepet.png" 
+                    alt="SherekePet" 
+                    class="w-9 h-9 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+                >
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                        SherekePet
+                    </span>
+                    <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
+                        SaaS Veterinario
+                    </span>
+                </div>
+            </a>
+
+            <!-- Acciones Rápidas -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <a 
+                    href="/portal/login" 
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-all"
+                    title="Acceso para propietarios de mascotas"
+                >
+                    🐾 <span class="hidden sm:inline ml-1">Portal Dueños</span>
+                </a>
+                <a 
+                    href="/registro" 
+                    class="btn-touch px-4 py-2 text-xs font-extrabold text-teal-800 bg-teal-100/70 hover:bg-teal-100 border border-teal-300 rounded-xl transition-all shadow-xs"
+                >
+                    ✨ Prueba 14 Días
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal: Grid Split 2 Columnas -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 w-full flex items-center">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center w-full">
+            
+            <!-- ============================================== -->
+            <!-- COLUMNA IZQUIERDA: PROPUESTA DE VALOR          -->
+            <!-- ============================================== -->
+            <div class="lg:col-span-7 space-y-6 sm:space-y-8 pr-0 lg:pr-4">
+                
+                <!-- Badge Destacado -->
+                <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs">
+                    <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Plataforma Cloud para Clínicas y Consultorios Veterinarios</span>
+                </div>
+
+                <!-- Título Hero -->
+                <div class="space-y-3">
+                    <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                        Moderniza tu clínica veterinaria en una 
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                            sola plataforma
+                        </span>
+                    </h1>
+                    <p class="text-sm sm:text-base text-slate-600 leading-relaxed max-w-xl">
+                        Automatiza historias clínicas, recetas digitales, control de insumos y agendamiento inteligente. Mantén a los dueños fidelizados con su carnet digital en el móvil.
+                    </p>
+                </div>
+
+                <!-- Lista de Propuestas de Valor / Características -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                    
+                    <!-- Feature 1 -->
+                    <div class="p-4 bg-white/70 backdrop-blur rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5 hover:border-teal-300 transition-colors">
+                        <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center font-bold text-base">
+                            📋
+                        </div>
+                        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Historias Clínicas & Carnet</h2>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            Consultas, vacunación y antiparasitarios con trazabilidad clínica completa y búsqueda por DNI.
+                        </p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="p-4 bg-white/70 backdrop-blur rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5 hover:border-teal-300 transition-colors">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base">
+                            📅
+                        </div>
+                        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Agendamiento Inteligente</h2>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            Control de horarios, slots sin colisiones y confirmación en 1 clic de citas solicitadas por clientes.
+                        </p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="p-4 bg-white/70 backdrop-blur rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5 hover:border-teal-300 transition-colors">
+                        <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-base">
+                            📱
+                        </div>
+                        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Portal PWA para Dueños</h2>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            Acceso seguro con PIN para que los propietarios vean carnet y recetas sin instalar apps pesadas.
+                        </p>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div class="p-4 bg-white/70 backdrop-blur rounded-2xl border border-slate-200/80 shadow-2xs space-y-1.5 hover:border-teal-300 transition-colors">
+                        <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-base">
+                            📦
+                        </div>
+                        <h2 class="text-xs font-extrabold text-slate-800 uppercase tracking-wide">Mini-ERP & Insumos</h2>
+                        <p class="text-xs text-slate-500 leading-normal">
+                            Control de stock de medicamentos, champús para baños y consumo automático por tipo de servicio.
+                        </p>
+                    </div>
+
+                </div>
+
+                <!-- Garantías / Prueba Gratis -->
+                <div class="pt-2 flex flex-wrap items-center gap-4 text-xs font-semibold text-slate-500">
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+                        14 días de prueba gratis
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+                        Sin tarjeta de crédito
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+                        Soporte WhatsApp directo
+                    </span>
+                </div>
+
+            </div>
+
+            <!-- ============================================== -->
+            <!-- COLUMNA DERECHA: FORMULARIO DE LOGIN           -->
+            <!-- ============================================== -->
+            <div class="lg:col-span-5 w-full max-w-md mx-auto lg:max-w-none">
+                <div class="bg-white p-7 sm:p-8 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200/80 space-y-5">
+                    
+                    <!-- Encabezado de la Card -->
+                    <div class="text-center space-y-1.5">
+                        <div class="w-14 h-14 mx-auto flex items-center justify-center mb-2">
+                            <img src="/static/img/icon-sherekepet.png" alt="SherekePet" class="w-14 h-14 object-contain drop-shadow-sm">
+                        </div>
+                        <h2 class="text-xl font-black text-slate-900 tracking-tight">Acceso Veterinario</h2>
+                        <p class="text-xs text-slate-500">
+                            Ingresa con tus credenciales a tu clínica
+                        </p>
+                    </div>
+
+                    <!-- Alerta de Error -->
+                    {% if error %}
+                    <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center space-x-2 animate-in fade-in duration-200">
+                        <i data-lucide="triangle-alert" class="w-4 h-4 text-rose-600 shrink-0" aria-hidden="true"></i>
+                        <p>{{ error }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Botón Google Auth -->
+                    <a 
+                        href="/auth/google/login"
+                        class="btn-touch w-full py-3 px-4 border border-slate-200 hover:border-slate-300 rounded-2xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center space-x-2.5 transition-all shadow-2xs cursor-pointer"
+                    >
+                        <svg class="w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                        </svg>
+                        <span>Continuar con Google</span>
+                    </a>
+
+                    <!-- Separador -->
+                    <div class="relative flex py-1 items-center">
+                        <div class="flex-grow border-t border-slate-200"></div>
+                        <span class="flex-shrink mx-3 text-slate-400 text-[11px] uppercase font-bold tracking-wider">o con correo</span>
+                        <div class="flex-grow border-t border-slate-200"></div>
+                    </div>
+
+                    <!-- Formulario de Login -->
+                    <form method="POST" action="/login" class="space-y-4">
+                        <div>
+                            <label for="email" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                                Correo o Nombre de Usuario
+                            </label>
+                            <input 
+                                type="text" 
+                                id="email" 
+                                name="email" 
+                                value="{{ email or '' }}"
+                                placeholder="doctor@tuclinica.com o usuario" 
+                                class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                                required
+                            >
+                        </div>
+
+                        <div>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label for="password" class="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                                    Contraseña
+                                </label>
+                            </div>
+                            <input 
+                                type="password" 
+                                id="password" 
+                                name="password" 
+                                placeholder="••••••••" 
+                                class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                                required
+                            >
+                        </div>
+
+                        <div class="pt-1">
+                            <button 
+                                type="submit" 
+                                class="btn-touch w-full py-3.5 px-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                            >
+                                <span>Ingresar al Sistema</span>
+                                <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Enlaces Inferiores -->
+                    <div class="text-center pt-3 border-t border-slate-100 space-y-2">
+                        <p class="text-xs text-slate-500">
+                            ¿Aún no tienes cuenta? 
+                            <a href="/registro" class="text-teal-700 font-bold hover:underline">
+                                Crear Clínica Gratis
+                            </a>
+                        </p>
+                        <p class="text-[11px] text-slate-400">
+                            ¿Eres cliente / dueño de mascota? 
+                            <a href="/portal/login" class="text-slate-600 font-semibold hover:text-teal-700 underline">
+                                Consulta tus mascotas aquí
+                            </a>
+                        </p>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer Simple -->
+    <footer class="w-full border-t border-slate-200/80 bg-white/60 py-4 text-center text-xs text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div class="flex items-center space-x-2">
+                <img src="/static/img/icon-sherekepet.png" alt="SherekePet" class="w-4 h-4 object-contain">
+                <span>SherekePet SaaS Veterinario &bull; Gestión Inteligente</span>
+            </div>
+            <div>
+                <span>v0.3.0 &bull; © 2026 Todos los derechos reservados</span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>

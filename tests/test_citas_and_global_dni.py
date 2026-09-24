@@ -229,7 +229,14 @@ def test_agendar_confirmar_cancelar_cita(client, db_session):
 
     resp_conf = client.put(f"/api/clinic/citas/{cita_id}/confirmar")
     assert resp_conf.status_code == 200
-    assert resp_conf.json()["estado"] == "CONFIRMADA"
+    assert resp_conf.json()["estado"] in ["Confirmada", "CONFIRMADA"]
+    assert resp_conf.json()["clinica_id"] == clinica.id
+    assert resp_conf.json()["mascota_id"] == mascota.id
+
+    # Test también alias sin /clinic (/api/citas/{id}/confirmar)
+    resp_conf_alias = client.put(f"/api/citas/{cita_id}/confirmar")
+    assert resp_conf_alias.status_code == 200
+    assert resp_conf_alias.json()["estado"] in ["Confirmada", "CONFIRMADA"]
 
     # 4. Cancelar Cita
     resp_canc = client.put(f"/api/clinic/citas/{cita_id}/cancelar")

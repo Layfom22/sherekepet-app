@@ -1,3 +1,4 @@
+import enum
 from datetime import date, datetime, time
 from typing import Optional, List
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, Numeric, String, Text, Time
@@ -392,6 +393,13 @@ class HorarioAtencion(Base, SoftDeleteMixin, TimestampMixin):
         return f"<HorarioAtencion(clinica_id={self.clinica_id}, dia={self.dia_semana}, activo={self.activo})>"
 
 
+class TipoProducto(str, enum.Enum):
+    """Tipos de productos para el inventario de la clínica."""
+    CHAMPU = "Champú"
+    VACUNA = "Vacuna"
+    MEDICINA = "Medicina"
+
+
 class Producto(Base, SoftDeleteMixin, TimestampMixin):
     """Modelo de Inventario e Insumos de la Clínica."""
     __tablename__ = "sp_productos"
@@ -404,6 +412,7 @@ class Producto(Base, SoftDeleteMixin, TimestampMixin):
         index=True
     )
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    tipo: Mapped[str] = mapped_column(String(50), default="Champú", nullable=False)
     codigo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     stock_actual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     unidad_medida: Mapped[str] = mapped_column(String(30), default="ml", nullable=False)
@@ -413,9 +422,10 @@ class Producto(Base, SoftDeleteMixin, TimestampMixin):
 
     # Relaciones
     clinica = relationship("Clinica")
+    servicios_asociados = relationship("ServicioProducto", back_populates="producto", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<Producto(id={self.id}, nombre='{self.nombre}', stock={self.stock_actual}{self.unidad_medida})>"
+        return f"<Producto(id={self.id}, nombre='{self.nombre}', tipo='{self.tipo}', stock={self.stock_actual}{self.unidad_medida})>"
 
 
 class ServicioBano(Base, SoftDeleteMixin, TimestampMixin):
@@ -447,4 +457,54 @@ class ServicioBano(Base, SoftDeleteMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<ServicioBano(id={self.id}, nombre='{self.nombre}', precio={self.precio})>"
+
+
+class ServicioCatalogo(Base, SoftDeleteMixin, TimestampMixin):
+    """Modelo de Catálogo de Servicios de la Clínica (Mini-ERP)."""
+    __tablename__ = "sp_servicios_catalogo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    clinica_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_clinicas.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    nombre: Mapped[str] = mapped_column(String(150), nullable=False)
+    tipo_servicio: Mapped[str] = mapped_column(String(50), default="General", nullable=False)
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Relaciones
+    clinica = relationship("Clinica")
+    productos = relationship("ServicioProducto", back_populates="servicio", cascade="all, delete-orphan")
+
+    def __repr__(self) -> str:
+        return f"<ServicioCatalogo(id={self.id}, nombre='{self.nombre}', tipo='{self.tipo_servicio}', activo={self.activo})>"
+
+
+class ServicioProducto(Base, TimestampMixin):
+    """Tabla intermedia para vincular qué producto y cuánta cantidad consume cada servicio."""
+    __tablename__ = "sp_servicio_productos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
+    servicio_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_servicios_catalogo.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    producto_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("sp_productos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    cantidad: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+
+    # Relaciones
+    servicio = relationship("ServicioCatalogo", back_populates="productos")
+    producto = relationship("Producto", back_populates="servicios_asociados")
+
+    def __repr__(self) -> str:
+        return f"<ServicioProducto(servicio_id={self.servicio_id}, producto_id={self.producto_id}, cantidad={self.cantidad})>"
 

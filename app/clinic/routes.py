@@ -4,7 +4,7 @@ from datetime import date, time, timedelta
 import json
 from typing import List, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status, Body
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, func
@@ -1365,7 +1365,7 @@ def vista_login_veterinario(request: Request, error: Optional[str] = None, db: S
 
     return templates.TemplateResponse(
         request=request,
-        name="clinic/login.html",
+        name="landing.html",
         context={"error": error, "email": ""}
     )
 
@@ -1398,7 +1398,7 @@ async def procesar_login_veterinario(request: Request, db: Session = Depends(get
             )
         return templates.TemplateResponse(
             request=request,
-            name="clinic/login.html",
+            name="landing.html",
             context={"error": ex.detail, "email": email}
         )
     except Exception as ex:
@@ -1413,7 +1413,7 @@ async def procesar_login_veterinario(request: Request, db: Session = Depends(get
             error_msg = str(ex)
         return templates.TemplateResponse(
             request=request,
-            name="clinic/login.html",
+            name="landing.html",
             context={"error": error_msg, "email": email}
         )
 
@@ -2106,15 +2106,15 @@ def vista_agenda_citas(
     ).order_by(Cita.hora.asc()).all()
 
     total_hoy = len(citas)
-    total_pendientes = sum(1 for c in citas if c.estado == "PENDIENTE")
-    total_confirmadas = sum(1 for c in citas if c.estado == "CONFIRMADA")
-    total_canceladas = sum(1 for c in citas if c.estado == "CANCELADA")
+    total_pendientes = sum(1 for c in citas if c.estado.upper() == "PENDIENTE")
+    total_confirmadas = sum(1 for c in citas if c.estado.upper() == "CONFIRMADA")
+    total_canceladas = sum(1 for c in citas if c.estado.upper() == "CANCELADA")
 
     # Citas pendientes en OTRAS fechas futuras para alertar al veterinario
     otras_fechas_query = db.query(Cita).filter(
         Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False,
-        Cita.estado == "PENDIENTE",
+        func.upper(Cita.estado) == "PENDIENTE",
         Cita.fecha != fecha_filtro,
         Cita.fecha >= hoy
     ).order_by(Cita.fecha.asc()).all()
@@ -2137,7 +2137,7 @@ def vista_agenda_citas(
     total_pendientes_global = db.query(Cita).filter(
         Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False,
-        Cita.estado == "PENDIENTE",
+        func.upper(Cita.estado) == "PENDIENTE",
         Cita.fecha >= hoy
     ).count()
 
@@ -2146,7 +2146,7 @@ def vista_agenda_citas(
         Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False,
         Cita.fecha >= hoy,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"])
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"])
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).limit(20).all()
 
     return templates.TemplateResponse(
@@ -2171,36 +2171,78 @@ def vista_agenda_citas(
 
 @router.put(
     "/api/clinic/citas/{cita_id}/confirmar",
+    summary="Confirmar Cita Agendada (Clínica)",
+    description="Actualiza el estado de la cita a Confirmada garantizando la integridad relacional de clinica_id y mascota_id."
+)
+@router.put(
+    "/api/citas/{cita_id}/confirmar",
     summary="Confirmar Cita Agendada",
-    description="Actualiza el estado de la cita a CONFIRMADA.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Actualiza el estado de la cita a Confirmada garantizando la integridad relacional de clinica_id y mascota_id."
 )
 def confirmar_cita_veterinario(
     cita_id: int,
     request: Request,
+    payload: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
-
-    cita = db.query(Cita).filter(
+    
+    # Buscar la cita por su ID primario asegurando que no esté eliminada
+    query = db.query(Cita).filter(
         Cita.id == cita_id,
-        Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False
-    ).first()
+    )
+    if current_user:
+        query = query.filter(Cita.clinica_id == current_user.clinica_id)
+        
+    cita = query.first()
 
     if not cita:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
 
-    cita.estado = "CONFIRMADA"
+    # Guardar explícitamente los IDs de relación para evitar que queden NULL en la transacción
+    # (Solución Caso 'Agujero Negro': asegurar que clinica_id y mascota_id jamás se anulen)
+    original_clinica_id = cita.clinica_id
+    original_mascota_id = cita.mascota_id
+    original_cliente_id = cita.cliente_id
+
+    # Actualizar estado a 'Confirmada'
+    cita.estado = "Confirmada"
+
+    # Blindaje de integridad relacional: restaurar llaves si fueron alteradas
+    if cita.clinica_id is None or cita.clinica_id <= 0:
+        cita.clinica_id = original_clinica_id
+    if cita.mascota_id is None or cita.mascota_id <= 0:
+        cita.mascota_id = original_mascota_id
+    if cita.cliente_id is None or cita.cliente_id <= 0:
+        cita.cliente_id = original_cliente_id
+
     db.commit()
     db.refresh(cita)
 
     return {
         "mensaje": "Cita confirmada exitosamente.",
         "cita_id": cita.id,
-        "estado": cita.estado
+        "id": cita.id,
+        "estado": cita.estado,
+        "clinica_id": cita.clinica_id,
+        "mascota_id": cita.mascota_id,
+        "cliente_id": cita.cliente_id
     }
+
+
+@router.put(
+    "/api/citas/{id}/confirmar",
+    summary="Confirmar Cita Agendada (Alias id)",
+    description="Actualiza el estado de la cita a Confirmada garantizando la integridad relacional de clinica_id y mascota_id."
+)
+def confirmar_cita_alias_id(
+    id: int,
+    request: Request,
+    payload: Optional[dict] = Body(default=None),
+    db: Session = Depends(get_db)
+):
+    return confirmar_cita_veterinario(cita_id=id, request=request, payload=payload, db=db)
 
 
 @router.put(

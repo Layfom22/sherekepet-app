@@ -17,7 +17,9 @@ from app.clinic.models import (
     Cita,
     HorarioAtencion,
     Producto,
-    ServicioBano
+    ServicioBano,
+    ServicioCatalogo,
+    ServicioProducto
 )
 from app.follow_up.models import (
     MedicationPlan,
@@ -101,10 +103,23 @@ def run_auto_migrations(target_engine) -> None:
         # Crear sp_productos si no existe
         if "sp_productos" not in tables:
             Base.metadata.create_all(target_engine, tables=[Producto.__table__])
+        else:
+            cols = {c["name"] for c in inspector.get_columns("sp_productos")}
+            with target_engine.begin() as conn:
+                if "tipo" not in cols:
+                    conn.execute(text("ALTER TABLE sp_productos ADD COLUMN tipo VARCHAR(50) DEFAULT 'Champú';"))
 
         # Crear sp_servicios_bano si no existe
         if "sp_servicios_bano" not in tables:
             Base.metadata.create_all(target_engine, tables=[ServicioBano.__table__])
+
+        # Crear sp_servicios_catalogo si no existe
+        if "sp_servicios_catalogo" not in tables:
+            Base.metadata.create_all(target_engine, tables=[ServicioCatalogo.__table__])
+
+        # Crear sp_servicio_productos si no existe
+        if "sp_servicio_productos" not in tables:
+            Base.metadata.create_all(target_engine, tables=[ServicioProducto.__table__])
 
         # 2. sp_mascotas
         if "sp_mascotas" in tables:

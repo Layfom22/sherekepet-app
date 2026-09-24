@@ -164,9 +164,11 @@ def test_usuario_nuevo_o_sin_sesion_redirige_a_login(client):
     """
     client.cookies.clear()
 
+    # La ruta raíz (/) es la landing page pública con formulario de login
     resp_root = client.get("/", follow_redirects=False)
-    assert resp_root.status_code == 303
-    assert resp_root.headers["location"] == "/login"
+    assert resp_root.status_code == 200
+    assert "SherekePet" in resp_root.text
+    assert "Acceso Veterinario" in resp_root.text
 
     resp_dash = client.get("/dashboard", follow_redirects=False)
     assert resp_dash.status_code == 303

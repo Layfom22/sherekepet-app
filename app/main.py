@@ -7,7 +7,12 @@ from app.database import init_db
 from app.auth.routes import router as auth_router, google_router
 from app.clinic.routes import router as clinic_router
 from app.follow_up.routes import router as follow_up_router
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
+
+templates = Jinja2Templates(directory="app/templates")
+
+
 
 
 @asynccontextmanager
@@ -49,13 +54,18 @@ app.include_router(clinic_router)
 app.include_router(follow_up_router)
 
 
-@app.get("/", include_in_schema=False)
+
+@app.get("/", include_in_schema=False, response_class=HTMLResponse)
 def root(request: Request):
     if request.cookies.get("vet_token"):
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_303_SEE_OTHER)
     if request.cookies.get("client_token"):
         return RedirectResponse(url="/portal/dashboard", status_code=status.HTTP_303_SEE_OTHER)
-    return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html",
+        context={"error": None, "email": ""}
+    )
 
 
 @app.get("/api/health", tags=["Health"])

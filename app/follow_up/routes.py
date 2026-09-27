@@ -440,6 +440,16 @@ def portal_dashboard(
         Cita.estado.in_(["PENDIENTE", "CONFIRMADA"])
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
+    # Citas sugeridas por la veterinaria (ej: Próximo Baño sugerido) para retención y confirmación móvil
+    hoy_lima = get_lima_now().date()
+    citas_sugeridas = db.query(Cita).join(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False,
+        Cita.is_deleted == False,
+        Cita.estado == "SUGERIDA",
+        Cita.fecha >= hoy_lima
+    ).order_by(Cita.fecha.asc()).all()
+
     # Obtener tratamientos activos con sus próximas dosis
     mascota_ids = [m.id for m in mascotas]
     planes_activos = db.query(MedicationPlan).filter(
@@ -471,10 +481,42 @@ def portal_dashboard(
             "clinicas_cliente": clinicas_cliente,
             "mascotas": mascotas,
             "citas_cliente": citas_cliente,
+            "citas_sugeridas": citas_sugeridas,
             "dosis_pendientes": dosis_pendientes,
             "ahora": get_lima_now()
         }
     )
+
+
+def extraer_detalle_receta(texto_tratamiento: Optional[str]):
+    """
+    Parsea cadenas del tipo:
+    '💊 Prescripción Médica: Amoxicilina 500mg | Frecuencia: Cada 8 horas | Cantidad/Dosis: 1 pastilla'
+    o variaciones, extrayendo medicamento, frecuencia y cantidad/dosis para renderizado destacado.
+    Retorna (receta_dict, texto_restante).
+    """
+    if not texto_tratamiento:
+        return None, None
+
+    import re
+    patron = re.compile(
+        r"(?:💊\s*)?Prescripción Médica:\s*(.*?)\s*\|\s*Frecuencia:\s*(.*?)\s*\|\s*Cantidad/Dosis:\s*(.*?)(?:\n|$)",
+        re.IGNORECASE
+    )
+    match = patron.search(texto_tratamiento)
+    if match:
+        med = match.group(1).strip()
+        frec = match.group(2).strip()
+        dosis = match.group(3).strip()
+        resto = patron.sub("", texto_tratamiento).strip()
+        return {
+            "medicamento": med,
+            "frecuencia": frec,
+            "cantidad": dosis,
+            "badge_texto": f"💊 {dosis} • {frec}"
+        }, (resto if resto else None)
+
+    return None, texto_tratamiento
 
 
 @router.get("/portal/carnet/{mascota_id}", response_class=HTMLResponse, summary="Carnet Digital y Medicación")
@@ -512,6 +554,8 @@ def portal_carnet_mascota(
             msg = f"Hola {cli_nombre}, te escribo como dueño de {mascota.nombre} sobre la atención del {at.created_at.strftime('%d/%m/%Y')}."
             enlace_wa = generar_enlace_whatsapp(cli_telefono, msg)
 
+        receta_info, tratamiento_limpio = extraer_detalle_receta(at.tratamiento)
+
         atenciones_info.append({
             "id": at.id,
             "fecha": at.created_at,
@@ -519,6 +563,8 @@ def portal_carnet_mascota(
             "motivo": at.motivo,
             "diagnostico": at.diagnostico,
             "tratamiento": at.tratamiento,
+            "tratamiento_limpio": tratamiento_limpio,
+            "receta_info": receta_info,
             "peso_kg": at.peso_actual_kg,
             "vet_nombre": vet_nombre,
             "vet_foto": vet_foto,
@@ -1015,6 +1061,120 @@ def agendar_cita_portal(
             "estado": nueva_cita.estado
         }
     }
+
+
+class CitaConfirmarSugerenciaRequest(BaseModel):
+    hora: str  # "HH:MM"
+    fecha: Optional[date] = None
+
+
+@router.post(
+    "/api/portal/citas/{cita_id}/confirmar",
+    status_code=status.HTTP_200_OK,
+    summary="Confirmar Cita Sugerida desde el Portal del Paciente",
+    description="Permite al dueño confirmar la hora exacta de una cita sugerida (ej. Próximo Baño) y pasar su estado a CONFIRMADA."
+)
+def confirmar_cita_sugerida(
+    cita_id: int,
+    payload: CitaConfirmarSugerenciaRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
+
+    # Validar que la cita pertenezca a este cliente (por DNI unificado)
+    cita = db.query(Cita).join(Cliente).filter(
+        Cita.id == cita_id,
+        Cliente.dni == cliente.dni,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita sugerida no encontrada o no pertenece a su perfil.")
+
+    # Parsear hora "HH:MM"
+    try:
+        partes = payload.hora.strip().split(":")
+        hora_obj = time(hour=int(partes[0]), minute=int(partes[1]))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de hora inválido (use HH:MM).")
+
+    fecha_final = payload.fecha or cita.fecha
+    hoy_lima = get_lima_now().date()
+    if fecha_final < hoy_lima:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se puede confirmar una cita en fecha pasada.")
+
+    if fecha_final == hoy_lima and hora_obj <= get_lima_now().time():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha transcurrido.")
+
+    # Verificar disponibilidad en la clínica (evitar colisión de horario)
+    conflicto = db.query(Cita).filter(
+        Cita.id != cita.id,
+        Cita.clinica_id == cita.clinica_id,
+        Cita.fecha == fecha_final,
+        Cita.hora == hora_obj,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.is_deleted == False
+    ).first()
+    if conflicto:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este horario ya se encuentra ocupado en la veterinaria. Por favor selecciona otra hora."
+        )
+
+    cita.fecha = fecha_final
+    cita.hora = hora_obj
+    cita.estado = "CONFIRMADA"
+    cita.updated_at = get_lima_now()
+
+    db.commit()
+    db.refresh(cita)
+
+    return {
+        "status": "ok",
+        "mensaje": "¡Cita confirmada exitosamente!",
+        "cita": {
+            "id": cita.id,
+            "mascota_nombre": cita.mascota.nombre if cita.mascota else "Mascota",
+            "fecha": cita.fecha.strftime("%d/%m/%Y"),
+            "hora": cita.hora.strftime("%I:%M %p"),
+            "estado": cita.estado,
+            "motivo": cita.motivo
+        }
+    }
+
+
+@router.post(
+    "/api/portal/citas/{cita_id}/descartar",
+    status_code=status.HTTP_200_OK,
+    summary="Descartar Cita Sugerida desde el Portal del Paciente"
+)
+def descartar_cita_sugerida(
+    cita_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    cita = db.query(Cita).join(Cliente).filter(
+        Cita.id == cita_id,
+        Cliente.dni == cliente.dni,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    cita.estado = "CANCELADA"
+    cita.updated_at = get_lima_now()
+    db.commit()
+
+    return {"status": "ok", "mensaje": "Sugerencia descartada correctamente."}
+
 
 
 

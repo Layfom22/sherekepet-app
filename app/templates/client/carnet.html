@@ -218,7 +218,7 @@
             </div>
 
             {% if ultimo_veterinario.motivo %}
-            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-1.5 text-xs">
+            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
                 <div class="flex items-center space-x-1.5 text-slate-800 font-bold">
                     <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true"></i>
                     <span>Motivo: {{ ultimo_veterinario.motivo }}</span>
@@ -228,8 +228,37 @@
                     <strong class="text-slate-800">Diagnóstico:</strong> {{ ultimo_veterinario.diagnostico }}
                 </div>
                 {% endif %}
-                {% if ultimo_veterinario.tratamiento %}
-                <div class="text-slate-600">
+                
+                <!-- Receta Médica Estructurada y Resaltada -->
+                {% if ultimo_veterinario.receta_info %}
+                <div class="mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2 shadow-2xs">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
+                            <i data-lucide="pill" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i>
+                            <span>Prescripción Médica / Receta</span>
+                        </div>
+                        <span class="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded-md border border-teal-200">
+                            Receta Oficial
+                        </span>
+                    </div>
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-0.5">
+                        <div class="min-w-0">
+                            <span class="text-[10px] uppercase font-bold text-slate-400">Medicamento</span>
+                            <p class="text-sm font-black text-slate-900 tracking-tight">{{ ultimo_veterinario.receta_info.medicamento }}</p>
+                        </div>
+                        <!-- Badge Resaltado con Cantidad y Frecuencia -->
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 text-white font-black text-xs shadow-xs self-start sm:self-auto">
+                            <span>💊 {{ ultimo_veterinario.receta_info.cantidad }} &bull; {{ ultimo_veterinario.receta_info.frecuencia }}</span>
+                        </div>
+                    </div>
+                    {% if ultimo_veterinario.tratamiento_limpio %}
+                    <div class="text-slate-600 text-[11px] pt-1.5 border-t border-teal-200/60 leading-relaxed">
+                        <strong class="text-slate-700">Indicaciones adicionales:</strong> {{ ultimo_veterinario.tratamiento_limpio }}
+                    </div>
+                    {% endif %}
+                </div>
+                {% elif ultimo_veterinario.tratamiento %}
+                <div class="text-slate-600 pt-1 border-t border-slate-200/60">
                     <strong class="text-slate-800">Tratamiento Indicado:</strong> {{ ultimo_veterinario.tratamiento }}
                 </div>
                 {% endif %}
@@ -269,12 +298,38 @@
                             <i data-lucide="hospital" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
                             <span>{{ at.clinica_nombre }} &bull; <span class="text-slate-500 font-normal">{{ at.tipo }}</span></span>
                         </p>
-                        <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1">
+                        <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5">
                             <p class="text-slate-700"><strong>Motivo:</strong> {{ at.motivo }}</p>
                             {% if at.diagnostico %}
                             <p class="text-slate-600"><strong>Diagnóstico:</strong> {{ at.diagnostico }}</p>
                             {% endif %}
-                            {% if at.tratamiento %}
+                            
+                            <!-- Receta médica estructurada para atenciones anteriores -->
+                            {% if at.receta_info %}
+                            <div class="mt-2 p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
+                                        <i data-lucide="pill" class="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true"></i>
+                                        <span>Prescripción Médica</span>
+                                    </div>
+                                    <span class="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-white px-1.5 py-0.5 rounded border border-teal-200">Receta</span>
+                                </div>
+                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pt-0.5">
+                                    <div>
+                                        <span class="text-[10px] uppercase font-bold text-slate-400">Medicamento</span>
+                                        <p class="text-xs font-black text-slate-900">{{ at.receta_info.medicamento }}</p>
+                                    </div>
+                                    <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 text-white font-black text-[11px] shadow-2xs self-start sm:self-auto">
+                                        <span>💊 {{ at.receta_info.cantidad }} &bull; {{ at.receta_info.frecuencia }}</span>
+                                    </div>
+                                </div>
+                                {% if at.tratamiento_limpio %}
+                                <p class="text-slate-600 text-[11px] pt-1 border-t border-teal-200/60">
+                                    <strong>Indicaciones:</strong> {{ at.tratamiento_limpio }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            {% elif at.tratamiento %}
                             <p class="text-slate-600"><strong>Tratamiento:</strong> {{ at.tratamiento }}</p>
                             {% endif %}
                         </div>
@@ -327,9 +382,13 @@
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-100 text-teal-800 uppercase">Sueño Protegido</span>
                             {% endif %}
                         </div>
-                        <p class="text-xs text-slate-500 mt-0.5">
-                            Cada {{ plan.frecuencia_horas }} horas &bull; Total: {{ plan.total_dosis }} tomas
-                        </p>
+                        <!-- Badge destacado con Cantidad y Frecuencia -->
+                        <div class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 font-black text-xs shadow-2xs">
+                            <span class="text-sm">💊</span>
+                            <span>1 dosis cada {{ plan.frecuencia_horas }} horas</span>
+                            <span class="text-teal-400 font-normal">&bull;</span>
+                            <span class="text-teal-700 font-medium">{{ plan.total_dosis }} tomas programadas</span>
+                        </div>
                     </div>
                     <span class="text-xs font-bold text-slate-400">
                         {{ item.dosis_consumidas }}/{{ plan.total_dosis }}

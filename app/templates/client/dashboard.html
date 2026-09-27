@@ -66,6 +66,86 @@
         </button>
     </div>
 
+    <!-- Tarjeta de Notificación: Sugerencia de Próximo Baño (Bucle de Retención) -->
+    {% if citas_sugeridas %}
+    <div class="space-y-3.5" id="contenedorSugerenciasCitas">
+        {% for s in citas_sugeridas %}
+        <div id="card-sugerencia-{{ s.id }}" class="bg-gradient-to-br from-teal-50/90 via-sky-50/70 to-emerald-50 rounded-3xl p-5 border-2 border-teal-400 shadow-md space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
+            <div class="flex items-start space-x-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <i data-lucide="sparkles" class="w-6 h-6 animate-pulse" aria-hidden="true"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md border border-teal-300">
+                            Sugerencia de la Veterinaria
+                        </span>
+                        <span class="text-[11px] font-bold text-slate-500 font-mono">
+                            {{ s.fecha.strftime('%d/%m/%Y') }}
+                        </span>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900 mt-1 leading-snug">
+                        Tienes una sugerencia de baño para <span class="text-teal-700 underline decoration-teal-300 decoration-2 underline-offset-2">{{ s.mascota.nombre }}</span> el <span class="font-bold text-slate-900">{{ s.fecha.strftime('%d/%m/%Y') }}</span>.
+                    </h3>
+                    <p class="text-xs text-slate-600 font-medium mt-0.5">
+                        ¿Deseas confirmar la hora?
+                    </p>
+                </div>
+            </div>
+
+            <!-- Selector Interactivo de Hora -->
+            <div class="bg-white/95 backdrop-blur-xs p-4 rounded-2xl border border-teal-200/90 space-y-3 shadow-2xs">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <label for="hora-sugerida-{{ s.id }}" class="text-xs font-bold text-slate-700 flex items-center space-x-1.5">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                        <span>Elige o ajusta tu horario de baño:</span>
+                    </label>
+                    <!-- Pills táctiles de selección rápida -->
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <button type="button" onclick="setQuickTime({{ s.id }}, '09:30')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors">09:30 AM</button>
+                        <button type="button" onclick="setQuickTime({{ s.id }}, '11:00')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors">11:00 AM</button>
+                        <button type="button" onclick="setQuickTime({{ s.id }}, '15:00')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors">03:00 PM</button>
+                        <button type="button" onclick="setQuickTime({{ s.id }}, '16:30')" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 transition-colors">04:30 PM</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input 
+                        type="time" 
+                        id="hora-sugerida-{{ s.id }}" 
+                        value="{{ s.hora.strftime('%H:%M') if s.hora else '10:00' }}" 
+                        class="btn-touch flex-1 px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold font-mono text-sm text-slate-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    >
+                    <button 
+                        type="button" 
+                        id="btn-confirmar-sugerida-{{ s.id }}"
+                        onclick="confirmarCitaSugerida({{ s.id }})" 
+                        class="btn-touch px-4 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white font-black text-xs rounded-xl shadow-sm hover:shadow transition-all inline-flex items-center space-x-1.5 shrink-0"
+                    >
+                        <i data-lucide="calendar-check" class="w-4 h-4" aria-hidden="true"></i>
+                        <span>Confirmar Hora</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 text-[11px]">
+                    <span class="text-slate-500 truncate flex items-center space-x-1">
+                        <i data-lucide="hospital" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
+                        <span class="truncate">{{ s.clinica.nombre_comercial or s.clinica.nombre }} &bull; {{ s.motivo }}</span>
+                    </span>
+                    <button 
+                        type="button" 
+                        onclick="descartarCitaSugerida({{ s.id }})" 
+                        class="text-slate-400 hover:text-rose-600 font-medium transition-colors"
+                    >
+                        No por ahora
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Sección: Mis Próximas Citas (si existen) -->
     {% if citas_cliente %}
     <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
@@ -965,6 +1045,97 @@ async function registrarNuevaMascota(e) {
             btn.disabled = false;
             btn.innerHTML = `<span>Guardar Mascota</span>`;
         }
+    }
+}
+
+// Gestión de Citas Sugeridas (Próximo Baño - Retención)
+function setQuickTime(citaId, hora) {
+    const input = document.getElementById(`hora-sugerida-{{ "${citaId}" }}`.replace('{{ "${citaId}" }}', citaId));
+    if (input) {
+        input.value = hora;
+        input.classList.add('ring-2', 'ring-teal-500');
+        setTimeout(() => input.classList.remove('ring-2', 'ring-teal-500'), 500);
+    }
+}
+
+async function confirmarCitaSugerida(citaId) {
+    const input = document.getElementById(`hora-sugerida-${citaId}`);
+    const btn = document.getElementById(`btn-confirmar-sugerida-${citaId}`);
+    const horaVal = input ? input.value : "10:00";
+
+    if (!horaVal) {
+        alert("Por favor selecciona o ingresa una hora para la cita de baño.");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-75');
+        btn.innerHTML = `<svg class="animate-spin w-4 h-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Confirmando...</span>`;
+    }
+
+    try {
+        const resp = await fetch(`/api/portal/citas/${citaId}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hora: horaVal })
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            mostrarToast("¡Cita de baño confirmada con éxito!");
+
+            const card = document.getElementById(`card-sugerencia-${citaId}`);
+            if (card) {
+                card.classList.add('scale-95', 'opacity-0', 'transition-all', 'duration-300');
+            }
+
+            setTimeout(() => {
+                window.location.reload();
+            }, 800);
+        } else {
+            const err = await resp.json();
+            alert("No se pudo confirmar la cita: " + (err.detail || "Verifique los datos o seleccione otra hora."));
+            if (btn) {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                btn.innerHTML = `<i data-lucide="calendar-check" class="w-4 h-4 mr-1"></i><span>Confirmar Hora</span>`;
+                window.initLucideIcons?.();
+            }
+        }
+    } catch (e) {
+        console.error("Error confirmando sugerencia de cita:", e);
+        alert("Error de conexión al confirmar la cita. Inténtalo nuevamente.");
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-75');
+            btn.innerHTML = `<i data-lucide="calendar-check" class="w-4 h-4 mr-1"></i><span>Confirmar Hora</span>`;
+            window.initLucideIcons?.();
+        }
+    }
+}
+
+async function descartarCitaSugerida(citaId) {
+    if (!confirm("¿Deseas omitir esta sugerencia de baño por ahora?")) {
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/portal/citas/${citaId}/descartar`, {
+            method: 'POST'
+        });
+        if (resp.ok) {
+            const card = document.getElementById(`card-sugerencia-${citaId}`);
+            if (card) {
+                card.classList.add('scale-95', 'opacity-0', 'transition-all', 'duration-300');
+                setTimeout(() => card.remove(), 350);
+            }
+        } else {
+            const err = await resp.json();
+            alert(err.detail || "No se pudo descartar la sugerencia.");
+        }
+    } catch (e) {
+        console.error("Error descartando sugerencia:", e);
     }
 }
 

@@ -798,7 +798,7 @@ async function agendarProximoBanoRetencion() {
         fecha: fechaVal,
         hora: horaVal,
         motivo: "Próximo Baño y Grooming (Recurrencia)",
-        estado: "CONFIRMADA"
+        estado: "SUGERIDA"
     };
 
     try {
@@ -809,7 +809,7 @@ async function agendarProximoBanoRetencion() {
         });
 
         if (resp.ok) {
-            alert("¡Próxima cita de baño agendada con éxito para la mascota!");
+            alert("¡Sugerencia de próximo baño guardada! Le aparecerá al dueño en su portal móvil para confirmar la hora.");
             window.location.reload();
         } else {
             alert("Atención de baño registrada. (Fecha anotada).");

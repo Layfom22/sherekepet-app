@@ -828,20 +828,47 @@ def portal_crear_mascota(
     if not payload.nombre or not payload.nombre.strip():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El nombre de la mascota es obligatorio.")
 
-    mascota = Mascota(
-        clinica_id=cliente.clinica_id,
-        cliente_id=cliente.id,
-        nombre=payload.nombre.strip(),
-        especie=payload.especie.strip() if payload.especie else "Canino",
-        raza=payload.raza.strip() if payload.raza else None,
-        sexo=payload.sexo.strip() if payload.sexo else None,
-        fecha_nacimiento=payload.fecha_nacimiento,
-        foto_url=payload.foto_url,
-        rasgos_distintivos=payload.rasgos_distintivos.strip() if payload.rasgos_distintivos else None
-    )
-    db.add(mascota)
-    db.commit()
-    db.refresh(mascota)
+    nombre_limpio = payload.nombre.strip()
+
+    # Comprobar si ya existe una mascota activa con este nombre para el cliente
+    mascota_existente = db.query(Mascota).join(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False,
+        func.lower(func.trim(Mascota.nombre)) == nombre_limpio.lower(),
+        Mascota.is_deleted == False
+    ).first()
+
+    if mascota_existente:
+        if payload.especie and payload.especie.strip():
+            mascota_existente.especie = payload.especie.strip()
+        if payload.raza and payload.raza.strip():
+            mascota_existente.raza = payload.raza.strip()
+        if payload.sexo and payload.sexo.strip():
+            mascota_existente.sexo = payload.sexo.strip()
+        if payload.fecha_nacimiento:
+            mascota_existente.fecha_nacimiento = payload.fecha_nacimiento
+        if payload.foto_url:
+            mascota_existente.foto_url = payload.foto_url
+        if payload.rasgos_distintivos and payload.rasgos_distintivos.strip():
+            mascota_existente.rasgos_distintivos = payload.rasgos_distintivos.strip()
+        db.commit()
+        db.refresh(mascota_existente)
+        mascota = mascota_existente
+    else:
+        mascota = Mascota(
+            clinica_id=cliente.clinica_id,
+            cliente_id=cliente.id,
+            nombre=nombre_limpio,
+            especie=payload.especie.strip() if payload.especie else "Canino",
+            raza=payload.raza.strip() if payload.raza else None,
+            sexo=payload.sexo.strip() if payload.sexo else None,
+            fecha_nacimiento=payload.fecha_nacimiento,
+            foto_url=payload.foto_url,
+            rasgos_distintivos=payload.rasgos_distintivos.strip() if payload.rasgos_distintivos else None
+        )
+        db.add(mascota)
+        db.commit()
+        db.refresh(mascota)
 
     return {
         "mensaje": "Mascota registrada exitosamente.",

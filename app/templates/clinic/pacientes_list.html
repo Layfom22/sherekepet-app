@@ -187,6 +187,7 @@
                             </div>
 
                             <!-- Botón Ficha Clínica de la Mascota -->
+                            {% if m.clinica_id == clinica.id %}
                             <a 
                                 href="/pacientes/{{ m.id }}" 
                                 class="btn-touch px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center space-x-1.5 shrink-0"
@@ -195,6 +196,17 @@
                                 <span>Ver Ficha</span>
                                 <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             </a>
+                            {% else %}
+                            <button 
+                                type="button"
+                                onclick="vincularYAbrirFicha({{ m.id }}, this)" 
+                                class="btn-touch px-3.5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center space-x-1.5 shrink-0"
+                                title="Vincular a tu clínica y abrir Ficha Médica"
+                            >
+                                <i data-lucide="link" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                <span>Vincular Ficha</span>
+                            </button>
+                            {% endif %}
 
                         </div>
                         {% endfor %}
@@ -300,6 +312,36 @@ async function subirFotoDirecta(input, mascotaId) {
         if (loader) loader.classList.add("hidden");
     } finally {
         input.value = "";
+    }
+}
+
+async function vincularYAbrirFicha(mascotaId, btn) {
+    if (!confirm("¿Deseas vincular este paciente a tu clínica y abrir su ficha clínica?")) return;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Vinculando...</span>`;
+    window.initLucideIcons?.();
+
+    try {
+        const resp = await fetch(`/api/clinic/vincular-mascota/${mascotaId}`, {
+            method: 'POST'
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            window.location.href = `/pacientes/${data.mascota_id}`;
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error al vincular: " + (err.detail || "No se pudo vincular la mascota."));
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+            window.initLucideIcons?.();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al vincular la mascota.");
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        window.initLucideIcons?.();
     }
 }
 </script>

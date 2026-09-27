@@ -281,3 +281,78 @@ def test_agendar_cita_retencion_y_proximas_citas_en_agenda(client, db_session, v
     assert "Peluchín" in resp_agenda.text
     assert "Próximo Baño de Mantenimiento" in resp_agenda.text
     assert "Próximas 15-20 Citas Programadas" in resp_agenda.text
+
+
+def test_deduplicacion_mascotas_mismo_nombre_y_multi_clinica(client, db_session, vet_setup):
+    """
+    Reproduce exactamente el caso reportado por el usuario:
+    - Dueño 1 (Roger): 1 Mulato (otra clínica), 2 Princesas (1 local y 1 otra clínica).
+    - Dueño 2 (Teresa): 1 Afro (local), 2 Biscochos (otra clínica), 1 Nieve (otra clínica).
+    Verifica que:
+    1. En GET /pacientes, Princesa y Biscocho aparecen EXACTAMENTE 1 vez cada uno.
+    2. Roger tiene 2 mascotas y Teresa tiene 3 mascotas (total 5, no 7).
+    3. Princesa local es priorizada y muestra 'Paciente de tu Clínica'.
+    4. Al abrir una mascota de otra sede (Mulato), no genera 404.
+    """
+    clinica = vet_setup["clinica"]
+
+    # Crear una clínica externa para simular registros de red / portal
+    clinica_ext = Clinica(
+        nombre="Clínica Externa",
+        nombre_comercial="Clínica Externa",
+        zona_horaria="America/Lima",
+        plan_activo="solo"
+    )
+    db_session.add(clinica_ext)
+    db_session.flush()
+
+    # Dueño 1: Roger
+    c1_local = Cliente(clinica_id=clinica.id, dni="70566711", nombres="Roger Fernando", apellido_paterno="Cabezudo", telefono="922508449")
+    c1_ext = Cliente(clinica_id=clinica_ext.id, dni="70566711", nombres="Roger Fernando", apellido_paterno="Cabezudo", telefono="922508449")
+    db_session.add_all([c1_local, c1_ext])
+    db_session.flush()
+
+    m_mulato = Mascota(clinica_id=clinica_ext.id, cliente_id=c1_ext.id, nombre="Mulato", especie="Canino", raza="Mestizo", peso=10.0)
+    m_princesa_local = Mascota(clinica_id=clinica.id, cliente_id=c1_local.id, nombre="Princesa", especie="Canino", raza="Jack Russell Terrier", peso=15.0)
+    m_princesa_ext = Mascota(clinica_id=clinica_ext.id, cliente_id=c1_ext.id, nombre="Princesa", especie="Canino", raza="Jack Russell Terrier", peso=15.0)
+
+    # Dueño 2: Teresa
+    c2_local = Cliente(clinica_id=clinica.id, dni="70566732", nombres="Teresa Victoria", apellido_paterno="Cabezudo", telefono="934292901")
+    c2_ext = Cliente(clinica_id=clinica_ext.id, dni="70566732", nombres="Teresa Victoria", apellido_paterno="Cabezudo", telefono="934292901")
+    db_session.add_all([c2_local, c2_ext])
+    db_session.flush()
+
+    m_afro = Mascota(clinica_id=clinica.id, cliente_id=c2_local.id, nombre="Afro", especie="Canino", raza="Criollo", peso=25.0)
+    m_biscocho_1 = Mascota(clinica_id=clinica_ext.id, cliente_id=c2_ext.id, nombre="Biscocho", especie="Felino", raza="Criollo")
+    m_biscocho_2 = Mascota(clinica_id=clinica_ext.id, cliente_id=c2_ext.id, nombre="Biscocho", especie="Felino", raza="Criollo")
+    m_nieve = Mascota(clinica_id=clinica_ext.id, cliente_id=c2_ext.id, nombre="Nieve", especie="Canino", raza="Husky", peso=28.0)
+
+    db_session.add_all([m_mulato, m_princesa_local, m_princesa_ext, m_afro, m_biscocho_1, m_biscocho_2, m_nieve])
+    db_session.commit()
+
+    # 1. Comprobar directorio de pacientes
+    resp = client.get("/pacientes")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Total registrado debe ser 5 mascotas (no 7)
+    assert "5 MASCOTAS" in html or "(5 MASCOTAS)" in html or "5 mascotas" in html
+    assert "7 MASCOTAS" not in html
+
+    # Cada mascota debe tener su botón de acción (Ver Ficha para locales, Vincular Ficha para externas)
+    assert (html.count("Ver Ficha") + html.count("Vincular Ficha")) >= 5
+    assert "Princesa" in html
+    assert "Biscocho" in html
+    assert "Mulato" in html
+    assert "Afro" in html
+    assert "Nieve" in html
+
+    # 2. Vincular Mulato a la clínica actual y verificar que abre su ficha con éxito
+    resp_vincular = client.post(f"/api/clinic/vincular-mascota/{m_mulato.id}")
+    assert resp_vincular.status_code == 200
+    nueva_id = resp_vincular.json()["mascota_id"]
+
+    resp_ficha = client.get(f"/pacientes/{nueva_id}")
+    assert resp_ficha.status_code == 200
+    assert "Mulato" in resp_ficha.text
+

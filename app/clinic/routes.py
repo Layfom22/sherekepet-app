@@ -784,21 +784,40 @@ def buscar_cliente_global_por_dni(
     if not dni_limpio or len(dni_limpio) < 4 or len(dni_limpio) > 20:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El documento debe tener entre 4 y 20 caracteres.")
 
-    cliente = db.query(Cliente).filter(
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    clientes = db.query(Cliente).filter(
         Cliente.dni == dni_limpio,
         Cliente.is_deleted == False
-    ).first()
+    ).order_by(Cliente.created_at.desc()).all()
 
-    if not cliente:
+    if not clientes:
         return {
             "encontrado": False,
             "mensaje": "DNI no encontrado en la red SherekePet."
         }
 
-    mascotas = db.query(Mascota).filter(
-        Mascota.cliente_id == cliente.id,
+    cliente = next((c for c in clientes if c.clinica_id == target_clinica_id), clientes[0])
+
+    mascotas_raw = db.query(Mascota).join(Cliente).filter(
+        Cliente.dni == dni_limpio,
+        Cliente.is_deleted == False,
         Mascota.is_deleted == False
     ).order_by(Mascota.created_at.desc()).all()
+
+    mascotas_por_nombre = {}
+    for m in mascotas_raw:
+        clave_nom = m.nombre.strip().lower()
+        if clave_nom not in mascotas_por_nombre:
+            mascotas_por_nombre[clave_nom] = []
+        mascotas_por_nombre[clave_nom].append(m)
+
+    mascotas = []
+    for clave_nom, lista in mascotas_por_nombre.items():
+        local = next((item for item in lista if item.clinica_id == target_clinica_id), None)
+        principal = local or lista[0]
+        mascotas.append(principal)
 
     return {
         "encontrado": True,
@@ -873,6 +892,20 @@ def vincular_mascota_a_clinica(
         )
         db.add(cliente_local)
         db.flush()
+
+    # Comprobar si ya existe una mascota local con ese mismo nombre
+    mascota_local = db.query(Mascota).filter(
+        Mascota.clinica_id == target_clinica_id,
+        Mascota.cliente_id == cliente_local.id,
+        func.lower(func.trim(Mascota.nombre)) == mascota_original.nombre.strip().lower(),
+        Mascota.is_deleted == False
+    ).first()
+
+    if mascota_local:
+        return {
+            "mensaje": "Mascota ya asociada a su clínica.",
+            "mascota_id": mascota_local.id
+        }
 
     nueva_mascota = Mascota(
         clinica_id=target_clinica_id,
@@ -1074,27 +1107,62 @@ def registrar_paciente_rapido(
 
     alergias_legado = payload.detalle_alergias if payload.tiene_alergias else payload.mascota_alergias
 
-    # 4. Registrar Mascota (con foto_url si se envió)
-    mascota = Mascota(
-        clinica_id=target_clinica_id,
-        cliente_id=cliente.id,
-        especie_id=payload.especie_id,
-        raza_id=payload.raza_id,
-        nombre=payload.mascota_nombre.strip(),
-        especie=nombre_especie,
-        raza=nombre_raza,
-        peso=payload.mascota_peso,
-        fecha_nacimiento=payload.fecha_nacimiento,
-        foto_url=payload.foto_url,
-        tiene_alergias=payload.tiene_alergias,
-        detalle_alergias=payload.detalle_alergias if payload.tiene_alergias else None,
-        condiciones_previas=payload.condiciones_previas.strip() if payload.condiciones_previas else None,
-        alergias=alergias_legado
-    )
-    db.add(mascota)
-    db.commit()
-    db.refresh(cliente)
-    db.refresh(mascota)
+    # 4. Registrar o Actualizar Mascota (evitando duplicidad)
+    nombre_mascota_limpio = payload.mascota_nombre.strip()
+    mascota_existente = db.query(Mascota).join(Cliente).filter(
+        Cliente.dni == payload.dni.strip(),
+        Cliente.is_deleted == False,
+        func.lower(func.trim(Mascota.nombre)) == nombre_mascota_limpio.lower(),
+        Mascota.is_deleted == False
+    ).first()
+
+    if mascota_existente:
+        mascota_existente.clinica_id = target_clinica_id
+        mascota_existente.cliente_id = cliente.id
+        if payload.especie_id:
+            mascota_existente.especie_id = payload.especie_id
+        if payload.raza_id:
+            mascota_existente.raza_id = payload.raza_id
+        if nombre_especie:
+            mascota_existente.especie = nombre_especie
+        if nombre_raza:
+            mascota_existente.raza = nombre_raza
+        if payload.mascota_peso:
+            mascota_existente.peso = payload.mascota_peso
+        if payload.fecha_nacimiento:
+            mascota_existente.fecha_nacimiento = payload.fecha_nacimiento
+        if payload.foto_url:
+            mascota_existente.foto_url = payload.foto_url
+        if payload.tiene_alergias:
+            mascota_existente.tiene_alergias = True
+            mascota_existente.detalle_alergias = payload.detalle_alergias
+        if payload.condiciones_previas:
+            mascota_existente.condiciones_previas = payload.condiciones_previas.strip()
+        db.commit()
+        db.refresh(cliente)
+        db.refresh(mascota_existente)
+        mascota = mascota_existente
+    else:
+        mascota = Mascota(
+            clinica_id=target_clinica_id,
+            cliente_id=cliente.id,
+            especie_id=payload.especie_id,
+            raza_id=payload.raza_id,
+            nombre=nombre_mascota_limpio,
+            especie=nombre_especie,
+            raza=nombre_raza,
+            peso=payload.mascota_peso,
+            fecha_nacimiento=payload.fecha_nacimiento,
+            foto_url=payload.foto_url,
+            tiene_alergias=payload.tiene_alergias,
+            detalle_alergias=payload.detalle_alergias if payload.tiene_alergias else None,
+            condiciones_previas=payload.condiciones_previas.strip() if payload.condiciones_previas else None,
+            alergias=alergias_legado
+        )
+        db.add(mascota)
+        db.commit()
+        db.refresh(cliente)
+        db.refresh(mascota)
 
     return PacienteRapidoResponse(
         mensaje="Paciente y dueño registrados con éxito.",
@@ -1869,17 +1937,60 @@ def vista_lista_pacientes(
     propietarios_data = []
 
     for c in propietarios_unicos:
-        # Todas las mascotas vinculadas a este DNI unificado (deduplicadas por Mascota.id)
+        # Todas las mascotas vinculadas a este DNI unificado
         mascotas_query = db.query(Mascota).join(Cliente).filter(
             Cliente.dni == c.dni,
+            Cliente.is_deleted == False,
             Mascota.is_deleted == False
-        ).order_by(Mascota.nombre.asc()).all()
+        ).order_by(Mascota.created_at.desc()).all()
 
-        mascotas_dict = {}
+        mascotas_por_nombre = {}
         for m in mascotas_query:
-            if m.id not in mascotas_dict:
-                mascotas_dict[m.id] = m
-        todas_mascotas = list(mascotas_dict.values())
+            clave_nom = m.nombre.strip().lower()
+            if clave_nom not in mascotas_por_nombre:
+                mascotas_por_nombre[clave_nom] = []
+            mascotas_por_nombre[clave_nom].append(m)
+
+        todas_mascotas = []
+        for clave_nom, lista_instancias in mascotas_por_nombre.items():
+            # 1. Priorizar la instancia que pertenece a la clínica actual
+            local = next((inst for inst in lista_instancias if inst.clinica_id == target_clinica_id), None)
+            if local:
+                principal = local
+            else:
+                # 2. Si no hay instancia local, seleccionar la más completa
+                principal = sorted(
+                    lista_instancias,
+                    key=lambda item: (
+                        1 if item.foto_url else 0,
+                        1 if item.fecha_nacimiento else 0,
+                        1 if (item.peso and item.peso > 0) else 0,
+                        item.id
+                    ),
+                    reverse=True
+                )[0]
+
+            # 3. Enriquecer datos de la mascota principal con atributos de las otras instancias si le faltan
+            for otra in lista_instancias:
+                if otra.id == principal.id:
+                    continue
+                if not principal.foto_url and otra.foto_url:
+                    principal.foto_url = otra.foto_url
+                if not principal.fecha_nacimiento and otra.fecha_nacimiento:
+                    principal.fecha_nacimiento = otra.fecha_nacimiento
+                if (not principal.peso or principal.peso <= 0) and (otra.peso and otra.peso > 0):
+                    principal.peso = otra.peso
+                if not principal.raza and otra.raza:
+                    principal.raza = otra.raza
+                if not principal.sexo and otra.sexo:
+                    principal.sexo = otra.sexo
+                if not principal.tiene_alergias and otra.tiene_alergias:
+                    principal.tiene_alergias = otra.tiene_alergias
+                    principal.detalle_alergias = otra.detalle_alergias or principal.detalle_alergias
+
+            todas_mascotas.append(principal)
+
+        todas_mascotas.sort(key=lambda item: item.nombre.lower())
 
         if not todas_mascotas:
             continue
@@ -1967,15 +2078,33 @@ def vista_ficha_mascota(
     if not current_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    mascota_query = db.query(Mascota).filter(
+    target_clinica_id = current_user.clinica_id
+
+    # 1. Buscar si la mascota pertenece directamente a la clínica actual
+    mascota = db.query(Mascota).filter(
         Mascota.id == mascota_id,
         Mascota.is_deleted == False,
-        Mascota.clinica_id == current_user.clinica_id
-    )
+        Mascota.clinica_id == target_clinica_id
+    ).first()
 
-    mascota = mascota_query.first()
-
+    # 2. Si no pertenece a esta clínica, verificar si ya tiene ficha local por nombre unificado
     if not mascota:
+        mascota_externa = db.query(Mascota).filter(
+            Mascota.id == mascota_id,
+            Mascota.is_deleted == False
+        ).first()
+
+        if mascota_externa and mascota_externa.cliente and mascota_externa.cliente.dni:
+            mascota_local = db.query(Mascota).join(Cliente).filter(
+                Cliente.dni == mascota_externa.cliente.dni,
+                Mascota.clinica_id == target_clinica_id,
+                func.lower(func.trim(Mascota.nombre)) == mascota_externa.nombre.strip().lower(),
+                Mascota.is_deleted == False
+            ).first()
+
+            if mascota_local:
+                return RedirectResponse(url=f"/pacientes/{mascota_local.id}", status_code=status.HTTP_302_FOUND)
+
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
 
     # Atenciones ordenadas descendente por fecha

@@ -199,6 +199,92 @@ def run_auto_migrations(target_engine) -> None:
         print(f"[WARN] Error durante auto-migraciones: {e}")
 
 
+def consolidar_mascotas_duplicadas(db: Session) -> None:
+    """
+    Consolida mascotas duplicadas en la base de datos pertenecientes al mismo propietario (DNI)
+    con el mismo nombre normalizado.
+    Reasigna atenciones, vacunas, seguimientos y citas a la mascota principal, y marca
+    las duplicadas como is_deleted = True.
+    """
+    from app.clinic.models import Mascota, Cliente
+
+    try:
+        mascotas = db.query(Mascota).join(Cliente).filter(
+            Mascota.is_deleted == False,
+            Cliente.is_deleted == False
+        ).order_by(Mascota.id.asc()).all()
+
+        agrupadas = {}
+        for m in mascotas:
+            dni = (m.cliente.dni if m.cliente else "").strip()
+            if not dni:
+                continue
+            nombre_norm = m.nombre.strip().lower()
+            clave = (dni, nombre_norm)
+            if clave not in agrupadas:
+                agrupadas[clave] = []
+            agrupadas[clave].append(m)
+
+        hubo_cambios = False
+        for (dni, nombre_norm), lista in agrupadas.items():
+            if len(lista) <= 1:
+                continue
+
+            # Priorizar:
+            # 1. Instancia con atenciones, vacunas o citas registradas
+            # 2. Instancia con foto
+            # 3. Instancia con fecha de nacimiento
+            # 4. Menor ID (creada primero)
+            principal = sorted(
+                lista,
+                key=lambda item: (
+                    len(item.atenciones) + len(item.vacunas) + len(item.citas),
+                    1 if item.foto_url else 0,
+                    1 if item.fecha_nacimiento else 0,
+                    1 if (item.peso and item.peso > 0) else 0,
+                    -item.id
+                ),
+                reverse=True
+            )[0]
+
+            for dup in lista:
+                if dup.id == principal.id:
+                    continue
+
+                if not principal.foto_url and dup.foto_url:
+                    principal.foto_url = dup.foto_url
+                if not principal.fecha_nacimiento and dup.fecha_nacimiento:
+                    principal.fecha_nacimiento = dup.fecha_nacimiento
+                if (not principal.peso or principal.peso <= 0) and (dup.peso and dup.peso > 0):
+                    principal.peso = dup.peso
+                if not principal.raza and dup.raza:
+                    principal.raza = dup.raza
+                if not principal.sexo and dup.sexo:
+                    principal.sexo = dup.sexo
+                if not principal.tiene_alergias and dup.tiene_alergias:
+                    principal.tiene_alergias = dup.tiene_alergias
+                    principal.detalle_alergias = dup.detalle_alergias or principal.detalle_alergias
+
+                for a in dup.atenciones:
+                    a.mascota_id = principal.id
+                for v in dup.vacunas:
+                    v.mascota_id = principal.id
+                for s in dup.seguimientos:
+                    s.mascota_id = principal.id
+                for c in dup.citas:
+                    c.mascota_id = principal.id
+
+                dup.is_deleted = True
+                hubo_cambios = True
+
+        if hubo_cambios:
+            db.commit()
+            print("[OK] Mascotas duplicadas consolidadas exitosamente.")
+    except Exception as ex:
+        db.rollback()
+        print(f"[WARN] Error al consolidar mascotas duplicadas: {ex}")
+
+
 def init_db() -> None:
     """
     Inicialización segura de la base de datos.
@@ -211,7 +297,17 @@ def init_db() -> None:
     # 2. Auto-migrar columnas faltantes en tablas existentes (ej. en Render PostgreSQL)
     run_auto_migrations(engine)
 
-    # 3. Inicializar datos de catálogos si no existen
+    # 3. Consolidar mascotas duplicadas existentes en BD
+    db = SessionLocal()
+    try:
+        consolidar_mascotas_duplicadas(db)
+    except Exception as e:
+        db.rollback()
+        print(f"[WARN] Error al consolidar mascotas: {e}")
+    finally:
+        db.close()
+
+    # 4. Inicializar datos de catálogos si no existen
     from seed_catalogos import seed_catalogos
     db = SessionLocal()
     try:

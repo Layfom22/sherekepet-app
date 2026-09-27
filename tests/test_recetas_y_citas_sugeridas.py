@@ -247,3 +247,127 @@ def test_confirmar_y_descartar_cita_sugerida_desde_celular(client, db_session):
     db_session.expire_all()
     cita_db2 = db_session.query(Cita).filter(Cita.id == cita_sugerida_2.id).first()
     assert cita_db2.estado == "CANCELADA"
+
+
+def test_deduplicacion_mascotas_dashboard_dueno(client, db_session):
+    """
+    Validar que si una mascota con el mismo nombre está registrada en dos veterinarias
+    distintas (ej. CITYVET y RoyVetComercial) para el mismo dueño, en el Dashboard aparezca
+    SOLO UNA VEZ y el contador de mascotas registradas sea 1.
+    """
+    c1 = Clinica(nombre="CITYVET", zona_horaria="America/Lima", plan_activo="solo")
+    c2 = Clinica(nombre="RoyVetComercial", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([c1, c2])
+    db_session.flush()
+
+    # Mismo dueño en ambas clínicas (DNI unificado)
+    dueno1 = Cliente(clinica_id=c1.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    dueno2 = Cliente(clinica_id=c2.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    db_session.add_all([dueno1, dueno2])
+    db_session.flush()
+
+    # Princesa registrada en c1 y en c2
+    m1 = Mascota(
+        clinica_id=c1.id,
+        cliente_id=dueno1.id,
+        nombre="Princesa",
+        especie="Canino",
+        raza="Jack Russell Terrier",
+        sexo="Hembra"
+    )
+    m2 = Mascota(
+        clinica_id=c2.id,
+        cliente_id=dueno2.id,
+        nombre="Princesa",
+        especie="Canino",
+        raza="Jack Russell Terrier",
+        sexo="Hembra",
+        foto_url="https://r2.sherekepet.com/princesa.webp"
+    )
+    db_session.add_all([m1, m2])
+    db_session.commit()
+
+    token = create_access_token(data={"sub": str(dueno1.id), "role": "client"})
+    client.cookies.set("client_token", token)
+
+    resp = client.get("/portal/dashboard")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Debe decir 1 mascota registrada (no 2)
+    assert "1 mascota registrada" in html
+    # Debe tener la foto de la instancia que la tiene
+    assert "https://r2.sherekepet.com/princesa.webp" in html
+
+
+def test_carnet_atenciones_agrupadas_por_veterinario_ordenadas(client, db_session):
+    """
+    Validar que en el carnet las atenciones de la mascota estén:
+    1. Unificadas entre todas las clínicas donde se atendió (CITYVET y RoyVetComercial).
+    2. Agrupadas por veterinario.
+    3. Ordenadas por quién atendió la última vez (el más reciente aparece primero como Último Médico Tratante).
+    """
+    from app.clinic.models import Veterinario
+
+    c1 = Clinica(nombre="CITYVET", zona_horaria="America/Lima", plan_activo="solo")
+    c2 = Clinica(nombre="RoyVetComercial", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([c1, c2])
+    db_session.flush()
+
+    dueno = Cliente(clinica_id=c1.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    db_session.add(dueno)
+    db_session.flush()
+
+    vet_antiguo = Veterinario(clinica_id=c1.id, nombre="Dr. Carlos CityVet", email="carlos@cityvet.pe")
+    vet_reciente = Veterinario(clinica_id=c2.id, nombre="Dr. Roy RoyVet", email="roy@royvet.pe")
+    db_session.add_all([vet_antiguo, vet_reciente])
+    db_session.flush()
+
+    m1 = Mascota(clinica_id=c1.id, cliente_id=dueno.id, nombre="Princesa", especie="Canino")
+    m2 = Mascota(clinica_id=c2.id, cliente_id=dueno.id, nombre="Princesa", especie="Canino")
+    db_session.add_all([m1, m2])
+    db_session.flush()
+
+    # Atención antigua con Dr. Carlos (hace 10 días)
+    at1 = AtencionClinica(
+        clinica_id=c1.id,
+        mascota_id=m1.id,
+        veterinario_id=vet_antiguo.id,
+        tipo_atencion="CONSULTA",
+        motivo="Vacuna y chequeo en CityVet",
+        created_at=get_lima_now() - timedelta(days=10)
+    )
+    # Atención reciente con Dr. Roy (ayer)
+    at2 = AtencionClinica(
+        clinica_id=c2.id,
+        mascota_id=m2.id,
+        veterinario_id=vet_reciente.id,
+        tipo_atencion="GROOMING",
+        motivo="Baño medicado en RoyVet",
+        created_at=get_lima_now() - timedelta(days=1)
+    )
+    db_session.add_all([at1, at2])
+    db_session.commit()
+
+    token = create_access_token(data={"sub": str(dueno.id), "role": "client"})
+    client.cookies.set("client_token", token)
+
+    # Entrar al carnet de m1 (debe ver atenciones de m1 y m2)
+    resp = client.get(f"/portal/carnet/{m1.id}")
+    assert resp.status_code == 200
+    html = resp.text
+
+    # Se muestran ambos veterinarios
+    assert "Dr. Roy RoyVet" in html
+    assert "Dr. Carlos CityVet" in html
+    assert "2 atenciones" in html
+    assert "2 médicos" in html
+
+    # Dr. Roy fue el más reciente: debe tener el badge de "Último Médico Tratante"
+    # Y debe aparecer ANTES en el HTML que Dr. Carlos
+    pos_roy = html.find("Dr. Roy RoyVet")
+    pos_carlos = html.find("Dr. Carlos CityVet")
+    assert pos_roy != -1 and pos_carlos != -1
+    assert pos_roy < pos_carlos, "Dr. Roy debe aparecer primero porque atendió más recientemente"
+    assert "Último Médico Tratante" in html
+

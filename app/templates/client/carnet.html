@@ -166,190 +166,155 @@
             </h2>
             {% if total_atenciones and total_atenciones > 0 %}
             <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-800 border border-teal-200">
-                {{ total_atenciones }} atención{{ 'es' if total_atenciones != 1 else '' }}
+                {% if total_atenciones == 1 %}1 atención{% else %}{{ total_atenciones }} atenciones{% endif %} &bull; {{ veterinarios_agrupados|length }} médico{{ 's' if veterinarios_agrupados|length != 1 else '' }}
             </span>
             {% endif %}
         </div>
 
-        {% if ultimo_veterinario %}
-        <!-- Tarjeta del Último Veterinario Tratante (Más reciente) -->
-        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
-            <div class="flex items-start justify-between gap-3">
-                <div class="flex items-center space-x-3.5 min-w-0">
-                    <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0 overflow-hidden shadow-2xs">
-                        {% if ultimo_veterinario.vet_foto %}
-                        <img src="{{ ultimo_veterinario.vet_foto }}" alt="{{ ultimo_veterinario.vet_nombre }}" class="w-full h-full object-cover">
-                        {% else %}
-                        <i data-lucide="user-round" class="w-6 h-6 text-teal-600" aria-hidden="true"></i>
-                        {% endif %}
-                    </div>
-                    <div class="min-w-0">
-                        <div class="flex items-center space-x-2">
-                            <span class="text-[10px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
-                                {% if ultimo_veterinario.fecha %}Última Atención{% else %}Médico Asignado{% endif %}
-                            </span>
-                            {% if ultimo_veterinario.fecha %}
-                            <span class="text-xs font-bold text-slate-400 font-mono">
-                                {{ ultimo_veterinario.fecha.strftime('%d/%m/%Y') }}
-                            </span>
+        {% if veterinarios_agrupados %}
+        <div class="space-y-4">
+            {% for vet_grupo in veterinarios_agrupados %}
+            <div class="bg-white rounded-3xl p-5 border {% if vet_grupo.es_ultimo_tratante %}border-teal-300 ring-2 ring-teal-100 shadow-md{% else %}border-slate-200 shadow-sm{% endif %} space-y-4">
+                
+                <!-- Encabezado del Veterinario -->
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center space-x-3.5 min-w-0">
+                        <div class="w-12 h-12 rounded-2xl {% if vet_grupo.es_ultimo_tratante %}bg-teal-50 border border-teal-200 text-teal-700{% else %}bg-slate-100 border border-slate-200 text-slate-600{% endif %} flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                            {% if vet_grupo.vet_foto %}
+                            <img src="{{ vet_grupo.vet_foto }}" alt="{{ vet_grupo.vet_nombre }}" class="w-full h-full object-cover">
+                            {% else %}
+                            <i data-lucide="user-round" class="w-6 h-6 {% if vet_grupo.es_ultimo_tratante %}text-teal-600{% else %}text-slate-500{% endif %}" aria-hidden="true"></i>
                             {% endif %}
                         </div>
-                        <h3 class="text-base font-black text-slate-900 mt-1 truncate">
-                            {{ ultimo_veterinario.vet_nombre }}
-                        </h3>
-                        <p class="text-xs text-slate-500 font-medium truncate flex items-center space-x-1">
-                            <i data-lucide="hospital" class="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true"></i>
-                            <span class="truncate">{{ ultimo_veterinario.clinica_nombre }}</span>
-                        </p>
-                    </div>
-                </div>
-
-                {% if ultimo_veterinario.enlace_whatsapp %}
-                <a 
-                    href="{{ ultimo_veterinario.enlace_whatsapp }}" 
-                    target="_blank"
-                    class="btn-touch px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0 flex items-center space-x-1.5"
-                    title="Contactar al equipo veterinario por WhatsApp"
-                >
-                    <i data-lucide="message-circle" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                    <span class="hidden sm:inline">WhatsApp</span>
-                </a>
-                {% endif %}
-            </div>
-
-            {% if ultimo_veterinario.motivo %}
-            <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
-                <div class="flex items-center space-x-1.5 text-slate-800 font-bold">
-                    <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true"></i>
-                    <span>Motivo: {{ ultimo_veterinario.motivo }}</span>
-                </div>
-                {% if ultimo_veterinario.diagnostico %}
-                <div class="text-slate-600 pt-1 border-t border-slate-200/60">
-                    <strong class="text-slate-800">Diagnóstico:</strong> {{ ultimo_veterinario.diagnostico }}
-                </div>
-                {% endif %}
-                
-                <!-- Receta Médica Estructurada y Resaltada -->
-                {% if ultimo_veterinario.receta_info %}
-                <div class="mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2 shadow-2xs">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
-                            <i data-lucide="pill" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i>
-                            <span>Prescripción Médica / Receta</span>
-                        </div>
-                        <span class="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded-md border border-teal-200">
-                            Receta Oficial
-                        </span>
-                    </div>
-                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-0.5">
                         <div class="min-w-0">
-                            <span class="text-[10px] uppercase font-bold text-slate-400">Medicamento</span>
-                            <p class="text-sm font-black text-slate-900 tracking-tight">{{ ultimo_veterinario.receta_info.medicamento }}</p>
-                        </div>
-                        <!-- Badge Resaltado con Cantidad y Frecuencia -->
-                        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 text-white font-black text-xs shadow-xs self-start sm:self-auto">
-                            <span>💊 {{ ultimo_veterinario.receta_info.cantidad }} &bull; {{ ultimo_veterinario.receta_info.frecuencia }}</span>
+                            <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+                                {% if vet_grupo.es_ultimo_tratante %}
+                                <span class="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100 px-2 py-0.5 rounded-md border border-teal-300 inline-flex items-center gap-1">
+                                    <i data-lucide="award" class="w-3 h-3 text-teal-700"></i>
+                                    <span>Último Médico Tratante</span>
+                                </span>
+                                {% else %}
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                                    Médico Tratante
+                                </span>
+                                {% endif %}
+                                <span class="text-xs font-bold text-slate-400 font-mono">
+                                    Última visita: {{ vet_grupo.ultima_fecha.strftime('%d/%m/%Y') }}
+                                </span>
+                            </div>
+                            <h3 class="text-base font-black text-slate-900 mt-1 truncate">
+                                {{ vet_grupo.vet_nombre }}
+                            </h3>
+                            <p class="text-xs text-slate-500 font-medium truncate flex items-center space-x-1">
+                                <i data-lucide="hospital" class="w-3.5 h-3.5 text-slate-400 shrink-0" aria-hidden="true"></i>
+                                <span class="truncate">{{ vet_grupo.clinica_nombre }} &bull; {% if vet_grupo.atenciones|length == 1 %}1 atención{% else %}{{ vet_grupo.atenciones|length }} atenciones{% endif %}</span>
+                            </p>
                         </div>
                     </div>
-                    {% if ultimo_veterinario.tratamiento_limpio %}
-                    <div class="text-slate-600 text-[11px] pt-1.5 border-t border-teal-200/60 leading-relaxed">
-                        <strong class="text-slate-700">Indicaciones adicionales:</strong> {{ ultimo_veterinario.tratamiento_limpio }}
-                    </div>
+
+                    {% if vet_grupo.enlace_whatsapp %}
+                    <a 
+                        href="{{ vet_grupo.enlace_whatsapp }}" 
+                        target="_blank"
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0 flex items-center space-x-1.5"
+                        title="Contactar al equipo veterinario por WhatsApp"
+                    >
+                        <i data-lucide="message-circle" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">WhatsApp</span>
+                    </a>
                     {% endif %}
                 </div>
-                {% elif ultimo_veterinario.tratamiento %}
-                <div class="text-slate-600 pt-1 border-t border-slate-200/60">
-                    <strong class="text-slate-800">Tratamiento Indicado:</strong> {{ ultimo_veterinario.tratamiento }}
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
 
-            <!-- Botón para Expandir/Contraer Otros Veterinarios y Atenciones Anteriores -->
-            {% if otras_atenciones and otras_atenciones|length > 0 %}
-            <div class="pt-2 border-t border-slate-100">
-                <button 
-                    type="button" 
-                    id="btnToggleOtrosVets"
-                    onclick="toggleOtrosVeterinarios()"
-                    class="btn-touch w-full py-2.5 px-4 text-xs font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-200/80 rounded-2xl transition-all flex items-center justify-between"
-                >
-                    <span class="flex items-center space-x-1.5">
-                        <i data-lucide="folder" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                        <span>Ver otros veterinarios y atenciones anteriores ({{ otras_atenciones|length }})</span>
-                    </span>
-                    <i data-lucide="chevron-down" id="iconoToggleVets" class="w-4 h-4 transition-transform duration-200" aria-hidden="true"></i>
-                </button>
-
-                <!-- Contenedor Desplegable -->
-                <div id="contenedorOtrosVets" class="hidden mt-3 space-y-3 pt-1">
-                    {% for at in otras_atenciones %}
-                    <div class="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 space-y-2 text-xs">
+                <!-- Lista de Atenciones Realizadas por este Veterinario -->
+                <div class="space-y-3 pt-1 border-t border-slate-100">
+                    {% for at in vet_grupo.atenciones %}
+                    <div class="p-3.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-2 text-xs">
                         <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-2">
-                                <i data-lucide="user-round" class="w-4 h-4 text-slate-500" aria-hidden="true"></i>
-                                <span class="font-black text-slate-900">{{ at.vet_nombre }}</span>
-                            </div>
+                            <span class="font-extrabold text-slate-800 flex items-center space-x-1.5">
+                                <i data-lucide="clipboard-list" class="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true"></i>
+                                <span>{{ at.tipo }} &bull; {{ at.motivo }}</span>
+                            </span>
                             <span class="text-[11px] font-bold text-slate-500 font-mono">
                                 {{ at.fecha.strftime('%d/%m/%Y') }}
                             </span>
                         </div>
-                        <p class="text-[11px] text-teal-700 font-semibold flex items-center space-x-1">
-                            <i data-lucide="hospital" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
-                            <span>{{ at.clinica_nombre }} &bull; <span class="text-slate-500 font-normal">{{ at.tipo }}</span></span>
-                        </p>
-                        <div class="bg-white p-2.5 rounded-xl border border-slate-200 space-y-1.5">
-                            <p class="text-slate-700"><strong>Motivo:</strong> {{ at.motivo }}</p>
-                            {% if at.diagnostico %}
-                            <p class="text-slate-600"><strong>Diagnóstico:</strong> {{ at.diagnostico }}</p>
-                            {% endif %}
-                            
-                            <!-- Receta médica estructurada para atenciones anteriores -->
-                            {% if at.receta_info %}
-                            <div class="mt-2 p-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
-                                        <i data-lucide="pill" class="w-3.5 h-3.5 text-teal-600 shrink-0" aria-hidden="true"></i>
-                                        <span>Prescripción Médica</span>
-                                    </div>
-                                    <span class="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-white px-1.5 py-0.5 rounded border border-teal-200">Receta</span>
+
+                        {% if at.diagnostico %}
+                        <div class="text-slate-600 pt-1 border-t border-slate-200/60">
+                            <strong class="text-slate-800">Diagnóstico:</strong> {{ at.diagnostico }}
+                        </div>
+                        {% endif %}
+
+                        <!-- Receta Médica Estructurada y Resaltada -->
+                        {% if at.receta_info %}
+                        <div class="mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2 shadow-2xs">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
+                                    <i data-lucide="pill" class="w-4 h-4 text-teal-600 shrink-0" aria-hidden="true"></i>
+                                    <span>Prescripción Médica / Receta</span>
                                 </div>
-                                <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pt-0.5">
-                                    <div>
-                                        <span class="text-[10px] uppercase font-bold text-slate-400">Medicamento</span>
-                                        <p class="text-xs font-black text-slate-900">{{ at.receta_info.medicamento }}</p>
-                                    </div>
-                                    <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-600 text-white font-black text-[11px] shadow-2xs self-start sm:self-auto">
-                                        <span>💊 {{ at.receta_info.cantidad }} &bull; {{ at.receta_info.frecuencia }}</span>
-                                    </div>
-                                </div>
-                                {% if at.tratamiento_limpio %}
-                                <p class="text-slate-600 text-[11px] pt-1 border-t border-teal-200/60">
-                                    <strong>Indicaciones:</strong> {{ at.tratamiento_limpio }}
-                                </p>
-                                {% endif %}
+                                <span class="text-[10px] font-black uppercase tracking-wider text-teal-800 bg-teal-100/90 px-2 py-0.5 rounded-md border border-teal-200">
+                                    Receta
+                                </span>
                             </div>
-                            {% elif at.tratamiento %}
-                            <p class="text-slate-600"><strong>Tratamiento:</strong> {{ at.tratamiento }}</p>
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-0.5">
+                                <div class="min-w-0">
+                                    <span class="text-[10px] uppercase font-bold text-slate-400">Medicamento</span>
+                                    <p class="text-sm font-black text-slate-900 tracking-tight">{{ at.receta_info.medicamento }}</p>
+                                </div>
+                                <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 text-white font-black text-xs shadow-xs self-start sm:self-auto">
+                                    <span>💊 {{ at.receta_info.cantidad }} &bull; {{ at.receta_info.frecuencia }}</span>
+                                </div>
+                            </div>
+                            {% if at.tratamiento_limpio %}
+                            <div class="text-slate-600 text-[11px] pt-1.5 border-t border-teal-200/60 leading-relaxed">
+                                <strong class="text-slate-700">Indicaciones:</strong> {{ at.tratamiento_limpio }}
+                            </div>
                             {% endif %}
                         </div>
-                        {% if at.enlace_whatsapp %}
-                        <div class="flex justify-end pt-1">
-                            <a 
-                                href="{{ at.enlace_whatsapp }}" 
-                                target="_blank" 
-                                class="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center space-x-1"
-                            >
-                                <i data-lucide="message-circle" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                <span>Consultar sobre esta atención</span>
-                            </a>
+                        {% elif at.tratamiento %}
+                        <div class="text-slate-600 pt-1 border-t border-slate-200/60">
+                            <strong class="text-slate-800">Tratamiento Indicado:</strong> {{ at.tratamiento }}
                         </div>
                         {% endif %}
                     </div>
                     {% endfor %}
                 </div>
+
             </div>
+            {% endfor %}
+        </div>
+        {% elif ultimo_veterinario %}
+        <!-- Fallback de médico asignado sin atenciones previas -->
+        <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+            <div class="flex items-center space-x-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-700 shrink-0">
+                    <i data-lucide="user-round" class="w-6 h-6 text-teal-600" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <span class="text-[10px] font-black uppercase tracking-wider text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200">
+                        Médico Asignado
+                    </span>
+                    <h3 class="text-base font-black text-slate-900 mt-1">{{ ultimo_veterinario.vet_nombre }}</h3>
+                    <p class="text-xs text-slate-500 font-medium">{{ ultimo_veterinario.clinica_nombre }}</p>
+                </div>
+            </div>
+            {% if ultimo_veterinario.enlace_whatsapp %}
+            <a 
+                href="{{ ultimo_veterinario.enlace_whatsapp }}" 
+                target="_blank"
+                class="btn-touch w-full py-2.5 px-4 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors flex items-center justify-center space-x-1.5"
+            >
+                <i data-lucide="message-circle" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Contactar a la Clínica por WhatsApp</span>
+            </a>
             {% endif %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-3xl p-6 text-center border border-slate-200 text-slate-400 text-xs">
+            <i data-lucide="clipboard-x" class="w-8 h-8 text-slate-300 mx-auto mb-2" aria-hidden="true"></i>
+            <p class="font-bold text-slate-700">Sin atenciones clínicas registradas todavía.</p>
+            <p class="text-slate-400 mt-0.5">Las consultas y procedimientos que realice el veterinario aparecerán agrupadas aquí.</p>
         </div>
         {% endif %}
     </div>

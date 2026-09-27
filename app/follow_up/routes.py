@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.timezone import get_lima_now
@@ -393,38 +394,75 @@ def portal_dashboard(
         return RedirectResponse(url="/portal/login", status_code=status.HTTP_303_SEE_OTHER)
 
     # Obtener mascotas activas del cliente filtrando por su DNI (Unificación Global SherekePet)
-    mascotas = db.query(Mascota).join(Cliente).filter(
+    mascotas_raw = db.query(Mascota).join(Cliente).filter(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Mascota.is_deleted == False
     ).order_by(Mascota.created_at.desc()).all()
 
-    # Adjuntar última atención y veterinario tratante a cada mascota para visualización directa
-    for m in mascotas:
+    # Deduplicación inteligente: agrupar por nombre normalizado de la mascota
+    mascotas_agrupadas = {}
+    for m in mascotas_raw:
+        clave_nom = m.nombre.strip().lower()
+        if clave_nom not in mascotas_agrupadas:
+            mascotas_agrupadas[clave_nom] = []
+        mascotas_agrupadas[clave_nom].append(m)
+
+    mascotas = []
+    todas_mascota_ids = []
+    for clave_nom, lista_m in mascotas_agrupadas.items():
+        # Seleccionar la instancia principal más completa (priorizando foto y datos)
+        principal = sorted(
+            lista_m,
+            key=lambda item: (
+                1 if item.foto_url else 0,
+                1 if item.fecha_nacimiento else 0,
+                1 if (item.microchip or item.rasgos_distintivos) else 0,
+                item.created_at or datetime.min
+            ),
+            reverse=True
+        )[0]
+
+        # Guardar todas las IDs asociadas a esta mascota física
+        principal.ids_unificadas = [item.id for item in lista_m]
+        todas_mascota_ids.extend(principal.ids_unificadas)
+
+        # Nombres de todas las clínicas asociadas a esta mascota
+        clinicas_asociadas = []
+        for item in lista_m:
+            if item.clinica:
+                nom = item.clinica.nombre_comercial or item.clinica.nombre
+                if nom and nom not in clinicas_asociadas:
+                    clinicas_asociadas.append(nom)
+
+        # Buscar la última atención clínica considerando TODAS las instancias de esta mascota
         ult_at = db.query(AtencionClinica).filter(
-            AtencionClinica.mascota_id == m.id,
+            AtencionClinica.mascota_id.in_(principal.ids_unificadas),
             AtencionClinica.is_deleted == False
         ).order_by(AtencionClinica.created_at.desc()).first()
+
         if ult_at:
             v_nom = ult_at.veterinario.nombre if (ult_at.veterinario and ult_at.veterinario.nombre) else "Médico Veterinario"
             c_nom = (ult_at.clinica.nombre_comercial or ult_at.clinica.nombre) if ult_at.clinica else "Veterinaria"
-            m.ultimo_vet_info = {
+            principal.ultimo_vet_info = {
                 "veterinario": v_nom,
                 "clinica": c_nom,
                 "fecha": ult_at.created_at.strftime("%d/%m/%Y"),
                 "motivo": ult_at.motivo
             }
         else:
-            cli_n = (m.clinica.nombre_comercial or m.clinica.nombre) if m.clinica else "SherekePet"
-            m.ultimo_vet_info = {
+            cli_n = " • ".join(clinicas_asociadas) if clinicas_asociadas else ((principal.clinica.nombre_comercial or principal.clinica.nombre) if principal.clinica else "SherekePet")
+            principal.ultimo_vet_info = {
                 "veterinario": "Equipo Veterinario",
                 "clinica": cli_n,
                 "fecha": None,
                 "motivo": "Registrado en clínica"
             }
 
+        mascotas.append(principal)
+
     # Obtener veterinarias asociadas al cliente y sus mascotas para agendamiento centralizado
-    clinica_ids = {m.clinica_id for m in mascotas}
+    clinica_ids = {m.clinica_id for m in mascotas_raw}
     if cliente.clinica_id:
         clinica_ids.add(cliente.clinica_id)
     clinicas_cliente = db.query(Clinica).filter(
@@ -450,8 +488,8 @@ def portal_dashboard(
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc()).all()
 
-    # Obtener tratamientos activos con sus próximas dosis
-    mascota_ids = [m.id for m in mascotas]
+    # Obtener tratamientos activos con sus próximas dosis (para todas las instancias unificadas)
+    mascota_ids = todas_mascota_ids
     planes_activos = db.query(MedicationPlan).filter(
         MedicationPlan.pet_id.in_(mascota_ids),
         MedicationPlan.estado == "ACTIVO",
@@ -533,18 +571,29 @@ def portal_carnet_mascota(
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
 
-    # 1. Atenciones clínicas veterinarias ordenadas cronológicamente (la más reciente primero)
+    # Obtener todas las instancias de esta misma mascota para el dueño (unificación multi-clínica SherekePet)
+    mascotas_unificadas = db.query(Mascota).join(Cliente).filter(
+        Cliente.dni == mascota.cliente.dni,
+        func.lower(func.trim(Mascota.nombre)) == mascota.nombre.strip().lower(),
+        Mascota.is_deleted == False
+    ).all()
+    todas_ids = [m.id for m in mascotas_unificadas]
+    if mascota.id not in todas_ids:
+        todas_ids.append(mascota.id)
+
+    # 1. Atenciones clínicas veterinarias ordenadas cronológicamente (de todas las sedes)
     atenciones = db.query(AtencionClinica).filter(
-        AtencionClinica.mascota_id == mascota_id,
+        AtencionClinica.mascota_id.in_(todas_ids),
         AtencionClinica.is_deleted == False
     ).order_by(AtencionClinica.created_at.desc()).all()
 
-    atenciones_info = []
+    grupos_vets = {}
     for at in atenciones:
         vet = at.veterinario
         cli = db.query(Clinica).filter(Clinica.id == at.clinica_id).first() if at.clinica_id else None
         
-        vet_nombre = vet.nombre if (vet and vet.nombre) else "Médico Veterinario"
+        vet_key = vet.id if vet else f"clinica_{at.clinica_id}"
+        vet_nombre = vet.nombre if (vet and vet.nombre) else f"Médico Veterinario ({(cli.nombre_comercial or cli.nombre) if cli else 'Clínica'})"
         vet_foto = vet.foto_perfil if vet else None
         cli_nombre = (cli.nombre_comercial or cli.nombre) if cli else "Clínica Veterinaria"
         cli_telefono = cli.telefono if cli else None
@@ -556,7 +605,7 @@ def portal_carnet_mascota(
 
         receta_info, tratamiento_limpio = extraer_detalle_receta(at.tratamiento)
 
-        atenciones_info.append({
+        item_atencion = {
             "id": at.id,
             "fecha": at.created_at,
             "tipo": at.tipo_atencion,
@@ -571,14 +620,36 @@ def portal_carnet_mascota(
             "clinica_nombre": cli_nombre,
             "clinica_telefono": cli_telefono,
             "enlace_whatsapp": enlace_wa
-        })
+        }
 
-    ultimo_veterinario = None
-    otras_atenciones = []
-    if atenciones_info:
-        ultimo_veterinario = atenciones_info[0]
-        otras_atenciones = atenciones_info[1:]
+        if vet_key not in grupos_vets:
+            grupos_vets[vet_key] = {
+                "vet_key": vet_key,
+                "vet_nombre": vet_nombre,
+                "vet_foto": vet_foto,
+                "clinica_nombre": cli_nombre,
+                "clinica_telefono": cli_telefono,
+                "enlace_whatsapp": enlace_wa,
+                "ultima_fecha": at.created_at,
+                "atenciones": [],
+                "es_ultimo_tratante": False
+            }
+
+        grupos_vets[vet_key]["atenciones"].append(item_atencion)
+        if at.created_at > grupos_vets[vet_key]["ultima_fecha"]:
+            grupos_vets[vet_key]["ultima_fecha"] = at.created_at
+
+    # Convertir a lista y ordenar por quién atendió la última vez (más reciente primero)
+    veterinarios_agrupados = list(grupos_vets.values())
+    veterinarios_agrupados.sort(key=lambda g: g["ultima_fecha"], reverse=True)
+
+    if veterinarios_agrupados:
+        veterinarios_agrupados[0]["es_ultimo_tratante"] = True
+        ultimo_veterinario = veterinarios_agrupados[0]["atenciones"][0]
+        otras_atenciones = [at for g in veterinarios_agrupados[1:] for at in g["atenciones"]]
     else:
+        ultimo_veterinario = None
+        otras_atenciones = []
         cli_reg = mascota.clinica or (mascota.cliente.clinica if mascota.cliente else None)
         if cli_reg:
             primer_vet = cli_reg.veterinarios[0] if (cli_reg.veterinarios and len(cli_reg.veterinarios) > 0) else None
@@ -593,6 +664,8 @@ def portal_carnet_mascota(
                 "motivo": "Clínica de Registro Oficial",
                 "diagnostico": None,
                 "tratamiento": None,
+                "tratamiento_limpio": None,
+                "receta_info": None,
                 "peso_kg": mascota.peso,
                 "vet_nombre": vet_nom,
                 "vet_foto": primer_vet.foto_perfil if primer_vet else None,
@@ -601,15 +674,15 @@ def portal_carnet_mascota(
                 "enlace_whatsapp": enlace_wa
             }
 
-    # 2. Vacunas (solo lectura)
+    # 2. Vacunas (solo lectura de todas las sedes unificadas)
     vacunas = db.query(RegistroVacuna).filter(
-        RegistroVacuna.mascota_id == mascota_id,
+        RegistroVacuna.mascota_id.in_(todas_ids),
         RegistroVacuna.is_deleted == False
     ).order_by(RegistroVacuna.fecha_aplicacion.desc()).all()
 
-    # 3. Planes de medicación y su próxima dosis pendiente
+    # 3. Planes de medicación y su próxima dosis pendiente (de todas las sedes unificadas)
     planes = db.query(MedicationPlan).filter(
-        MedicationPlan.pet_id == mascota_id,
+        MedicationPlan.pet_id.in_(todas_ids),
         MedicationPlan.is_deleted == False
     ).order_by(MedicationPlan.created_at.desc()).all()
 
@@ -641,7 +714,8 @@ def portal_carnet_mascota(
             "clinica": mascota.clinica or mascota.cliente.clinica,
             "ultimo_veterinario": ultimo_veterinario,
             "otras_atenciones": otras_atenciones,
-            "total_atenciones": len(atenciones_info),
+            "veterinarios_agrupados": veterinarios_agrupados,
+            "total_atenciones": len(atenciones),
             "vacunas": vacunas,
             "planes": planes_info,
             "ahora": get_lima_now()

@@ -8,8 +8,9 @@
     <!-- Encabezado de Paciente / Ficha Resumen -->
     <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div class="relative group flex-shrink-0">
-                    <div id="petAvatarContainer" class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center shadow-md overflow-hidden relative">
+            <div class="flex items-center space-x-4">
+                <div class="flex flex-col items-center shrink-0">
+                    <div id="petAvatarContainer" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-teal-500 to-emerald-400 text-white flex items-center justify-center shadow-md overflow-hidden relative border-2 border-white ring-1 ring-slate-200">
                         {% if mascota.foto_url %}
                         <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('petAvatarEmoji')?.classList.remove('hidden');">
                         <span id="petAvatarEmoji" class="hidden"><i data-lucide="paw-print" class="w-8 h-8" aria-hidden="true"></i></span>
@@ -22,8 +23,9 @@
                             <span>Subiendo foto...</span>
                         </div>
                     </div>
-                    <label for="fotoMascotaInput" id="lblFotoMascotaInput" class="btn-touch absolute -bottom-1 -right-1 w-7 h-7 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-xs shadow cursor-pointer transition-transform group-hover:scale-110" title="Subir / Cambiar foto de la mascota" aria-label="Subir o cambiar foto de la mascota">
-                        <i data-lucide="camera" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                    <label for="fotoMascotaInput" id="lblFotoMascotaInput" class="btn-touch mt-2 cursor-pointer inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:text-teal-700 bg-slate-100 hover:bg-teal-50 active:bg-teal-100 border border-slate-200 hover:border-teal-300 rounded-lg transition-all shadow-2xs" title="Subir o cambiar foto de la mascota" aria-label="Subir o cambiar foto de la mascota">
+                        <i data-lucide="camera" class="w-3.5 h-3.5 text-slate-500" aria-hidden="true"></i>
+                        <span>Cambiar foto</span>
                     </label>
                     <input type="file" id="fotoMascotaInput" accept="image/*" class="hidden" onchange="subirFotoMascota(this, {{ mascota.id }})">
                 </div>
@@ -284,18 +286,22 @@
 </div>
 
 <!-- Modal para Registrar Nueva Atención -->
-<div id="modalAtencion" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs overflow-y-auto p-4 flex items-center justify-center">
-    <div class="bg-white max-w-lg w-full rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        <div class="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <h3 class="text-lg font-bold text-slate-900">Registrar Atención para {{ mascota.nombre }}</h3>
-            <button type="button" onclick="cerrarModalAtencion()" class="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg" aria-label="Cerrar modal">
+<div id="modalAtencion" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+    <div class="bg-white max-w-xl w-full rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] sm:max-h-[90vh] overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+        <div class="shrink-0 px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="stethoscope" class="w-5 h-5 text-teal-600"></i>
+                <span>Registrar Atención para {{ mascota.nombre }}</span>
+            </h3>
+            <button type="button" onclick="cerrarModalAtencion()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors p-1.5 rounded-lg" aria-label="Cerrar modal">
                 <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
             </button>
         </div>
 
-        <form id="formAtencion" class="p-6 space-y-4">
-            <input type="hidden" id="atencion_clinica_id" value="{{ mascota.clinica_id }}">
-            <input type="hidden" id="atencion_mascota_id" value="{{ mascota.id }}">
+        <form id="formAtencion" class="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div class="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
+                <input type="hidden" id="atencion_clinica_id" value="{{ mascota.clinica_id }}">
+                <input type="hidden" id="atencion_mascota_id" value="{{ mascota.id }}">
 
             <div>
                 <label for="tipo_atencion" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
@@ -462,9 +468,15 @@
                 <textarea id="tratamiento" rows="2" placeholder="Cuidados en casa o indicaciones adicionales..." class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"></textarea>
             </div>
 
-            <div class="pt-2 flex justify-end gap-2">
-                <button type="button" onclick="cerrarModalAtencion()" class="btn-touch px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
-                <button type="submit" id="btnGuardarAtencion" class="btn-touch px-5 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl">Guardar Atención</button>
+            </div>
+
+            <!-- Pie Fijo de Acciones del Modal -->
+            <div class="shrink-0 px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="cerrarModalAtencion()" class="btn-touch px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors">Cancelar</button>
+                <button type="submit" id="btnGuardarAtencion" class="btn-touch px-5 py-2 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Guardar Atención</span>
+                </button>
             </div>
         </form>
     </div>
@@ -474,7 +486,7 @@
 <!-- MODAL: BUCLE DE RETENCIÓN - AGENDAR PRÓXIMO BAÑO          -->
 <!-- ======================================================== -->
 <div id="modalRetencionBano" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-teal-100 text-center animate-in zoom-in-95">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-teal-100 text-center animate-in zoom-in-95 max-h-[92vh] overflow-y-auto">
         <div class="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-200 text-teal-600 flex items-center justify-center mx-auto shadow-sm">
             <i data-lucide="sparkles" class="w-7 h-7"></i>
         </div>
@@ -551,8 +563,12 @@ const CATALOGO_VACUNAS = {
 };
 
 function abrirModalAtencion() {
-    document.getElementById('modalAtencion').classList.remove('hidden');
+    const modal = document.getElementById('modalAtencion');
+    modal.classList.remove('hidden');
+    const scrollContainer = modal.querySelector('.overflow-y-auto');
+    if (scrollContainer) scrollContainer.scrollTop = 0;
     cargarOpcionesServiciosBano();
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function cerrarModalAtencion() {

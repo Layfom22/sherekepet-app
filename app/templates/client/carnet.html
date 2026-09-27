@@ -42,14 +42,8 @@
     <!-- Tarjeta Estilo DNI de Mascota Oficial (Tema Claro por Defecto) -->
     <div id="dni-card" class="bg-white rounded-3xl p-5 text-slate-800 shadow-xl border border-slate-200 relative overflow-hidden space-y-4 transition-colors duration-300">
         
-        <!-- Marca de Agua de Fondo y Holograma Decorativo -->
-        <div class="dni-watermark absolute -right-8 -bottom-8 w-44 h-44 rounded-full bg-slate-100 pointer-events-none blur-xl"></div>
-        <div class="absolute right-4 top-4 text-slate-300 opacity-20 pointer-events-none">
-            <i data-lucide="paw-print" class="w-10 h-10" aria-hidden="true"></i>
-        </div>
-
         <!-- Encabezado Superior del DNI -->
-        <div class="dni-divider flex items-center justify-between border-b border-slate-200 pb-3">
+        <div class="dni-divider relative z-10 flex items-center justify-between border-b border-slate-200 pb-3">
             <div class="flex items-center space-x-2">
                 <i data-lucide="paw-print" class="w-5 h-5 text-indigo-600 shrink-0" aria-hidden="true"></i>
                 <div>
@@ -139,9 +133,9 @@
         {% endif %}
 
         <!-- Barra Inferior del DNI: Autogestión de la Mascota -->
-        <div class="dni-divider pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
-            <span class="dni-subtext text-[11px] text-slate-500 flex items-center space-x-1.5">
-                <i data-lucide="paw-print" class="w-3.5 h-3.5" aria-hidden="true"></i>
+        <div class="dni-divider relative z-10 pt-3 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span class="dni-subtext text-[11px] text-slate-500 flex items-center space-x-1.5 font-medium">
+                <i data-lucide="paw-print" class="w-3.5 h-3.5 text-indigo-600" aria-hidden="true"></i>
                 <span>Ficha de Mascota</span>
             </span>
 
@@ -149,9 +143,9 @@
                 type="button" 
                 id="btnEditarPerfil"
                 onclick="abrirModalEditarPerfil()"
-                class="btn-touch px-3.5 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 active:bg-indigo-200 rounded-xl border border-indigo-200 shadow-xs transition-all flex items-center space-x-1.5 shrink-0"
+                class="btn-touch relative z-10 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-xl shadow-sm transition-all flex items-center space-x-1.5 shrink-0"
             >
-                <i data-lucide="pencil" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <i data-lucide="pencil" class="w-3.5 h-3.5 text-white" aria-hidden="true"></i>
                 <span>Editar Perfil</span>
             </button>
         </div>
@@ -852,17 +846,11 @@ function cambiarTemaDni(tema) {
     const btnEdit = document.getElementById("btnEditarPerfil") || document.getElementById("btnEditarDni");
     const titularNom = card.querySelector(".dni-titular-nombre");
     const lblFoto = document.getElementById("lblFotoMascotaInput");
-    const watermark = card.querySelector(".dni-watermark");
 
     if (tema === 'claro') {
         // Tarjeta en Modo Claro
         card.classList.remove("bg-gradient-to-br", "from-indigo-900", "via-indigo-800", "to-purple-900", "text-white", "border-indigo-400/30");
         card.classList.add("bg-white", "text-slate-800", "border-slate-200", "shadow-xl");
-
-        if (watermark) {
-            watermark.classList.remove("bg-white/5");
-            watermark.classList.add("bg-slate-100");
-        }
 
         // Textos secundarios
         subtexts.forEach(el => {
@@ -906,8 +894,7 @@ function cambiarTemaDni(tema) {
 
         // Botón Editar
         if (btnEdit) {
-            btnEdit.classList.remove("text-white", "bg-indigo-700/80", "hover:bg-indigo-600", "border-indigo-400/40");
-            btnEdit.classList.add("text-indigo-700", "bg-indigo-50", "hover:bg-indigo-100", "border-indigo-200");
+            btnEdit.className = "btn-touch relative z-10 px-4 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-xl shadow-sm transition-all flex items-center space-x-1.5 shrink-0";
         }
 
         // Estado visual de los botones del selector
@@ -919,11 +906,6 @@ function cambiarTemaDni(tema) {
         // Tarjeta en Modo Oscuro
         card.classList.remove("bg-white", "text-slate-800", "border-slate-200");
         card.classList.add("bg-gradient-to-br", "from-indigo-900", "via-indigo-800", "to-purple-900", "text-white", "border-indigo-400/30");
-
-        if (watermark) {
-            watermark.classList.remove("bg-slate-100");
-            watermark.classList.add("bg-white/5");
-        }
 
         // Textos secundarios
         subtexts.forEach(el => {
@@ -967,8 +949,7 @@ function cambiarTemaDni(tema) {
 
         // Botón Editar
         if (btnEdit) {
-            btnEdit.classList.remove("text-indigo-700", "bg-indigo-50", "hover:bg-indigo-100", "border-indigo-200");
-            btnEdit.classList.add("text-white", "bg-indigo-700/80", "hover:bg-indigo-600", "border-indigo-400/40");
+            btnEdit.className = "btn-touch relative z-10 px-4 py-2 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 rounded-xl border border-indigo-400/40 shadow-xs transition-all flex items-center space-x-1.5 shrink-0";
         }
 
         // Estado visual de los botones del selector

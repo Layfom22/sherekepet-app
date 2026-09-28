@@ -657,7 +657,7 @@ function renderizarMascotasExistentes(mascotas) {
         tarjeta.innerHTML = `
             <div class="flex items-center space-x-2.5 min-w-0">
                 <div class="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center shrink-0 overflow-hidden text-indigo-600">
-                    ${m.foto_url ? `<img src="${m.foto_url}" class="w-full h-full object-cover">` : `<i data-lucide="paw-print" class="w-5 h-5"></i>`}
+                    ${m.foto_url ? `<img src="${m.foto_url}" alt="${m.nombre || 'Mascota'}" class="w-full h-full object-cover">` : `<i data-lucide="paw-print" class="w-5 h-5"></i>`}
                 </div>
                 <div class="min-w-0">
                     <p class="text-xs font-black text-slate-900 truncate">${m.nombre}</p>

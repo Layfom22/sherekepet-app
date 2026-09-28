@@ -297,21 +297,107 @@
         </div>
     </main>
 
-    <!-- Footer Simple -->
-    <footer class="w-full border-t border-slate-200/80 bg-white/60 py-4 text-center text-xs text-slate-400">
-        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div class="flex items-center space-x-2">
-                <img src="/static/img/icon-sherekepet.png" alt="SherekePet" class="w-4 h-4 object-contain">
-                <span>SherekePet SaaS Veterinario &bull; Gestión Inteligente</span>
+    <!-- Footer con Información Legal y Enlaces -->
+    <footer class="w-full border-t border-slate-200/90 bg-white/80 backdrop-blur py-6 text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
+                <!-- Marca & Razón Social -->
+                <div class="space-y-1">
+                    <div class="flex items-center justify-center md:justify-start space-x-2">
+                        <img src="/static/img/icon-sherekepet.png" alt="SherekePet SaaS" class="w-4 h-4 object-contain">
+                        <span class="font-bold text-slate-800">SherekePet SaaS Veterinario</span>
+                        <span class="text-slate-400">&bull;</span>
+                        <span class="text-slate-400">v0.3.0</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 font-medium">
+                        Razón Social: [TU EMPRESA] | RUC: [TU RUC] | Contacto: <a href="mailto:soporte@sherekepet.com" class="text-teal-700 hover:underline">soporte@sherekepet.com</a>
+                    </p>
+                </div>
+
+                <!-- Enlaces Legales -->
+                <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
+                    <a href="/terminos-y-condiciones" class="hover:text-teal-700 transition-colors">Términos y Condiciones</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/politica-privacidad" class="hover:text-teal-700 transition-colors">Política de Privacidad</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/politica-reembolsos" class="hover:text-teal-700 transition-colors">Política de Reembolsos</a>
+                </div>
             </div>
-            <div>
-                <span>v0.3.0 &bull; © 2026 Todos los derechos reservados</span>
+
+            <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 text-center sm:text-left">
+                <span>© 2026 SherekePet. Todos los derechos reservados. Desarrollado para clínicas veterinarias del Perú.</span>
+                <span>Plataforma Cloud Multi-tenant</span>
             </div>
         </div>
     </footer>
 
+    <!-- Cookie Consent Banner -->
+    <aside 
+        id="cookieConsentBanner" 
+        class="fixed bottom-0 inset-x-0 z-50 p-4 sm:p-5 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl transition-all duration-300 hidden"
+        aria-label="Consentimiento de cookies"
+    >
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-start sm:items-center space-x-3 text-xs text-slate-600">
+                <div class="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center shrink-0">
+                    <i data-lucide="cookie" class="w-5 h-5" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <p class="font-bold text-slate-800">Aviso sobre el uso de cookies y almacenamiento local</p>
+                    <p class="text-slate-500 text-[11px] leading-relaxed">
+                        Utilizamos cookies técnicas esenciales y almacenamiento local exclusivamente para mantener tu sesión activa, proteger el acceso multi-tenant y garantizar la seguridad del sistema. No utilizamos cookies de rastreo publicitario. Consulta nuestra <a href="/politica-privacidad" class="text-teal-700 font-semibold underline">Política de Privacidad</a>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-2.5 shrink-0 w-full sm:w-auto justify-end">
+                <button 
+                    type="button" 
+                    id="btnRechazarCookies" 
+                    onclick="responderCookies('rechazado')" 
+                    class="btn-touch px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all"
+                >
+                    Rechazar
+                </button>
+                <button 
+                    type="button" 
+                    id="btnAceptarCookies" 
+                    onclick="responderCookies('aceptado')" 
+                    class="btn-touch px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all"
+                >
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </aside>
+
     <script>
+        function verificarCookieConsent() {
+            try {
+                const consent = localStorage.getItem("cookie_consent");
+                const banner = document.getElementById("cookieConsentBanner");
+                if (!consent && banner) {
+                    banner.classList.remove("hidden");
+                }
+            } catch (e) {
+                console.error("Error al acceder a localStorage:", e);
+            }
+        }
+
+        function responderCookies(decision) {
+            try {
+                localStorage.setItem("cookie_consent", decision);
+            } catch (e) {
+                console.error("Error guardando en localStorage:", e);
+            }
+            const banner = document.getElementById("cookieConsentBanner");
+            if (banner) {
+                banner.classList.add("hidden");
+            }
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
+            verificarCookieConsent();
             if (window.lucide) {
                 window.lucide.createIcons();
             }

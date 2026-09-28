@@ -616,7 +616,7 @@ async function subirLogoClinica(input) {
             const container = document.getElementById("clinicLogoContainer");
             const logoUrl = data.logo_url || data.logo_b64;
             container.innerHTML = `
-                <img id="clinicLogoImg" src="${logoUrl}" alt="Logo" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('clinicLogoPlaceholder')?.classList.remove('hidden');">
+                <img id="clinicLogoImg" src="${logoUrl}" alt="Logo de la clínica" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('clinicLogoPlaceholder')?.classList.remove('hidden');">
                 <span id="clinicLogoPlaceholder" class="hidden text-teal-600 flex items-center justify-center"><i data-lucide="hospital" class="w-8 h-8" aria-hidden="true"></i></span>
                 <div id="logoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold p-1 text-center">
                     <i data-lucide="loader-2" class="w-4 h-4 animate-spin mb-0.5 text-white" aria-hidden="true"></i>

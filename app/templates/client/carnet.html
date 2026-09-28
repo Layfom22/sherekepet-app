@@ -672,7 +672,7 @@ async function subirFotoMascota(input, mascotaId) {
     const container = document.getElementById("petAvatarContainer");
     if (container) {
         container.innerHTML = `
-            <img id="petAvatarImg" src="${objectUrl}" alt="Foto" class="w-full h-full object-cover">
+            <img id="petAvatarImg" src="${objectUrl}" alt="Foto de la mascota" class="w-full h-full object-cover">
             <div id="fotoUploadLoader" class="absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
                 <svg class="animate-spin w-4 h-4 mb-0.5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                 <span>Subiendo foto...</span>
@@ -701,7 +701,7 @@ async function subirFotoMascota(input, mascotaId) {
             const data = await resp.json();
             const container = document.getElementById("petAvatarContainer");
             container.innerHTML = `
-                <img id="petAvatarImg" src="${data.foto_url}" alt="Foto" class="w-full h-full object-cover">
+                <img id="petAvatarImg" src="${data.foto_url}" alt="Foto de la mascota" class="w-full h-full object-cover">
                 <div id="fotoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
                     <svg class="animate-spin w-4 h-4 mb-0.5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                     <span>Subiendo foto...</span>

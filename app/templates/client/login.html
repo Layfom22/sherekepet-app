@@ -161,6 +161,19 @@
                         >
                     </div>
 
+                    <!-- Consentimiento Legal Obligatorio Dueños -->
+                    <div class="flex items-start space-x-2.5 pt-1">
+                        <input 
+                            type="checkbox" 
+                            id="aceptaTerminosCliente" 
+                            name="acepta_terminos" 
+                            class="mt-0.5 w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                        >
+                        <label for="aceptaTerminosCliente" class="text-xs text-slate-600 leading-snug cursor-pointer select-none">
+                            He leído y acepto los <a href="/terminos-y-condiciones" target="_blank" class="text-indigo-700 font-bold underline hover:text-indigo-800">Términos y Condiciones</a> y la <a href="/politica-privacidad" target="_blank" class="text-indigo-700 font-bold underline hover:text-indigo-800">Política de Privacidad</a>.
+                        </label>
+                    </div>
+
                     <button 
                         type="submit" 
                         id="btnCrearYEntrar"
@@ -285,6 +298,7 @@ function activarPaso2(dni, data) {
     const inputPin = document.getElementById("inputPin");
     const inputNuevoPin = document.getElementById("inputNuevoPin");
     const inputConfirmar = document.getElementById("inputConfirmarPin");
+    const checkTerminos = document.getElementById("aceptaTerminosCliente");
 
     if (data.needs_pin) {
         // Modo Primer Ingreso: Crear PIN
@@ -293,6 +307,7 @@ function activarPaso2(dni, data) {
         inputPin.removeAttribute("required");
         inputNuevoPin.setAttribute("required", "required");
         inputConfirmar.setAttribute("required", "required");
+        if (checkTerminos) checkTerminos.setAttribute("required", "required");
         setTimeout(() => inputNuevoPin.focus(), 100);
     } else {
         // Modo Login Recurrente: Ingresar PIN
@@ -301,6 +316,7 @@ function activarPaso2(dni, data) {
         inputPin.setAttribute("required", "required");
         inputNuevoPin.removeAttribute("required");
         inputConfirmar.removeAttribute("required");
+        if (checkTerminos) checkTerminos.removeAttribute("required");
         setTimeout(() => inputPin.focus(), 100);
     }
 }
@@ -312,6 +328,11 @@ function volverAPaso1() {
     document.getElementById("inputPin").value = "";
     document.getElementById("inputNuevoPin").value = "";
     document.getElementById("inputConfirmarPin").value = "";
+    const checkTerminos = document.getElementById("aceptaTerminosCliente");
+    if (checkTerminos) {
+        checkTerminos.checked = false;
+        checkTerminos.removeAttribute("required");
+    }
     document.getElementById("inputDni").focus();
 }
 
@@ -322,6 +343,7 @@ document.getElementById("formLoginPWA").addEventListener("submit", function(e) {
     if (currentNeedsPin) {
         const pin1 = document.getElementById("inputNuevoPin").value.trim();
         const pin2 = document.getElementById("inputConfirmarPin").value.trim();
+        const checkTerminos = document.getElementById("aceptaTerminosCliente");
 
         if (pin1.length !== 4 || !/^\d{4}$/.test(pin1)) {
             e.preventDefault();
@@ -334,6 +356,13 @@ document.getElementById("formLoginPWA").addEventListener("submit", function(e) {
             e.preventDefault();
             mostrarErrorJs("Los códigos PIN no coinciden. Confírmalo nuevamente.");
             document.getElementById("inputConfirmarPin").focus();
+            return;
+        }
+
+        if (checkTerminos && !checkTerminos.checked) {
+            e.preventDefault();
+            mostrarErrorJs("Debes aceptar los Términos y Condiciones y la Política de Privacidad.");
+            checkTerminos.focus();
             return;
         }
     } else {

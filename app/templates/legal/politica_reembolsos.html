@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Reembolsos - SherekePet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pet: {
+                            50: '#f0fdf9',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <script src="/static/js/lucide.min.js"></script>
+    <script>
+        if (!window.lucide) {
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+</head>
+<body class="min-h-full font-sans text-slate-800 antialiased bg-slate-50 flex flex-col justify-between">
+
+    <!-- Header Público -->
+    <header class="w-full bg-white/90 backdrop-blur border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+            <a href="/" class="flex items-center space-x-2.5">
+                <img src="/static/img/icon-sherekepet.png" alt="SherekePet SaaS" class="w-8 h-8 object-contain">
+                <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                    SherekePet
+                </span>
+            </a>
+            <div class="flex items-center space-x-3">
+                <a href="/" class="text-xs font-bold text-slate-600 hover:text-teal-700 flex items-center space-x-1">
+                    <i data-lucide="arrow-left" class="w-4 h-4" aria-hidden="true"></i>
+                    <span>Volver al Inicio</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Legal -->
+    <main class="flex-grow max-w-4xl mx-auto px-4 sm:px-6 py-10 w-full">
+        <div class="bg-white p-8 sm:p-12 rounded-3xl shadow-sm border border-slate-200 space-y-8">
+            
+            <div class="border-b border-slate-100 pb-6 space-y-2">
+                <div class="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 text-xs font-bold">
+                    <i data-lucide="receipt" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                    <span>Suscripciones, Facturación y Cancelaciones</span>
+                </div>
+                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Política de Reembolsos</h1>
+                <p class="text-xs text-slate-400">Última actualización: Septiembre de 2026</p>
+            </div>
+
+            <!-- Resumen Rápido -->
+            <div class="p-5 rounded-2xl bg-teal-50/70 border border-teal-200 text-teal-900 space-y-2">
+                <div class="flex items-center space-x-2 font-black text-sm text-teal-950">
+                    <i data-lucide="badge-check" class="w-5 h-5 text-teal-600 shrink-0" aria-hidden="true"></i>
+                    <span>Compromiso de Transparencia y Sin Cláusulas Ocultas</span>
+                </div>
+                <p class="text-xs leading-relaxed text-teal-800">
+                    En <strong>SherekePet</strong> creemos en relaciones comerciales honestas con la comunidad veterinaria. Ofrecemos 14 días de prueba completa sin necesidad de tarjeta de crédito, cobros mensuales fijos de <strong>S/ 49.00 / mes (Plan Emprendedor)</strong> y la posibilidad de cancelar tu servicio en cualquier momento sin penalidades.
+                </p>
+            </div>
+
+            <!-- Secciones Estructuradas -->
+            <div class="prose prose-slate max-w-none space-y-6 text-sm text-slate-600 leading-relaxed">
+                
+                <section class="space-y-2">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+                        <span>1. Periodo de Prueba Gratuita (Trial de 14 Días)</span>
+                    </h2>
+                    <p>
+                        Toda nueva clínica que se registre en SherekePet recibe automáticamente 14 días de acceso completo e ilimitado a todas las herramientas operativas. Durante este periodo no se realiza ningún cargo monetario ni se solicitan datos de tarjetas bancarias. El periodo de prueba está diseñado para que el equipo clínico verifique el valor del software antes de realizar cualquier desembolso.
+                    </p>
+                    <p class="text-xs text-slate-500 italic">
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi pellentesque odio at felis dignissim scelerisque. Ut imperdiet massa vitae sem molestie, a faucibus magna hendrerit.
+                    </p>
+                </section>
+
+                <section class="space-y-2">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+                        <span>2. Modelo de Suscripción: Plan Emprendedor (S/ 49.00 / mes)</span>
+                    </h2>
+                    <p>
+                        Finalizados los 14 días de prueba, el titular de la clínica puede activar el <strong>Plan Emprendedor a un costo de S/ 49.00 mensuales</strong> (Moneda en Soles Peruanos, PEN). El cobro cubre el mes calendario de servicio por adelantado, garantizando almacenamiento en la nube, soporte técnico continuo y actualizaciones de la plataforma.
+                    </p>
+                </section>
+
+                <section class="space-y-2">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+                        <span>3. Cancelación en Cualquier Momento Sin Permanencia</span>
+                    </h2>
+                    <p>
+                        No existen plazos forzosos de permanencia. La clínica puede cancelar su suscripción en cualquier instante desde el módulo de Facturación o contactando a nuestro equipo. La cancelación tendrá efecto al finalizar el ciclo de facturación mensual vigente, conservando el acceso a sus datos hasta el último día pagado.
+                    </p>
+                    <p class="text-xs text-slate-500 italic">
+                        Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus, omnis voluptas assumenda est, omnis dolor repellendus.
+                    </p>
+                </section>
+
+                <section class="space-y-2">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+                        <span>4. Condiciones para Solicitud de Reembolso</span>
+                    </h2>
+                    <p>
+                        Dado que los usuarios disponen de 14 días de prueba gratuita previa al primer pago, las suscripciones mensuales regulares no son reembolsables una vez iniciado el ciclo facturado. No obstante, se procederá al reembolso íntegro en los siguientes casos excepcionales:
+                    </p>
+                    <ul class="list-disc pl-5 space-y-1 text-xs">
+                        <li>Cargos duplicados por error involuntario del sistema o de la pasarela de pagos.</li>
+                        <li>Cobros generados con posterioridad a una solicitud formal de cancelación debidamente procesada.</li>
+                        <li>Interrupción severa y no programada del servicio superior a 72 horas consecutivas atribuible a la infraestructura central de SherekePet.</li>
+                    </ul>
+                    <p>
+                        Para procesar un reclamo bajo estas excepciones, el usuario deberá remitir el comprobante de pago dentro de los primeros 7 días naturales posteriores al cargo a <a href="mailto:soporte@sherekepet.com" class="text-teal-700 font-bold underline">soporte@sherekepet.com</a>.
+                    </p>
+                </section>
+
+                <section class="space-y-2">
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center space-x-2">
+                        <span>5. Proceso de Devolución</span>
+                    </h2>
+                    <p>
+                        Aprobada la solicitud de reembolso, la acreditación de los fondos se gestionará a través del mismo método de pago original (pasarela o transferencia) en un plazo estimado de 5 a 10 días hábiles, sujeto a los tiempos de liquidación de las entidades financieras emisoras.
+                    </p>
+                </section>
+
+            </div>
+
+            <!-- Footer interno -->
+            <div class="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <p>¿Dudas sobre pagos o reembolsos? Escríbenos a <a href="mailto:soporte@sherekepet.com" class="text-teal-700 font-bold hover:underline">soporte@sherekepet.com</a></p>
+                <a href="/" class="text-teal-700 font-bold hover:underline">Ir a la página principal &rarr;</a>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Footer Simple -->
+    <footer class="w-full border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-400">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <span>Razón Social: [TU EMPRESA] | RUC: [TU RUC] | Contacto: soporte@sherekepet.com</span>
+            <span>&copy; 2026 SherekePet. Todos los derechos reservados.</span>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>

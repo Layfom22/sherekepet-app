@@ -102,6 +102,10 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN nombre_comercial VARCHAR(150);"))
                 if "telefono" not in cols:
                     conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN telefono VARCHAR(50);"))
+                if "estado_suscripcion" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN estado_suscripcion VARCHAR(50) DEFAULT 'TRIAL';"))
+                if "trial_ends_at" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clinicas ADD COLUMN trial_ends_at TIMESTAMP;"))
 
         # Crear sp_citas si no existe
         if "sp_citas" not in tables:

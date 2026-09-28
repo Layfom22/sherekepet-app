@@ -1506,6 +1506,21 @@ async def procesar_registro_veterinario(request: Request, db: Session = Depends(
     nombre_clinica = str(form.get("nombre_clinica", "")).strip()
     email = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", "")).strip()
+    acepta_terminos = form.get("acepta_terminos")
+
+    # El checkbox es estrictamente obligatorio en el formulario HTML (required).
+    # Si viene explícitamente desmarcado o rechazado ("false", "0", "no"):
+    if acepta_terminos is not None and str(acepta_terminos).strip().lower() in ("false", "0", "off", "no"):
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/registro.html",
+            context={
+                "error": "Debes leer y aceptar los Términos y Condiciones y la Política de Privacidad para registrar tu clínica.",
+                "nombre": nombre,
+                "nombre_clinica": nombre_clinica,
+                "email": email
+            }
+        )
 
     try:
         req = VetRegisterRequest(
@@ -2197,6 +2212,81 @@ def vista_configuracion_clinica(
             "current_user": current_user,
             "nombre_comercial": clinica.nombre_comercial or ""
         }
+    )
+
+
+@router.get("/configuracion/facturacion", response_class=HTMLResponse, summary="Vista de Facturación y Suscripción SaaS")
+def vista_facturacion_clinica(
+    request: Request,
+    alerta: Optional[str] = None,
+    mensaje: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Vista de Facturación y Planes SaaS: Muestra Plan Emprendedor (S/ 49.00 / mes),
+    días restantes del Trial de 14 días o alerta roja de Suscripción Expirada.
+    """
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    target_clinica_id = current_user.clinica_id
+    clinica = db.query(Clinica).filter(
+        Clinica.id == target_clinica_id,
+        Clinica.is_deleted == False
+    ).first()
+
+    if not clinica:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    expirado = not clinica.tiene_suscripcion_activa
+    dias_restantes = clinica.dias_restantes_trial
+    en_trial = (clinica.estado_suscripcion or "").upper() == "TRIAL"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/billing.html",
+        context={
+            "clinica": clinica,
+            "current_user": current_user,
+            "expirado": expirado,
+            "dias_restantes": dias_restantes,
+            "en_trial": en_trial,
+            "alerta": alerta,
+            "mensaje": mensaje
+        }
+    )
+
+
+@router.post("/configuracion/facturacion/activar", response_class=HTMLResponse, summary="Activar Suscripción Plan Emprendedor")
+def activar_plan_emprendedor(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Activa la suscripción del Plan Emprendedor (S/ 49.00/mes) pasando el estado a ACTIVO
+    y desbloqueando inmediatamente todas las operaciones de la clínica.
+    """
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    clinica = db.query(Clinica).filter(
+        Clinica.id == current_user.clinica_id,
+        Clinica.is_deleted == False
+    ).first()
+
+    if clinica:
+        clinica.estado_suscripcion = "ACTIVO"
+        clinica.plan_activo = "emprendedor"
+        db.commit()
+        db.refresh(clinica)
+
+    return RedirectResponse(
+        url="/configuracion/facturacion?mensaje=¡Plan+Emprendedor+(S/+49.00/mes)+activado+con+éxito!+Tu+clínica+cuenta+con+acceso+total.",
+        status_code=status.HTTP_303_SEE_OTHER
     )
 
 

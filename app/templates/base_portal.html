@@ -129,14 +129,24 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer Mobile Discreto con Branding SherekePet -->
-    <footer class="py-6 text-center text-xs text-slate-400 mt-auto flex flex-col items-center justify-center space-y-1.5">
+    <!-- Footer Mobile Discreto con Branding SherekePet y Enlaces Legales -->
+    <footer class="py-6 text-center text-xs text-slate-400 mt-auto flex flex-col items-center justify-center space-y-2">
         <div class="flex items-center space-x-1.5 opacity-75 hover:opacity-100 transition-opacity">
             <img src="/static/img/icon-sherekepet.png" alt="SherekePet" class="w-4 h-4 rounded-md object-contain">
             <span class="font-extrabold text-slate-600">SherekePet</span>
         </div>
-        <p class="text-[11px]">Carnet Digital y Seguimiento de Mascotas</p>
+        <p class="text-[11px] text-slate-500">Carnet Digital y Seguimiento de Mascotas</p>
+        
+        <!-- Enlaces Legales Sutiles para el Dueño -->
+        <div class="flex items-center justify-center space-x-3 text-[11px] text-slate-500 font-medium">
+            <a href="/terminos-y-condiciones" target="_blank" class="hover:text-indigo-600 transition-colors underline">Términos y Condiciones</a>
+            <span class="text-slate-300">&bull;</span>
+            <a href="/politica-privacidad" target="_blank" class="hover:text-indigo-600 transition-colors underline">Política de Privacidad</a>
+        </div>
     </footer>
+
+    <!-- Cookie Consent Banner Global -->
+    {% include "components/cookie_banner.html" %}
 
     <!-- Inicialización de Lucide Icons -->
     <script>

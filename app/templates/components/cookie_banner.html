@@ -1,0 +1,79 @@
+<!-- Cookie Consent Banner Global SherekePet -->
+<aside 
+    id="cookieConsentBanner" 
+    class="fixed bottom-0 inset-x-0 z-50 p-4 sm:p-5 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-2xl transition-all duration-300 hidden"
+    aria-label="Consentimiento de cookies"
+>
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-start sm:items-center space-x-3 text-xs text-slate-600">
+            <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center shrink-0">
+                <i data-lucide="cookie" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+            <div>
+                <p class="font-bold text-slate-800">Aviso sobre el uso de cookies y almacenamiento local</p>
+                <p class="text-slate-500 text-[11px] leading-relaxed">
+                    Utilizamos cookies técnicas esenciales y almacenamiento local exclusivamente para mantener tu sesión activa, proteger el acceso seguro a tu cuenta y garantizar el correcto funcionamiento del sistema. No utilizamos cookies de rastreo publicitario. Consulta nuestra <a href="/politica-privacidad" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-semibold underline">Política de Privacidad</a>.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-2.5 shrink-0 w-full sm:w-auto justify-end">
+            <button 
+                type="button" 
+                id="btnRechazarCookies" 
+                onclick="responderCookiesGlobal('rechazado')" 
+                class="btn-touch px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+            >
+                Rechazar
+            </button>
+            <button 
+                type="button" 
+                id="btnAceptarCookies" 
+                onclick="responderCookiesGlobal('aceptado')" 
+                class="btn-touch px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 rounded-xl shadow-xs transition-all cursor-pointer"
+            >
+                Aceptar
+            </button>
+        </div>
+    </div>
+</aside>
+
+<script>
+    function verificarCookieConsentGlobal() {
+        try {
+            const consent = localStorage.getItem("cookie_consent");
+            const banner = document.getElementById("cookieConsentBanner");
+            if (!consent && banner) {
+                banner.classList.remove("hidden");
+            }
+        } catch (e) {
+            console.error("Error al acceder a localStorage:", e);
+        }
+    }
+
+    function responderCookiesGlobal(decision) {
+        try {
+            localStorage.setItem("cookie_consent", decision);
+        } catch (e) {
+            console.error("Error guardando en localStorage:", e);
+        }
+        const banner = document.getElementById("cookieConsentBanner");
+        if (banner) {
+            banner.classList.add("hidden");
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener("DOMContentLoaded", () => {
+            verificarCookieConsentGlobal();
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        });
+    } else {
+        verificarCookieConsentGlobal();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+</script>

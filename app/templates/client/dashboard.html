@@ -507,6 +507,20 @@
                 >
             </div>
 
+            <!-- Consentimiento Legal Obligatorio Nueva Mascota -->
+            <div class="flex items-start space-x-2 pt-1">
+                <input 
+                    type="checkbox" 
+                    id="aceptaTerminosNuevaMascota" 
+                    name="acepta_terminos" 
+                    required 
+                    class="mt-0.5 w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
+                >
+                <label for="aceptaTerminosNuevaMascota" class="text-[11px] text-slate-600 leading-snug cursor-pointer select-none">
+                    Confirmo que los datos y fotos ingresados son legítimos y acepto los <a href="/terminos-y-condiciones" target="_blank" class="text-indigo-600 font-semibold underline hover:text-indigo-800">Términos y Condiciones</a> y la <a href="/politica-privacidad" target="_blank" class="text-indigo-600 font-semibold underline hover:text-indigo-800">Política de Privacidad</a>.
+                </label>
+            </div>
+
             <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
                 <button 
                     type="button" 
@@ -987,6 +1001,14 @@ async function previsualizarFotoNueva(input) {
 // Registrar Nueva Mascota
 async function registrarNuevaMascota(e) {
     e.preventDefault();
+
+    const checkTerminos = document.getElementById("aceptaTerminosNuevaMascota");
+    if (checkTerminos && !checkTerminos.checked) {
+        alert("Debes aceptar los Términos y Condiciones y la Política de Privacidad.");
+        checkTerminos.focus();
+        return;
+    }
+
     const btn = document.getElementById("btnCrearMascota");
     if (btn) {
         btn.disabled = true;

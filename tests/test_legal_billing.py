@@ -160,3 +160,31 @@ def test_modelo_clinica_trial_14_dias_y_billing(client, db_session):
         json={"nombre": "Veterinaria San Francisco Test", "nombre_comercial": "Veterinaria Activa"}
     )
     assert resp_op_ok.status_code == 200
+
+
+def test_portal_duenos_legal_y_cookies(client):
+    """Verifica que el portal de dueños tenga blindaje legal, consentimiento explícito y cookie banner."""
+    # 1. Login de pacientes
+    resp = client.get("/portal/login")
+    assert resp.status_code == 200
+
+    # Banner de cookies global presente en el portal
+    assert 'id="cookieConsentBanner"' in resp.text
+    assert "cookie_consent" in resp.text
+
+    # Footer legal con target="_blank"
+    assert 'href="/terminos-y-condiciones"' in resp.text
+    assert 'href="/politica-privacidad"' in resp.text
+    assert 'target="_blank"' in resp.text
+
+    # Consentimiento explícito previo al botón Continuar
+    assert "Al continuar, confirmas que has leído y aceptas nuestros" in resp.text
+
+    # 2. Cláusulas de Privacidad de Pacientes y Dueños
+    resp_priv = client.get("/politica-privacidad")
+    assert resp_priv.status_code == 200
+    assert "Tratamiento de Datos de Pacientes y Dueños" in resp_priv.text
+    assert "identificador único" in resp_priv.text
+    assert "Cloudflare R2" in resp_priv.text
+    assert "veterinarias" in resp_priv.text
+

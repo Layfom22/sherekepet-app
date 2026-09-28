@@ -4,7 +4,7 @@ from datetime import date, time, timedelta
 import json
 from typing import List, Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status, Body
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status, Body, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_, func
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token, hash_password
 from app.database import get_db
+from app.services.email_service import enviar_alerta_paciente
 from app.auth.service import AuthService
 from app.auth.schemas import (
     VetLoginRequest,
@@ -2401,6 +2402,7 @@ def vista_agenda_citas(
 def confirmar_cita_veterinario(
     cita_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     payload: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db)
 ):
@@ -2439,6 +2441,18 @@ def confirmar_cita_veterinario(
     db.commit()
     db.refresh(cita)
 
+    # Inyección en segundo plano (BackgroundTasks) para envío de correo transaccional sin retrasar respuesta HTTP
+    destinatario_email = None
+    if payload and isinstance(payload, dict):
+        destinatario_email = payload.get("destinatario_email") or payload.get("email")
+    if not destinatario_email:
+        destinatario_email = request.query_params.get("destinatario_email") or request.query_params.get("email")
+    if not destinatario_email and cita.cliente:
+        destinatario_email = getattr(cita.cliente, "email", None)
+
+    if destinatario_email:
+        background_tasks.add_task(enviar_alerta_paciente, cita.id, destinatario_email)
+
     return {
         "mensaje": "Cita confirmada exitosamente.",
         "cita_id": cita.id,
@@ -2458,10 +2472,17 @@ def confirmar_cita_veterinario(
 def confirmar_cita_alias_id(
     id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     payload: Optional[dict] = Body(default=None),
     db: Session = Depends(get_db)
 ):
-    return confirmar_cita_veterinario(cita_id=id, request=request, payload=payload, db=db)
+    return confirmar_cita_veterinario(
+        cita_id=id,
+        request=request,
+        background_tasks=background_tasks,
+        payload=payload,
+        db=db
+    )
 
 
 @router.put(

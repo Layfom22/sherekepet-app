@@ -136,6 +136,13 @@ def run_auto_migrations(target_engine) -> None:
         if "sp_servicio_productos" not in tables:
             Base.metadata.create_all(target_engine, tables=[ServicioProducto.__table__])
 
+        # sp_clientes
+        if "sp_clientes" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_clientes")}
+            with target_engine.begin() as conn:
+                if "email" not in cols:
+                    conn.execute(text("ALTER TABLE sp_clientes ADD COLUMN email VARCHAR(255);"))
+
         # 2. sp_mascotas
         if "sp_mascotas" in tables:
             cols = {c["name"] for c in inspector.get_columns("sp_mascotas")}

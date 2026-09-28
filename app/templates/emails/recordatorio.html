@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recordatorio de Cita Médica - {{ clinica.nombre_comercial or clinica.nombre }}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 32px 12px;">
+    <tr>
+      <td align="center">
+        <!-- Contenedor Principal (Tarjeta de Marca Blanca) -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 580px; background-color: #ffffff; border-radius: 20px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);">
+          
+          <!-- Encabezado con Logo y Nombre de la Clínica -->
+          <tr>
+            <td style="padding: 28px 32px 20px 32px; border-bottom: 1px solid #f1f5f9; text-align: center; background-color: #ffffff;">
+              {% if clinica.logo_url %}
+              <div style="margin-bottom: 12px;">
+                <img src="{{ clinica.logo_url }}" alt="{{ clinica.nombre_comercial or clinica.nombre }}" style="max-height: 56px; max-width: 200px; height: auto; object-contain: contain; display: inline-block; border: 0;" />
+              </div>
+              {% endif %}
+              <h1 style="margin: 0; font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.02em;">
+                {{ clinica.nombre_comercial or clinica.nombre }}
+              </h1>
+              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-weight: 500;">
+                Atención Veterinaria Profesional
+              </p>
+            </td>
+          </tr>
+
+          <!-- Insignia de Confirmación -->
+          <tr>
+            <td style="padding: 24px 32px 8px 32px; text-align: center;">
+              <div style="display: inline-block; background-color: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 9999px; padding: 6px 16px; margin-bottom: 12px;">
+                <span style="color: #047857; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
+                  ✓ Cita Médica Confirmada
+                </span>
+              </div>
+              <h2 style="margin: 0; font-size: 18px; font-weight: 700; color: #1e293b;">
+                ¡Todo listo para la consulta de {{ mascota.nombre }}!
+              </h2>
+              <p style="margin: 8px 0 0 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                Te confirmamos los detalles de tu cita médica agendada. A continuación encontrarás toda la información de la consulta:
+              </p>
+            </td>
+          </tr>
+
+          <!-- Tarjeta de Detalles de la Cita -->
+          <tr>
+            <td style="padding: 16px 32px 24px 32px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; padding: 18px 20px;">
+                
+                <!-- Paciente (Mascota) -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600; width: 35%;">
+                    🐾 Paciente:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 700;">
+                    {{ mascota.nombre }}
+                  </td>
+                </tr>
+
+                <!-- Fecha -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600;">
+                    📅 Fecha:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 700;">
+                    {{ cita.fecha }}
+                  </td>
+                </tr>
+
+                <!-- Hora -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600;">
+                    ⏰ Hora:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 700;">
+                    {{ cita.hora.strftime('%H:%M') if cita.hora and cita.hora.strftime is defined else cita.hora }}
+                  </td>
+                </tr>
+
+                <!-- Motivo -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600;">
+                    🩺 Motivo:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #047857; font-weight: 700;">
+                    {{ cita.motivo }}
+                  </td>
+                </tr>
+
+                <!-- Clínica -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600;">
+                    🏥 Centro Médico:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 600;">
+                    {{ clinica.nombre_comercial or clinica.nombre }}
+                  </td>
+                </tr>
+
+                {% if clinica.telefono %}
+                <!-- Teléfono / WhatsApp -->
+                <tr>
+                  <td style="padding: 6px 0; font-size: 13px; color: #64748b; font-weight: 600;">
+                    📞 Contacto:
+                  </td>
+                  <td style="padding: 6px 0; font-size: 14px; color: #0f172a; font-weight: 600;">
+                    {{ clinica.telefono }}
+                  </td>
+                </tr>
+                {% endif %}
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Recomendaciones -->
+          <tr>
+            <td style="padding: 0 32px 28px 32px;">
+              <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 8px;">
+                <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #166534;">
+                  <strong>Recomendación:</strong> Te sugerimos llegar con 10 minutos de anticipación. Si cuentas con la cartilla de vacunación o antecedentes de <strong>{{ mascota.nombre }}</strong>, por favor llévalos a la consulta.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer con Marca Blanca Exigida -->
+          <tr>
+            <td style="padding: 20px 32px 24px 32px; background-color: #f8fafc; border-top: 1px solid #f1f5f9; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+                Este recordatorio médico fue enviado a través de SherekePet, la plataforma tecnológica de {{ clinica.nombre_comercial or clinica.nombre }}. Por favor, no respondas a este correo.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

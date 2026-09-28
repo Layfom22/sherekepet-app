@@ -12,6 +12,11 @@ from app.core.subscription import SubscriptionMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+import resend
+
+# Inicializar Resend SDK para correos transaccionales y Marca Blanca
+resend.api_key = settings.RESEND_API_KEY
+
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -21,6 +26,8 @@ templates = Jinja2Templates(directory="app/templates")
 async def lifespan(app: FastAPI):
     # Inicialización segura de la base de datos (CREATE TABLE IF NOT EXISTS)
     init_db()
+    if settings.RESEND_API_KEY:
+        resend.api_key = settings.RESEND_API_KEY
     yield
 
 

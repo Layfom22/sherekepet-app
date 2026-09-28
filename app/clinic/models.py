@@ -88,6 +88,7 @@ class Cliente(Base, SoftDeleteMixin, TimestampMixin):
     dni: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     pin_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     telefono: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     nombres: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     apellido_paterno: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     apellido_materno: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

@@ -182,3 +182,12 @@ SherekePet utiliza **exclusivamente [Lucide Icons](https://lucide.dev/)** para g
 - Todo icono decorativo incluye `aria-hidden="true"`.
 - Los botones sin texto descriptivo incluyen `aria-label="..."` y `title="..."` explícito.
 
+### 5. Patrón de Fondo Ambiental Global (Marca de Agua 15%)
+- **Archivo fuente**: `app/static/css/watermark.css` (clase `.app-watermark-bg` en `body`).
+- **Diseño**: Doodles flotantes veterinarios espaciados (gatito, perrito, estetoscopio, huella y huesito minimal en 160×160 px) en tono Slate neutro (`#475569`) al **15% de opacidad**.
+- **Cobertura global**: Presente de forma fija y no invasiva (`background-attachment: fixed`) en toda la aplicación:
+  - `landing.html` (Landing pública y login rápido).
+  - `base.html` (Panel clínico, fichas de pacientes, agenda y configuración).
+  - `base_portal.html` (Portal de dueños y carnet digital de mascotas).
+
+

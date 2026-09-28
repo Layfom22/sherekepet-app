@@ -55,9 +55,12 @@
         }
     </script>
 
+    <!-- Marca de Agua Ambiental Global -->
+    <link rel="stylesheet" href="/static/css/watermark.css">
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white pb-12 sm:pb-0">
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased selection:bg-indigo-500 selection:text-white pb-12 sm:pb-0 bg-slate-50 app-watermark-bg">
 
     <!-- Header Portal del Dueño (Minimalista, Centrado, con Marcos y Botones Definidos) -->
     <header class="sticky top-0 z-40 bg-gradient-to-r from-indigo-800 via-indigo-700 to-violet-800 text-white shadow-md border-b border-indigo-600/50">

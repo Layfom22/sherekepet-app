@@ -50,9 +50,12 @@
         }
     </script>
 
+    <!-- Marca de Agua Ambiental Global -->
+    <link rel="stylesheet" href="/static/css/watermark.css">
+
     {% block extra_head %}{% endblock %}
 </head>
-<body class="h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-slate-50">
+<body class="h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-slate-50 app-watermark-bg">
 
     {% set show_sidebar = current_user and not hide_sidebar %}
     {% set p_count = citas_pendientes_count or (current_user.citas_pendientes_count if current_user else 0) %}

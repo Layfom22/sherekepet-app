@@ -103,15 +103,56 @@
                 <label for="password" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                     Contraseña *
                 </label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    placeholder="Mínimo 8 caracteres" 
-                    class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
-                    minlength="8"
-                    required
-                >
+                <div class="relative">
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        placeholder="Mínimo 8 caracteres" 
+                        class="w-full px-4 py-3 pr-11 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                        minlength="8"
+                        required
+                    >
+                    <button 
+                        type="button" 
+                        onclick="togglePasswordVisibility('password', 'eyeIcon1')" 
+                        class="btn-touch absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-teal-600 focus:outline-none cursor-pointer transition-colors"
+                        tabindex="-1"
+                        aria-label="Ver u ocultar contraseña"
+                    >
+                        <i id="eyeIcon1" data-lucide="eye" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div>
+                <label for="password_confirm" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Repetir Contraseña *
+                </label>
+                <div class="relative">
+                    <input 
+                        type="password" 
+                        id="password_confirm" 
+                        name="password_confirm" 
+                        placeholder="Repite tu contraseña de 8+ caracteres" 
+                        class="w-full px-4 py-3 pr-11 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white transition-all"
+                        minlength="8"
+                        required
+                    >
+                    <button 
+                        type="button" 
+                        onclick="togglePasswordVisibility('password_confirm', 'eyeIcon2')" 
+                        class="btn-touch absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-teal-600 focus:outline-none cursor-pointer transition-colors"
+                        tabindex="-1"
+                        aria-label="Ver u ocultar confirmación de contraseña"
+                    >
+                        <i id="eyeIcon2" data-lucide="eye" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <p id="passwordMismatchMsg" class="hidden text-xs text-rose-500 font-semibold mt-1.5 flex items-center gap-1">
+                    <i data-lucide="alert-circle" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span>Las contraseñas no coinciden.</span>
+                </p>
             </div>
 
             <!-- Consentimiento Legal Obligatorio -->
@@ -131,7 +172,7 @@
             <div class="pt-2">
                 <button 
                     type="submit" 
-                    class="btn-touch w-full py-3.5 px-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5"
+                    class="btn-touch w-full py-3.5 px-4 text-sm font-extrabold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
                 >
                     <span>Registrar Clínica y Entrar</span>
                     <i data-lucide="arrow-right" class="w-4 h-4" aria-hidden="true"></i>
@@ -151,4 +192,56 @@
     </div>
 
 </div>
+
+<script>
+    function togglePasswordVisibility(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (!input || !icon) return;
+
+        const isPassword = input.type === 'password';
+        input.type = isPassword ? 'text' : 'password';
+
+        // Actualizar icono de Lucide dinámicamente
+        icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const form = document.querySelector('form[action="/registro"]');
+        const pass = document.getElementById('password');
+        const passConfirm = document.getElementById('password_confirm');
+        const mismatchMsg = document.getElementById('passwordMismatchMsg');
+
+        if (form && pass && passConfirm) {
+            function checkPasswordsMatch() {
+                if (passConfirm.value && pass.value !== passConfirm.value) {
+                    mismatchMsg.classList.remove('hidden');
+                    passConfirm.classList.add('border-rose-400');
+                    passConfirm.classList.remove('border-slate-300');
+                } else {
+                    mismatchMsg.classList.add('hidden');
+                    passConfirm.classList.remove('border-rose-400');
+                    passConfirm.classList.add('border-slate-300');
+                }
+            }
+
+            pass.addEventListener('input', checkPasswordsMatch);
+            passConfirm.addEventListener('input', checkPasswordsMatch);
+
+            form.addEventListener('submit', (e) => {
+                if (pass.value !== passConfirm.value) {
+                    e.preventDefault();
+                    mismatchMsg.classList.remove('hidden');
+                    passConfirm.classList.add('border-rose-400');
+                    passConfirm.classList.remove('border-slate-300');
+                    passConfirm.focus();
+                    return false;
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

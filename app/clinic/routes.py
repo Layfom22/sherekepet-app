@@ -1507,7 +1507,21 @@ async def procesar_registro_veterinario(request: Request, db: Session = Depends(
     nombre_clinica = str(form.get("nombre_clinica", "")).strip()
     email = str(form.get("email", "")).strip().lower()
     password = str(form.get("password", "")).strip()
+    password_confirm = form.get("password_confirm")
     acepta_terminos = form.get("acepta_terminos")
+
+    # Validación de coincidencia de contraseña (Repetir contraseña)
+    if password_confirm is not None and str(password_confirm).strip() != password:
+        return templates.TemplateResponse(
+            request=request,
+            name="clinic/registro.html",
+            context={
+                "error": "Las contraseñas no coinciden. Por favor asegúrate de repetirla exactamente igual.",
+                "nombre": nombre,
+                "nombre_clinica": nombre_clinica,
+                "email": email
+            }
+        )
 
     # El checkbox es estrictamente obligatorio en el formulario HTML (required).
     # Si viene explícitamente desmarcado o rechazado ("false", "0", "no"):

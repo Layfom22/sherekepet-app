@@ -21,7 +21,7 @@ class VetLoginRequest(BaseModel):
 class VetRegisterRequest(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150, description="Nombre del profesional")
     email: EmailStr = Field(..., description="Correo electrónico del veterinario")
-    password: str = Field(..., min_length=4, description="Contraseña de acceso")
+    password: str = Field(..., min_length=8, description="Contraseña de acceso (mínimo 8 caracteres)")
     nombre_clinica: str = Field(..., min_length=2, max_length=200, description="Nombre de la clínica veterinaria")
 
 
@@ -36,7 +36,7 @@ class ReenviarOtpRequest(BaseModel):
 
 class AsistenteCreateRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="Nombre de usuario del asistente (ej. recepcion_fido)")
-    password: str = Field(..., min_length=4, description="Contraseña de acceso")
+    password: str = Field(..., min_length=8, description="Contraseña de acceso (mínimo 8 caracteres)")
     nombre: Optional[str] = Field(None, max_length=150, description="Nombre descriptivo del asistente")
 
     @field_validator("username")

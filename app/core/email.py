@@ -22,19 +22,7 @@ def send_otp_email(destinatario: str, otp_code: str, nombre: Optional[str] = Non
     """
     destinatario = destinatario.strip().lower()
     saludo_nombre = f" {nombre.strip()}" if nombre and nombre.strip() else ""
-
-    # Si no hay credenciales SMTP configuradas, registrar advertencia en logs
-    if not (settings.SMTP_USER and settings.SMTP_PASS):
-        print(f"[OTP SIMULADO] Código para {destinatario}: {otp_code} (Configure SMTP_USER y SMTP_PASS para envío real)")
-        return False
-
-    remitente = settings.SMTP_FROM or settings.SMTP_USER
-
-    # Estructura del correo
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{otp_code} es tu código de verificación SherekePet"
-    msg["From"] = f"SherekePet <{remitente}>"
-    msg["To"] = destinatario
+    remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
 
     # Versión Texto Plano
     texto_plano = f"""
@@ -95,6 +83,34 @@ https://sherekepet-app.onrender.com
 </html>
 """
 
+    # 1. Prioridad: Enviar vía SDK oficial de Resend si RESEND_API_KEY está configurado
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            res = resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "subject": f"{otp_code} es tu código de verificación SherekePet",
+                "html": html_contenido,
+                "text": texto_plano
+            })
+            print(f"[OK] Correo OTP enviado con éxito vía Resend a {destinatario}: {res}")
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando correo OTP con Resend: {e}")
+            print(f"[WARN] Error enviando correo OTP vía Resend a {destinatario}: {e}")
+
+    # 2. Si no hay Resend y faltan credenciales SMTP, registrar en consola para no bloquear pruebas
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[OTP SIMULADO] Código para {destinatario}: {otp_code} (Configure RESEND_API_KEY o credenciales SMTP para envío a bandeja real)")
+        return False
+
+    # 3. Fallback: Enviar vía SMTP clásico
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"{otp_code} es tu código de verificación SherekePet"
+    msg["From"] = f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
     msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
     msg.attach(MIMEText(html_contenido, "html", "utf-8"))
 

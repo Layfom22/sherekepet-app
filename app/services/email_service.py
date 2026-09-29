@@ -65,7 +65,17 @@ async def enviar_alerta_paciente(cita_id: int, destinatario_email: str) -> Optio
             "html": html_content
         }
 
-        response = resend.Emails.send(payload)
+        try:
+            response = resend.Emails.send(payload)
+        except Exception as ex_dom:
+            err_str = str(ex_dom).lower()
+            if "not verified" in err_str or "validation_error" in err_str or "domain" in err_str:
+                logger.info("Dominio no verificado en Resend; reintentando con sandbox onboarding@resend.dev")
+                payload["from"] = f"{nombre_emisor} <onboarding@resend.dev>"
+                response = resend.Emails.send(payload)
+            else:
+                raise ex_dom
+
         logger.info(f"[EMAIL] Correo de alerta enviado exitosamente a {destinatario_email} para cita {cita_id}: {response}")
         return response
 

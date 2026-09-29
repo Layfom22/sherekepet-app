@@ -88,13 +88,29 @@ https://sherekepet-app.onrender.com
         try:
             import resend
             resend.api_key = settings.RESEND_API_KEY
-            res = resend.Emails.send({
-                "from": remitente,
-                "to": [destinatario],
-                "subject": f"{otp_code} es tu código de verificación SherekePet",
-                "html": html_contenido,
-                "text": texto_plano
-            })
+            try:
+                res = resend.Emails.send({
+                    "from": remitente,
+                    "to": [destinatario],
+                    "subject": f"{otp_code} es tu código de verificación SherekePet",
+                    "html": html_contenido,
+                    "text": texto_plano
+                })
+            except Exception as ex_dom:
+                # Si el dominio sherekepet.com aún no está verificado en Resend DNS, reintentar con el sandbox oficial
+                err_str = str(ex_dom).lower()
+                if "not verified" in err_str or "validation_error" in err_str or "domain" in err_str:
+                    logger.info("Dominio personalizado no verificado en Resend; reintentando con sandbox onboarding@resend.dev")
+                    res = resend.Emails.send({
+                        "from": "SherekePet <onboarding@resend.dev>",
+                        "to": [destinatario],
+                        "subject": f"{otp_code} es tu código de verificación SherekePet",
+                        "html": html_contenido,
+                        "text": texto_plano
+                    })
+                else:
+                    raise ex_dom
+
             print(f"[OK] Correo OTP enviado con éxito vía Resend a {destinatario}: {res}")
             return True
         except Exception as e:

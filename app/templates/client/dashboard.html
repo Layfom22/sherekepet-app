@@ -29,6 +29,14 @@
                             <i data-lucide="phone" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
                             <span><strong>Tel:</strong> <span id="perfilTelefono" class="text-slate-700">{{ cliente.telefono or 'No registrado' }}</span></span>
                         </span>
+                        <span class="inline-flex items-center space-x-1">
+                            <i data-lucide="mail" class="w-3.5 h-3.5 text-slate-400" aria-hidden="true"></i>
+                            <span><strong>Correo:</strong>
+                                <span id="perfilEmail" class="{% if cliente.email %}text-slate-700 font-medium{% else %}text-indigo-600 underline cursor-pointer font-semibold{% endif %}" {% if not cliente.email %}onclick="abrirModalEditarPerfilDueño()"{% endif %}>
+                                    {{ cliente.email or 'Agregar correo para recordatorios' }}
+                                </span>
+                            </span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -191,23 +199,57 @@
     <!-- Alertas de Medicinas Pendientes (si existen) -->
     {% if dosis_pendientes %}
     <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 shadow-xs space-y-3">
-        <div class="flex items-center space-x-2 text-amber-900">
-            <i data-lucide="pill" class="w-5 h-5 text-amber-600 shrink-0 animate-bounce" aria-hidden="true"></i>
-            <h2 class="text-sm font-black uppercase tracking-wide">¡Medicina Pendiente!</h2>
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center space-x-2 text-amber-900">
+                <i data-lucide="pill" class="w-5 h-5 text-amber-600 shrink-0 animate-bounce" aria-hidden="true"></i>
+                <h2 class="text-sm font-black uppercase tracking-wide">¡Medicina Pendiente!</h2>
+            </div>
+            <button 
+                type="button" 
+                id="btnActivarAlarmaPwa"
+                onclick="activarNotificacionesCelular()"
+                class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs inline-flex items-center space-x-1 transition-all"
+            >
+                <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600" aria-hidden="true"></i>
+                <span id="txtActivarAlarmaPwa">Notificar en mi celular</span>
+            </button>
         </div>
         {% for item in dosis_pendientes %}
-        <div class="bg-white p-3.5 rounded-2xl border border-amber-200 flex items-center justify-between">
-            <div>
-                <p class="text-sm font-black text-slate-900">{{ item.mascota.nombre }}</p>
-                <p class="text-xs font-medium text-slate-600">{{ item.plan.medicamento }} (Dosis {{ item.dosis.numero_dosis }}/{{ item.plan.total_dosis }})</p>
-                <p class="text-[11px] text-amber-700 font-bold mt-0.5 flex items-center space-x-1">
+        {% set hora_h = item.dosis.hora_programada.hour %}
+        <div 
+            class="dosis-pendiente-item bg-white p-3.5 rounded-2xl border border-amber-200 flex items-center justify-between gap-3"
+            data-dose-id="{{ item.dosis.id }}"
+            data-dose-iso="{{ item.dosis.hora_programada.isoformat() }}"
+            data-mascota="{{ item.mascota.nombre }}"
+            data-med="{{ item.plan.medicamento }}"
+            data-url="/portal/carnet/{{ item.mascota.id }}"
+        >
+            <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <p class="text-sm font-black text-slate-900">{{ item.mascota.nombre }}</p>
+                    {% if item.plan.frecuencia_horas == 12 %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        ☀️ Mañana y 🌙 Noche (Cada 12h)
+                    </span>
+                    {% else %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                        ⏱️ Cada {{ item.plan.frecuencia_horas }}h
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-xs font-medium text-slate-600 mt-0.5">{{ item.plan.medicamento }} (Dosis {{ item.dosis.numero_dosis }}/{{ item.plan.total_dosis }})</p>
+                <p class="text-[11px] text-amber-700 font-bold mt-0.5 flex items-center space-x-1 flex-wrap">
                     <i data-lucide="clock-3" class="w-3 h-3 text-amber-600 shrink-0" aria-hidden="true"></i>
                     <span>Programada: {{ item.dosis.hora_programada.strftime('%I:%M %p') }}</span>
+                    <span class="text-slate-400">&bull;</span>
+                    <span>
+                        {% if hora_h >= 6 and hora_h < 12 %}☀️ Turno Mañana{% elif hora_h >= 12 and hora_h < 19 %}🌤️ Turno Tarde{% else %}🌙 Turno Noche{% endif %}
+                    </span>
                 </p>
             </div>
             <a 
                 href="/portal/carnet/{{ item.mascota.id }}" 
-                class="btn-touch px-3.5 py-2 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs inline-flex items-center space-x-1"
+                class="btn-touch px-3.5 py-2 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-xs inline-flex items-center space-x-1 shrink-0"
             >
                 <span>Dar toma</span>
                 <i data-lucide="arrow-right" class="w-3.5 h-3.5" aria-hidden="true"></i>
@@ -372,6 +414,19 @@
                     placeholder="Ej. +51 987654321" 
                     class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
                 >
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Correo Electrónico (Notificaciones de citas y pastillas)</label>
+                <input 
+                    type="email" 
+                    id="inputDuenoEmail" 
+                    name="email" 
+                    value="{{ cliente.email or '' }}" 
+                    placeholder="Ej. micorreo@gmail.com" 
+                    class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-800"
+                >
+                <p class="text-[10px] text-slate-400 mt-1">Te enviaremos recordatorios de próximas citas y horarios de medicación.</p>
             </div>
 
             <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-[11px] text-slate-500 flex items-center space-x-1.5">
@@ -913,7 +968,8 @@ async function guardarPerfilDueno(e) {
 
     const payload = {
         nombre_completo: document.getElementById("inputDuenoNombre")?.value.trim() || undefined,
-        telefono: document.getElementById("inputDuenoTelefono")?.value.trim() || undefined
+        telefono: document.getElementById("inputDuenoTelefono")?.value.trim() || undefined,
+        email: document.getElementById("inputDuenoEmail")?.value.trim() ?? undefined
     };
 
     try {
@@ -932,6 +988,10 @@ async function guardarPerfilDueno(e) {
             if (data.telefono !== undefined) {
                 const elTel = document.getElementById("perfilTelefono");
                 if (elTel) elTel.textContent = data.telefono || "No registrado";
+            }
+            if (data.email !== undefined) {
+                const elEmail = document.getElementById("perfilEmail");
+                if (elEmail) elEmail.textContent = data.email || "No registrado (agrega uno para alertas de citas y pastillas)";
             }
             cerrarModalEditarPerfilDueño();
             mostrarToast("¡Perfil actualizado con éxito!");
@@ -1161,10 +1221,83 @@ async function descartarCitaSugerida(citaId) {
     }
 }
 
+// Notificaciones Móviles PWA para Recordatorios de Pastillas
+function actualizarEstadoBotonAlarma() {
+    const txt = document.getElementById('txtActivarAlarmaPwa');
+    const btn = document.getElementById('btnActivarAlarmaPwa');
+    if (!txt || !btn || !('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+        txt.textContent = 'Alertas activadas en celular';
+        btn.classList.remove('bg-white', 'text-amber-900', 'border-amber-300');
+        btn.classList.add('bg-emerald-100', 'text-emerald-900', 'border-emerald-300');
+    }
+}
+
+async function programarAlarmasDosisPendientes(forzarNotificacionPrueba = false) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker?.ready;
+    const sw = reg?.active || navigator.serviceWorker?.controller;
+    if (!sw) return;
+
+    const items = document.querySelectorAll('.dosis-pendiente-item');
+    items.forEach(el => {
+        const doseId = el.getAttribute('data-dose-id');
+        const isoStr = el.getAttribute('data-dose-iso');
+        const mascota = el.getAttribute('data-mascota') || 'tu mascota';
+        const med = el.getAttribute('data-med') || 'medicamento';
+        const url = el.getAttribute('data-url') || '/portal/dashboard';
+        if (!isoStr) return;
+
+        // Parsear hora programada en hora local
+        const targetTime = new Date(isoStr).getTime();
+        const delayMs = targetTime - Date.now();
+        // Si ya venció o falta menos de 24h, programar en el Service Worker
+        if (delayMs <= 24 * 3600 * 1000) {
+            sw.postMessage({
+                type: 'SCHEDULE_DOSE_NOTIFICATION',
+                title: `💊 Hora de pastilla para ${mascota}`,
+                body: `Le toca su dosis de ${med}. Toca aquí para abrir el carnet y marcar "Ya se la di".`,
+                delayMs: Math.max(delayMs, 1500),
+                tag: `dosis-${doseId}`,
+                url: url
+            });
+        }
+    });
+
+    if (forzarNotificacionPrueba) {
+        sw.postMessage({
+            type: 'SHOW_DOSE_NOTIFICATION',
+            title: '🔔 ¡Recordatorios de pastillas activados!',
+            body: 'Tu celular te avisará cuando le toque la medicina a tu mascota.',
+            tag: 'sherekepet-test-alarm',
+            url: '/portal/dashboard'
+        });
+    }
+}
+
+async function activarNotificacionesCelular() {
+    if (!('Notification' in window)) {
+        alert('Tu navegador no soporta notificaciones nativas. Te recomendamos agregar tu correo en "Mi Perfil" para recibir recordatorios.');
+        return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+        actualizarEstadoBotonAlarma();
+        await programarAlarmasDosisPendientes(true);
+        mostrarToast('¡Notificaciones en celular activadas!');
+    } else {
+        alert('Permiso de notificaciones denegado. Puedes activarlo en la configuración del navegador o agregar tu correo en "Mi Perfil".');
+    }
+}
+
 // Service Worker PWA
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
+            .then(() => {
+                actualizarEstadoBotonAlarma();
+                programarAlarmasDosisPendientes(false);
+            })
             .catch(err => console.log('SW error:', err));
     });
 }

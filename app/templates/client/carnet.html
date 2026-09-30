@@ -321,7 +321,20 @@
                 <i data-lucide="pill" class="w-4 h-4 text-teal-600 mr-1" aria-hidden="true"></i>
                 <span>Tratamientos Activos</span>
             </h2>
-            <span class="text-xs text-teal-700 font-semibold">{{ planes|length }} recetas</span>
+            <div class="flex items-center gap-2">
+                {% if planes %}
+                <button 
+                    type="button" 
+                    id="btnActivarAlarmaCarnet"
+                    onclick="activarNotificacionesCarnet()"
+                    class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs inline-flex items-center space-x-1 transition-all"
+                >
+                    <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600" aria-hidden="true"></i>
+                    <span id="txtActivarAlarmaCarnet">Avisar en celular</span>
+                </button>
+                {% endif %}
+                <span class="text-xs text-teal-700 font-semibold">{{ planes|length }} recetas</span>
+            </div>
         </div>
 
         {% if planes %}
@@ -334,7 +347,7 @@
                 <!-- Encabezado del Medicamento -->
                 <div class="flex items-start justify-between">
                     <div>
-                        <div class="flex items-center space-x-2">
+                        <div class="flex items-center space-x-2 flex-wrap gap-y-1">
                             <h3 class="text-lg font-black text-slate-900">{{ plan.medicamento }}</h3>
                             {% if plan.es_estricto %}
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 uppercase">Horario Estricto</span>
@@ -343,9 +356,12 @@
                             {% endif %}
                         </div>
                         <!-- Badge destacado con Cantidad y Frecuencia -->
-                        <div class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 font-black text-xs shadow-2xs">
+                        <div class="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 font-black text-xs shadow-2xs flex-wrap">
                             <span class="text-sm">💊</span>
                             <span>1 dosis cada {{ plan.frecuencia_horas }} horas</span>
+                            {% if plan.frecuencia_horas == 12 %}
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">☀️ Mañana y 🌙 Noche (2 veces al día)</span>
+                            {% endif %}
                             <span class="text-teal-400 font-normal">&bull;</span>
                             <span class="text-teal-700 font-medium">{{ plan.total_dosis }} tomas programadas</span>
                         </div>
@@ -366,12 +382,25 @@
 
                 <!-- Tarjeta de la Dosis Pendiente -->
                 {% if prox %}
-                <div id="dosis-panel-{{ plan.id }}" class="bg-gradient-to-br from-teal-50/80 to-emerald-50/80 rounded-2xl p-4 border border-teal-200 space-y-3">
-                    <div class="flex items-center justify-between text-xs">
+                {% set prox_h = prox.hora_programada.hour %}
+                <div 
+                    id="dosis-panel-{{ plan.id }}" 
+                    class="dosis-pendiente-carnet bg-gradient-to-br from-teal-50/80 to-emerald-50/80 rounded-2xl p-4 border border-teal-200 space-y-3"
+                    data-dose-id="{{ prox.id }}"
+                    data-dose-iso="{{ prox.hora_programada.isoformat() }}"
+                    data-med="{{ plan.medicamento }}"
+                    data-mascota="{{ mascota.nombre }}"
+                >
+                    <div class="flex items-center justify-between text-xs flex-wrap gap-1">
                         <span class="font-bold text-teal-900 uppercase">Toma Pendiente:</span>
-                        <span class="font-extrabold text-teal-700 bg-white px-2 py-0.5 rounded-md border border-teal-200">
-                            Dosis {{ prox.numero_dosis }} de {{ plan.total_dosis }}
-                        </span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                {% if prox_h >= 6 and prox_h < 12 %}☀️ Turno Mañana{% elif prox_h >= 12 and prox_h < 19 %}🌤️ Turno Tarde{% else %}🌙 Turno Noche{% endif %}
+                            </span>
+                            <span class="font-extrabold text-teal-700 bg-white px-2 py-0.5 rounded-md border border-teal-200">
+                                Dosis {{ prox.numero_dosis }} de {{ plan.total_dosis }}
+                            </span>
+                        </div>
                     </div>
 
                     <div class="text-center py-1">
@@ -384,10 +413,38 @@
                         </p>
                     </div>
 
+                    <!-- Ajuste rápido para pastillas de Mañana / Noche o cambio de horario -->
+                    <div class="bg-white/90 rounded-xl p-2.5 border border-teal-200/80 space-y-2">
+                        <div class="flex items-center justify-between gap-2 flex-wrap">
+                            <span class="text-[11px] font-bold text-slate-600 flex items-center space-x-1">
+                                <i data-lucide="clock" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                                <span>Ajustar horario de esta toma:</span>
+                            </span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <button 
+                                    type="button" 
+                                    onclick="reprogramarDosis({{ prox.id }}, '08:00')"
+                                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 transition-colors"
+                                >
+                                    ☀️ 08:00 AM (Mañana)
+                                </button>
+                                <button 
+                                    type="button" 
+                                    onclick="reprogramarDosis({{ prox.id }}, '20:00')"
+                                    class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 transition-colors"
+                                >
+                                    🌙 08:00 PM (Noche)
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- BOTÓN GRANDE ACCESIBLE: [Ya se la di] (Área táctil >= 44px) -->
                     <button 
                         type="button"
                         id="btn-confirmar-{{ prox.id }}"
+                        data-med="{{ plan.medicamento }}"
+                        data-mascota="{{ mascota.nombre }}"
                         onclick="confirmarTomaMedicamento({{ prox.id }}, {{ plan.id }})"
                         class="btn-touch w-full py-4 px-4 text-base font-black text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-2"
                     >
@@ -573,6 +630,9 @@
 <script>
 async function confirmarTomaMedicamento(doseId, planId) {
     const btn = document.getElementById(`btn-confirmar-${doseId}`);
+    const medNombre = btn?.getAttribute('data-med') || 'medicamento';
+    const mascotaNombre = btn?.getAttribute('data-mascota') || 'tu mascota';
+
     if (btn) {
         btn.disabled = true;
         btn.classList.add('opacity-75');
@@ -588,12 +648,35 @@ async function confirmarTomaMedicamento(doseId, planId) {
 
         if (resp.ok) {
             const data = await resp.json();
-            mostrarToast(data.mensaje || "¡Toma registrada con éxito!");
+            if (data.siguiente_dosis && data.siguiente_dosis.hora_programada) {
+                const sigDate = new Date(data.siguiente_dosis.hora_programada);
+                const horaStr = sigDate.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
+                mostrarToast(`¡Toma registrada! Próxima dosis (#${data.siguiente_dosis.numero_dosis}) programada a las ${horaStr}.`);
 
-            // Recargar o actualizar componentes en 800ms para efecto visual fluido
+                // Programar notificación en el celular vía Service Worker si tiene permisos
+                if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+                    const reg = await navigator.serviceWorker.ready;
+                    const sw = reg?.active || navigator.serviceWorker.controller;
+                    const delayMs = sigDate.getTime() - Date.now();
+                    if (sw && delayMs > 0) {
+                        sw.postMessage({
+                            type: 'SCHEDULE_DOSE_NOTIFICATION',
+                            title: `💊 Hora de pastilla para ${mascotaNombre}`,
+                            body: `Ya pasaron las horas indicadas. Le toca la Dosis #${data.siguiente_dosis.numero_dosis} de ${medNombre}.`,
+                            delayMs: delayMs,
+                            tag: `dosis-${data.siguiente_dosis.id}`,
+                            url: window.location.pathname
+                        });
+                    }
+                }
+            } else {
+                mostrarToast(data.mensaje || "¡Toma registrada con éxito!");
+            }
+
+            // Recargar o actualizar componentes en 1100ms para efecto visual fluido
             setTimeout(() => {
                 window.location.reload();
-            }, 900);
+            }, 1100);
         } else {
             const err = await resp.json();
             alert("Error: " + (err.detail || "No se pudo confirmar la toma."));
@@ -613,6 +696,71 @@ async function confirmarTomaMedicamento(doseId, planId) {
             btn.innerHTML = `<i data-lucide="check" class="w-5 h-5 mr-1" aria-hidden="true"></i><span>Ya se la di</span>`;
             window.initLucideIcons?.();
         }
+    }
+}
+
+async function reprogramarDosis(doseId, horaStr) {
+    try {
+        const resp = await fetch(`/api/medication/dose/${doseId}/reprogramar`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ hora: horaStr })
+        });
+        if (resp.ok) {
+            const data = await resp.json();
+            mostrarToast(`Horario ajustado a ${data.hora_formateada} (${data.turno})`);
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            const err = await resp.json();
+            alert("No se pudo ajustar la hora: " + (err.detail || "Intenta nuevamente."));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al ajustar el horario.");
+    }
+}
+
+async function activarNotificacionesCarnet() {
+    if (!('Notification' in window)) {
+        alert('Tu navegador no soporta notificaciones nativas. Agrega tu correo en "Mi Perfil" para recibir recordatorios.');
+        return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+        const txt = document.getElementById('txtActivarAlarmaCarnet');
+        const btn = document.getElementById('btnActivarAlarmaCarnet');
+        if (txt && btn) {
+            txt.textContent = 'Alertas activadas';
+            btn.classList.replace('bg-amber-50', 'bg-emerald-100');
+            btn.classList.replace('text-amber-900', 'text-emerald-900');
+        }
+        if ('serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.ready;
+            const sw = reg?.active || navigator.serviceWorker.controller;
+            if (sw) {
+                document.querySelectorAll('.dosis-pendiente-carnet').forEach(el => {
+                    const doseId = el.getAttribute('data-dose-id');
+                    const iso = el.getAttribute('data-dose-iso');
+                    const med = el.getAttribute('data-med') || 'medicamento';
+                    const mascota = el.getAttribute('data-mascota') || 'tu mascota';
+                    if (!iso) return;
+                    const delayMs = new Date(iso).getTime() - Date.now();
+                    if (delayMs <= 24 * 3600 * 1000) {
+                        sw.postMessage({
+                            type: 'SCHEDULE_DOSE_NOTIFICATION',
+                            title: `💊 Hora de pastilla para ${mascota}`,
+                            body: `Le toca su dosis de ${med}. Toca para abrir el carnet.`,
+                            delayMs: Math.max(delayMs, 1500),
+                            tag: `dosis-${doseId}`,
+                            url: window.location.pathname
+                        });
+                    }
+                });
+            }
+        }
+        mostrarToast('¡Notificaciones en celular activadas!');
+    } else {
+        alert('Permiso de notificaciones no concedido. Puedes agregar tu correo en "Mi Perfil" para recibir alertas.');
     }
 }
 

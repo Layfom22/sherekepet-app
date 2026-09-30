@@ -309,3 +309,200 @@ def send_appointment_notification_email(
     except Exception as e:
         logger.warning(f"Error enviando correo de cita por SMTP: {e}")
         return False
+
+
+def send_client_appointment_confirmation_email(
+    destinatario: str,
+    cliente_nombre: str,
+    mascota_nombre: str,
+    fecha_str: str,
+    hora_str: str,
+    motivo: str,
+    clinica_nombre: str
+) -> bool:
+    """Envía un correo de confirmación de cita al dueño de la mascota."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
+    asunto = f"Cita confirmada para {mascota_nombre} ({fecha_str} a las {hora_str})"
+
+    texto_plano = (
+        f"Hola {cliente_nombre},\n\n"
+        f"Tu cita para {mascota_nombre} en {clinica_nombre} ha quedado agendada.\n\n"
+        f"Detalles de la cita:\n"
+        f"- Mascota: {mascota_nombre}\n"
+        f"- Fecha: {fecha_str}\n"
+        f"- Hora: {hora_str}\n"
+        f"- Motivo: {motivo}\n\n"
+        f"Puedes revisar tu carnet y recordatorios en:\n"
+        f"https://sherekepet.com/portal/dashboard\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Confirmación de Cita</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 28px;">
+          <tr>
+            <td align="center" style="padding-bottom: 12px;">
+              <span style="display: inline-block; padding: 4px 12px; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                Cita Agendada
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <h2 style="margin: 0; color: #0f172a; font-size: 18px;">¡Hola {cliente_nombre}!</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: #64748b; line-height: 1.5; padding-bottom: 16px; text-align: center;">
+              Tu cita para <strong>{mascota_nombre}</strong> en <strong>{clinica_nombre}</strong> está registrada.
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px;">
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Mascota:</strong> {mascota_nombre}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Fecha:</strong> {fecha_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Hora:</strong> {hora_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Motivo:</strong> {motivo}</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 20px;">
+              <a href="https://sherekepet.com/portal/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #4f46e5; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
+                Abrir Mi Portal SherekePet
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "reply_to": "soporte@sherekepet.com",
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano,
+                "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando correo de confirmación a cliente con Resend: {e}")
+
+    return False
+
+
+def send_medication_reminder_email(
+    destinatario: str,
+    cliente_nombre: str,
+    mascota_nombre: str,
+    medicamento: str,
+    numero_dosis: int,
+    total_dosis: int,
+    hora_programada_str: str,
+    frecuencia_horas: int,
+    mascota_id: int
+) -> bool:
+    """Envía recordatorio / programación de la siguiente toma de medicamento al correo del dueño."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
+    esquema = "Mañana y Noche (cada 12h)" if frecuencia_horas == 12 else f"Cada {frecuencia_horas} horas"
+    asunto = f"💊 Próxima toma de {mascota_nombre}: {medicamento} a las {hora_programada_str}"
+
+    texto_plano = (
+        f"Hola {cliente_nombre},\n\n"
+        f"Recordatorio de medicación para {mascota_nombre}:\n"
+        f"- Medicamento: {medicamento}\n"
+        f"- Dosis pendiente: {numero_dosis} de {total_dosis}\n"
+        f"- Frecuencia: {esquema}\n"
+        f"- Próxima toma programada: {hora_programada_str}\n\n"
+        f"Cuando le des su pastilla, confirma la toma en tu carnet digital:\n"
+        f"https://sherekepet.com/portal/carnet/{mascota_id}\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Recordatorio de Medicación</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 28px;">
+          <tr>
+            <td align="center" style="padding-bottom: 12px;">
+              <span style="display: inline-block; padding: 4px 12px; background-color: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                💊 Recordatorio de Medicación
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <h2 style="margin: 0; color: #0f172a; font-size: 18px;">Próxima toma para {mascota_nombre}</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; padding: 16px; margin-top: 12px;">
+              <p style="margin: 4px 0; font-size: 14px; color: #0f766e;"><strong>Medicamento:</strong> {medicamento}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Dosis:</strong> {numero_dosis} de {total_dosis} ({esquema})</p>
+              <p style="margin: 8px 0 4px 0; font-size: 16px; font-weight: 800; color: #0f172a;">⏰ Hora Programada: {hora_programada_str}</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 20px;">
+              <a href="https://sherekepet.com/portal/carnet/{mascota_id}" style="display: inline-block; padding: 12px 24px; background-color: #059669; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
+                Confirmar Toma ("Ya se la di")
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "reply_to": "soporte@sherekepet.com",
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano,
+                "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando recordatorio de medicación con Resend: {e}")
+
+    return False
+

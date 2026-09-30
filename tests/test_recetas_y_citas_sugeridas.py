@@ -371,3 +371,145 @@ def test_carnet_atenciones_agrupadas_por_veterinario_ordenadas(client, db_sessio
     assert pos_roy < pos_carlos, "Dr. Roy debe aparecer primero porque atendió más recientemente"
     assert "Último Médico Tratante" in html
 
+
+def test_citas_pasadas_no_aparecen_en_proximas_citas_dashboard(client, db_session):
+    """
+    Validar que las citas cuya fecha ya pasó (ej. hace 8 días, como el 22 de septiembre)
+    NO aparezcan en la sección 'Mis Próximas Citas' del Dashboard del dueño,
+    mientras que las citas futuras sí aparezcan.
+    """
+    clinica = Clinica(nombre="RoyVetComercial", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    dueno = Cliente(clinica_id=clinica.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    db_session.add(dueno)
+    db_session.flush()
+
+    mascota = Mascota(clinica_id=clinica.id, cliente_id=dueno.id, nombre="Princesa", especie="Canino")
+    db_session.add(mascota)
+    db_session.flush()
+
+    hoy = get_lima_now().date()
+    cita_pasada = Cita(
+        clinica_id=clinica.id,
+        cliente_id=dueno.id,
+        mascota_id=mascota.id,
+        fecha=hoy - timedelta(days=8),
+        hora=time(10, 0),
+        motivo="Cita Pasada 22 Septiembre",
+        estado="PENDIENTE"
+    )
+    cita_futura = Cita(
+        clinica_id=clinica.id,
+        cliente_id=dueno.id,
+        mascota_id=mascota.id,
+        fecha=hoy + timedelta(days=3),
+        hora=time(16, 0),
+        motivo="Control Futuro Vigente",
+        estado="CONFIRMADA"
+    )
+    db_session.add_all([cita_pasada, cita_futura])
+    db_session.commit()
+
+    token = create_access_token(data={"sub": str(dueno.id), "role": "client"})
+    client.cookies.set("client_token", token)
+
+    resp = client.get("/portal/dashboard")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "Cita Pasada 22 Septiembre" not in html
+    assert "Control Futuro Vigente" in html
+
+
+def test_actualizar_correo_perfil_dueno_y_sincronizacion_dni(client, db_session):
+    """
+    Validar que el dueño pueda registrar/actualizar su correo electrónico en 'Editar Mi Perfil'
+    (PUT /api/portal/perfil) y que se sincronice en todas las clínicas donde tenga el mismo DNI.
+    """
+    c1 = Clinica(nombre="CITYVET", zona_horaria="America/Lima", plan_activo="solo")
+    c2 = Clinica(nombre="RoyVetComercial", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add_all([c1, c2])
+    db_session.flush()
+
+    dueno1 = Cliente(clinica_id=c1.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    dueno2 = Cliente(clinica_id=c2.id, dni="70566731", nombre_completo="Roger Cabezudo")
+    db_session.add_all([dueno1, dueno2])
+    db_session.commit()
+
+    token = create_access_token(data={"sub": str(dueno1.id), "role": "client"})
+    client.cookies.set("client_token", token)
+
+    resp = client.put("/api/portal/perfil", json={
+        "nombre_completo": "Roger Cabezudo",
+        "telefono": "+51 999888777",
+        "email": "roger.cabezudo@gmail.com"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["email"] == "roger.cabezudo@gmail.com"
+
+    db_session.expire_all()
+    d1_db = db_session.query(Cliente).filter(Cliente.id == dueno1.id).first()
+    d2_db = db_session.query(Cliente).filter(Cliente.id == dueno2.id).first()
+    assert d1_db.email == "roger.cabezudo@gmail.com"
+    assert d2_db.email == "roger.cabezudo@gmail.com"
+
+
+def test_reprogramar_dosis_manana_y_noche(client, db_session):
+    """
+    Validar que para pastillas de 2 veces al día (Mañana y Noche) o cualquier tratamiento activo,
+    el dueño pueda ajustar rápidamente la hora de la toma pendiente (ej. 08:00 Mañana o 20:00 Noche).
+    """
+    clinica = Clinica(nombre="RoyVet", zona_horaria="America/Lima", plan_activo="solo")
+    db_session.add(clinica)
+    db_session.flush()
+
+    dueno = Cliente(clinica_id=clinica.id, dni="70566731", nombre_completo="Roger Cabezudo", email="roger@test.com")
+    db_session.add(dueno)
+    db_session.flush()
+
+    mascota = Mascota(clinica_id=clinica.id, cliente_id=dueno.id, nombre="Princesa", especie="Canino")
+    db_session.add(mascota)
+    db_session.flush()
+
+    plan = MedicationPlan(
+        pet_id=mascota.id,
+        clinic_id=clinica.id,
+        medicamento="Prednisolona 20mg",
+        frecuencia_horas=12,
+        total_dosis=10,
+        es_estricto=False,
+        estado="ACTIVO"
+    )
+    db_session.add(plan)
+    db_session.flush()
+
+    dosis = DoseTracking(
+        plan_id=plan.id,
+        numero_dosis=1,
+        hora_programada=get_lima_now() + timedelta(hours=3),
+        estado="PENDIENTE"
+    )
+    db_session.add(dosis)
+    db_session.commit()
+
+    token = create_access_token(data={"sub": str(dueno.id), "role": "client"})
+    client.cookies.set("client_token", token)
+
+    # Ajustar a turno Mañana (08:00)
+    resp_manana = client.put(f"/api/medication/dose/{dosis.id}/reprogramar", json={"hora": "08:00"})
+    assert resp_manana.status_code == 200
+    data_m = resp_manana.json()
+    assert data_m["turno"] == "Mañana"
+    assert data_m["hora_formateada"] == "08:00 AM"
+
+    # Ajustar a turno Noche (20:00)
+    resp_noche = client.put(f"/api/medication/dose/{dosis.id}/reprogramar", json={"hora": "20:00"})
+    assert resp_noche.status_code == 200
+    data_n = resp_noche.json()
+    assert data_n["turno"] == "Noche"
+    assert data_n["hora_formateada"] == "08:00 PM"
+
+

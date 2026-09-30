@@ -101,14 +101,53 @@ self.addEventListener('push', event => {
     }
     const options = {
         body: data.body,
-        icon: 'https://img.icons8.com/fluency/192/veterinarian.png',
-        badge: 'https://img.icons8.com/fluency/192/veterinarian.png',
-        vibrate: [200, 100, 200],
-        data: { url: '/portal/dashboard' }
+        icon: '/static/img/icon-192.png',
+        badge: '/static/img/icon-192.png',
+        vibrate: [200, 100, 200, 100, 300],
+        tag: data.tag || 'sherekepet-med',
+        renotify: true,
+        data: { url: data.url || '/portal/dashboard' }
     };
     event.waitUntil(
         self.registration.showNotification(data.title, options)
     );
+});
+
+// Notificaciones programadas o disparadas desde la PWA en el celular
+self.addEventListener('message', event => {
+    if (!event.data) return;
+    if (event.data.type === 'SHOW_DOSE_NOTIFICATION') {
+        const title = event.data.title || '💊 Hora de Medicación - SherekePet';
+        const options = {
+            body: event.data.body || 'Tienes una dosis pendiente para tu mascota.',
+            icon: '/static/img/icon-192.png',
+            badge: '/static/img/icon-192.png',
+            vibrate: [250, 100, 250, 100, 350],
+            tag: event.data.tag || 'sherekepet-dose-alert',
+            renotify: true,
+            data: { url: event.data.url || '/portal/dashboard' }
+        };
+        event.waitUntil(self.registration.showNotification(title, options));
+    } else if (event.data.type === 'SCHEDULE_DOSE_NOTIFICATION') {
+        const delayMs = Math.max(0, Number(event.data.delayMs) || 0);
+        const title = event.data.title || '💊 Hora de Medicación - SherekePet';
+        const body = event.data.body || 'Es hora de suministrar la siguiente dosis a tu mascota.';
+        const url = event.data.url || '/portal/dashboard';
+        const tag = event.data.tag || 'sherekepet-scheduled-dose';
+        if (delayMs > 0 && delayMs <= 86400000) {
+            setTimeout(() => {
+                self.registration.showNotification(title, {
+                    body: body,
+                    icon: '/static/img/icon-192.png',
+                    badge: '/static/img/icon-192.png',
+                    vibrate: [250, 100, 250, 100, 350],
+                    tag: tag,
+                    renotify: true,
+                    data: { url: url }
+                });
+            }, delayMs);
+        }
+    }
 });
 
 self.addEventListener('notificationclick', event => {
@@ -187,6 +226,36 @@ def api_confirmar_toma(
     hora_real = payload.hora_real if payload else None
     dosis, siguiente = confirmar_toma(db=db, dose_id=id, hora_real=hora_real)
 
+    # Si se programó una siguiente dosis y el dueño tiene correo registrado, enviar recordatorio
+    if siguiente and dosis.plan and dosis.plan.mascota and dosis.plan.mascota.cliente:
+        try:
+            from app.core.email import send_medication_reminder_email
+            cli_dueno = dosis.plan.mascota.cliente
+            email_destino = cli_dueno.email
+            if not email_destino:
+                otro_c = db.query(Cliente).filter(
+                    Cliente.dni == cli_dueno.dni,
+                    Cliente.is_deleted == False,
+                    Cliente.email.isnot(None),
+                    Cliente.email != ""
+                ).first()
+                if otro_c:
+                    email_destino = otro_c.email
+            if email_destino:
+                send_medication_reminder_email(
+                    destinatario=email_destino,
+                    cliente_nombre=cli_dueno.nombre_completo or f"DNI {cli_dueno.dni}",
+                    mascota_nombre=dosis.plan.mascota.nombre,
+                    medicamento=dosis.plan.medicamento,
+                    numero_dosis=siguiente.numero_dosis,
+                    total_dosis=dosis.plan.total_dosis,
+                    hora_programada_str=siguiente.hora_programada.strftime("%I:%M %p (%d/%m/%Y)"),
+                    frecuencia_horas=dosis.plan.frecuencia_horas,
+                    mascota_id=dosis.plan.mascota.id
+                )
+        except Exception:
+            pass
+
     return ConfirmDoseResponse(
         dosis_confirmada_id=dosis.id,
         numero_dosis=dosis.numero_dosis,
@@ -195,6 +264,52 @@ def api_confirmar_toma(
         siguiente_dosis=DoseInfo.model_validate(siguiente) if siguiente else None,
         mensaje="¡Toma registrada con éxito!" if siguiente else "¡Felicidades! Tratamiento completado con éxito."
     )
+
+
+class ReprogramarDosisRequest(BaseModel):
+    hora: str  # "HH:MM", ej. "08:00" (Mañana) o "20:00" (Noche)
+
+
+@router.put(
+    "/api/medication/dose/{id}/reprogramar",
+    status_code=status.HTTP_200_OK,
+    summary="Ajustar hora de toma (ej. Turno Mañana 08:00 AM o Turno Noche 08:00 PM)"
+)
+def api_reprogramar_dosis(
+    id: int,
+    payload: ReprogramarDosisRequest,
+    db: Session = Depends(get_db)
+):
+    from app.core.timezone import LIMA_TZ
+    dosis = db.query(DoseTracking).filter(DoseTracking.id == id).first()
+    if not dosis or dosis.estado != "PENDIENTE":
+        raise HTTPException(status_code=404, detail="Dosis pendiente no encontrada.")
+
+    try:
+        partes = payload.hora.strip().split(":")
+        h, m = int(partes[0]), int(partes[1])
+    except Exception:
+        raise HTTPException(status_code=400, detail="Formato de hora inválido (use HH:MM).")
+
+    base_dt = dosis.hora_programada
+    if base_dt.tzinfo is None:
+        base_dt = base_dt.replace(tzinfo=LIMA_TZ)
+
+    nueva_dt = base_dt.replace(hour=h, minute=m, second=0, microsecond=0)
+    dosis.hora_programada = nueva_dt
+    db.commit()
+    db.refresh(dosis)
+
+    turno = "Mañana" if 6 <= h < 12 else ("Tarde" if 12 <= h < 19 else "Noche")
+
+    return {
+        "status": "ok",
+        "dosis_id": dosis.id,
+        "hora_programada": dosis.hora_programada.isoformat(),
+        "hora_formateada": dosis.hora_programada.strftime("%I:%M %p"),
+        "turno": turno,
+        "mensaje": f"Horario de toma ajustado a las {dosis.hora_programada.strftime('%I:%M %p')} ({turno})."
+    }
 
 
 @router.post(
@@ -461,6 +576,18 @@ def portal_dashboard(
 
         mascotas.append(principal)
 
+    # Unificar correo y teléfono entre sedes si el registro actual no los tiene
+    if not cliente.email or not cliente.telefono:
+        otros_registros = db.query(Cliente).filter(
+            Cliente.dni == cliente.dni,
+            Cliente.is_deleted == False
+        ).all()
+        for reg in otros_registros:
+            if not cliente.email and reg.email:
+                cliente.email = reg.email
+            if not cliente.telefono and reg.telefono:
+                cliente.telefono = reg.telefono
+
     # Obtener veterinarias asociadas al cliente y sus mascotas para agendamiento centralizado
     clinica_ids = {m.clinica_id for m in mascotas_raw}
     if cliente.clinica_id:
@@ -470,16 +597,25 @@ def portal_dashboard(
         Clinica.is_deleted == False
     ).all() if clinica_ids else []
 
-    # Citas agendadas vigentes del cliente (por DNI)
-    citas_cliente = db.query(Cita).join(Cliente).filter(
+    ahora_lima = get_lima_now()
+    hoy_lima = ahora_lima.date()
+    hora_actual = ahora_lima.time()
+
+    # Citas agendadas vigentes del cliente (por DNI) — excluir citas pasadas (fechas anteriores o horas de hoy que ya pasaron)
+    citas_raw = db.query(Cita).join(Cliente).filter(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"])
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
+    citas_cliente = [
+        c for c in citas_raw
+        if c.fecha > hoy_lima or (c.fecha == hoy_lima and (not c.hora or c.hora >= hora_actual))
+    ]
+
     # Citas sugeridas por la veterinaria (ej: Próximo Baño sugerido) para retención y confirmación móvil
-    hoy_lima = get_lima_now().date()
     citas_sugeridas = db.query(Cita).join(Cliente).filter(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
@@ -521,7 +657,7 @@ def portal_dashboard(
             "citas_cliente": citas_cliente,
             "citas_sugeridas": citas_sugeridas,
             "dosis_pendientes": dosis_pendientes,
-            "ahora": get_lima_now()
+            "ahora": ahora_lima
         }
     )
 
@@ -776,6 +912,7 @@ def actualizar_perfil_mascota(
 class ClientePerfilUpdateRequest(BaseModel):
     nombre_completo: Optional[str] = None
     telefono: Optional[str] = None
+    email: Optional[str] = None
 
 
 @router.put("/api/portal/perfil", summary="Actualizar Perfil del Dueño de Mascota")
@@ -788,10 +925,27 @@ def actualizar_perfil_cliente(
     if not cliente:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
-    if payload.nombre_completo is not None:
-        cliente.nombre_completo = payload.nombre_completo.strip()
-    if payload.telefono is not None:
-        cliente.telefono = payload.telefono.strip()
+    email_limpio = None
+    if payload.email is not None:
+        email_limpio = payload.email.strip().lower()
+        if email_limpio and "@" not in email_limpio:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ingrese un correo electrónico válido.")
+
+    # Sincronizar los datos de contacto en todas las clínicas asociadas a este mismo DNI
+    registros_dni = db.query(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False
+    ).all()
+    if not registros_dni:
+        registros_dni = [cliente]
+
+    for reg in registros_dni:
+        if payload.nombre_completo is not None and payload.nombre_completo.strip():
+            reg.nombre_completo = payload.nombre_completo.strip()
+        if payload.telefono is not None:
+            reg.telefono = payload.telefono.strip() if payload.telefono.strip() else None
+        if payload.email is not None:
+            reg.email = email_limpio if email_limpio else None
 
     db.commit()
     db.refresh(cliente)
@@ -801,6 +955,7 @@ def actualizar_perfil_cliente(
         "cliente_id": cliente.id,
         "nombre_completo": cliente.nombre_completo,
         "telefono": cliente.telefono,
+        "email": cliente.email,
         "dni": cliente.dni
     }
 
@@ -1126,9 +1281,9 @@ def agendar_cita_portal(
     db.commit()
     db.refresh(nueva_cita)
 
-    # Notificación por correo a los veterinarios de la clínica
+    # Notificación por correo a los veterinarios de la clínica y confirmación al dueño
     try:
-        from app.core.email import send_appointment_notification_email
+        from app.core.email import send_appointment_notification_email, send_client_appointment_confirmation_email
         from app.clinic.models import Veterinario
         vets = db.query(Veterinario).filter(
             Veterinario.clinica_id == payload.clinica_id,
@@ -1146,8 +1301,18 @@ def agendar_cita_portal(
                     motivo=nueva_cita.motivo,
                     clinica_nombre=clinica.nombre_comercial or clinica.nombre
                 )
-    except Exception as mail_err:
-        logger.warning(f"Aviso de cita por correo omitido o fallido: {mail_err}")
+        if cliente.email:
+            send_client_appointment_confirmation_email(
+                destinatario=cliente.email,
+                cliente_nombre=cliente.nombre_completo or f"DNI {cliente.dni}",
+                mascota_nombre=mascota.nombre,
+                fecha_str=nueva_cita.fecha.strftime("%d/%m/%Y"),
+                hora_str=nueva_cita.hora.strftime("%I:%M %p"),
+                motivo=nueva_cita.motivo,
+                clinica_nombre=clinica.nombre_comercial or clinica.nombre
+            )
+    except Exception:
+        pass
 
     return {
         "mensaje": "¡Cita agendada exitosamente!",
@@ -1232,6 +1397,21 @@ def confirmar_cita_sugerida(
 
     db.commit()
     db.refresh(cita)
+
+    try:
+        if cliente.email and cita.mascota and cita.clinica:
+            from app.core.email import send_client_appointment_confirmation_email
+            send_client_appointment_confirmation_email(
+                destinatario=cliente.email,
+                cliente_nombre=cliente.nombre_completo or f"DNI {cliente.dni}",
+                mascota_nombre=cita.mascota.nombre,
+                fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                hora_str=cita.hora.strftime("%I:%M %p"),
+                motivo=cita.motivo,
+                clinica_nombre=cita.clinica.nombre_comercial or cita.clinica.nombre
+            )
+    except Exception:
+        pass
 
     return {
         "status": "ok",

@@ -57,12 +57,28 @@ async def enviar_alerta_paciente(cita_id: int, destinatario_email: str) -> Optio
         if settings.RESEND_API_KEY:
             resend.api_key = settings.RESEND_API_KEY
 
+        import uuid
+        hora_txt = cita.hora.strftime('%H:%M') if cita.hora and hasattr(cita.hora, 'strftime') else str(cita.hora)
+        texto_plano = (
+            f"Recordatorio de Cita Médica Confirmada - {nombre_emisor}\n\n"
+            f"Paciente: {mascota.nombre}\n"
+            f"Fecha: {cita.fecha}\n"
+            f"Hora: {hora_txt}\n"
+            f"Motivo: {cita.motivo}\n\n"
+            f"Recomendación: Llegar con 10 minutos de anticipación.\n\n"
+            f"Este recordatorio médico fue enviado a través de SherekePet, "
+            f"la plataforma tecnológica de {nombre_emisor}. Por favor, no respondas a este correo."
+        )
+
         # 6. Construir y enviar el payload con resend.Emails.send()
         payload = {
             "from": from_email,
             "to": [destinatario_email],
+            "reply_to": "soporte@sherekepet.com",
             "subject": subject,
-            "html": html_content
+            "html": html_content,
+            "text": texto_plano,
+            "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
         }
 
         try:

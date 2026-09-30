@@ -37,7 +37,7 @@ def get_google_redirect_uri(request: Request) -> str:
 
     host = request.headers.get("x-forwarded-host") or request.headers.get("host") or "localhost:8000"
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme
-    if "onrender.com" in host or "https" in str(request.base_url):
+    if "onrender.com" in host or "sherekepet.com" in host or "https" in str(request.base_url):
         proto = "https"
 
     return f"{proto}://{host}/auth/google/callback"

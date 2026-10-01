@@ -53,6 +53,19 @@
                         {% endfor %}
                     </div>
                     {% endif %}
+
+                    <!-- Interruptor Global Único de Notificaciones (para todas las citas y pastillas) -->
+                    <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+                        <button 
+                            type="button" 
+                            id="btnToggleAlertasGlobales"
+                            onclick="alternarAlertasGlobalesCelular()"
+                            class="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs inline-flex items-center space-x-1.5 transition-all"
+                        >
+                            <i id="iconoAlertasGlobales" data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600 shrink-0" aria-hidden="true"></i>
+                            <span id="txtAlertasGlobales">Activar alertas en celular (Citas y Pastillas)</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -178,15 +191,6 @@
                 <span>Mis Próximas Citas</span>
             </h2>
             <div class="flex items-center gap-2">
-                <button 
-                    type="button" 
-                    onclick="activarNotificacionesCelular()"
-                    class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 inline-flex items-center space-x-1 transition-all"
-                    title="Recibir alerta en mi celular cuando el veterinario confirme"
-                >
-                    <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
-                    <span class="txtEstadoNotifCitas">Avisarme en celular</span>
-                </button>
                 <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                     {{ citas_cliente|length }} agendada{{ 's' if citas_cliente|length != 1 else '' }}
                 </span>
@@ -257,15 +261,6 @@
                 <i data-lucide="pill" class="w-5 h-5 text-amber-600 shrink-0 animate-bounce" aria-hidden="true"></i>
                 <h2 class="text-sm font-black uppercase tracking-wide">¡Medicina Pendiente!</h2>
             </div>
-            <button 
-                type="button" 
-                id="btnActivarAlarmaPwa"
-                onclick="activarNotificacionesCelular()"
-                class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs inline-flex items-center space-x-1 transition-all"
-            >
-                <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-amber-600" aria-hidden="true"></i>
-                <span id="txtActivarAlarmaPwa">Notificar en mi celular</span>
-            </button>
         </div>
         {% for item in dosis_pendientes %}
         {% set hora_h = item.dosis.hora_programada.hour %}
@@ -1020,6 +1015,17 @@ async function enviarAgendarCita(e) {
         return;
     }
 
+    // Solicitar consentimiento de notificaciones automáticamente al agendar (solo si aún no se ha concedido)
+    if ('Notification' in window && Notification.permission === 'default') {
+        try {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+                localStorage.removeItem('sherekepet_alertas_pausadas');
+                actualizarEstadoBotonAlarma();
+            }
+        } catch (_) {}
+    }
+
     const btn = document.getElementById("btnConfirmarCita");
     if (btn) {
         btn.disabled = true;
@@ -1043,7 +1049,7 @@ async function enviarAgendarCita(e) {
 
         if (resp.ok) {
             cerrarModalAgendarCita();
-            mostrarToast("¡Cita agendada con éxito!");
+            mostrarToast("¡Cita agendada! Te avisaremos apenas el veterinario confirme.");
             setTimeout(() => {
                 window.location.reload();
             }, 700);
@@ -1265,6 +1271,17 @@ async function confirmarCitaSugerida(citaId) {
         return;
     }
 
+    // Pedir consentimiento de notificaciones automáticamente al confirmar cita si aún no ha respondido
+    if ('Notification' in window && Notification.permission === 'default') {
+        try {
+            const perm = await Notification.requestPermission();
+            if (perm === 'granted') {
+                localStorage.removeItem('sherekepet_alertas_pausadas');
+                actualizarEstadoBotonAlarma();
+            }
+        } catch (_) {}
+    }
+
     if (btn) {
         btn.disabled = true;
         btn.classList.add('opacity-75');
@@ -1336,25 +1353,63 @@ async function descartarCitaSugerida(citaId) {
     }
 }
 
-// Notificaciones Móviles PWA para Recordatorios de Pastillas y Confirmación de Citas
+// Notificaciones Móviles Globales PWA (Citas y Recordatorios de Pastillas)
+function sonAlertasGlobalesActivas() {
+    return ('Notification' in window) &&
+           Notification.permission === 'granted' &&
+           localStorage.getItem('sherekepet_alertas_pausadas') !== '1';
+}
+
 function actualizarEstadoBotonAlarma() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-        const txt = document.getElementById('txtActivarAlarmaPwa');
-        const btn = document.getElementById('btnActivarAlarmaPwa');
-        if (txt && btn) {
-            txt.textContent = 'Alertas activadas en celular';
-            btn.classList.remove('bg-white', 'text-amber-900', 'border-amber-300');
-            btn.classList.add('bg-emerald-100', 'text-emerald-900', 'border-emerald-300');
-        }
-        document.querySelectorAll('.txtEstadoNotifCitas').forEach(el => {
-            el.textContent = 'Alertas activadas';
-        });
+    const btnGlobal = document.getElementById('btnToggleAlertasGlobales');
+    const txtGlobal = document.getElementById('txtAlertasGlobales');
+    if (!btnGlobal || !txtGlobal) return;
+
+    if (!('Notification' in window)) {
+        txtGlobal.textContent = 'Sin soporte de alertas en este navegador';
+        return;
+    }
+
+    const pausadas = localStorage.getItem('sherekepet_alertas_pausadas') === '1';
+
+    if (Notification.permission === 'granted' && !pausadas) {
+        txtGlobal.textContent = 'Alertas activas para todo (Toca para desactivar)';
+        btnGlobal.className = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm border bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700/50 hover:bg-emerald-100';
+    } else if (Notification.permission === 'granted' && pausadas) {
+        txtGlobal.textContent = 'Alertas desactivadas (Toca para reactivar)';
+        btnGlobal.className = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm border bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-200';
+    } else {
+        txtGlobal.textContent = 'Activar alertas en celular (Citas y Pastillas)';
+        btnGlobal.className = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm border bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-700/50 hover:bg-amber-100';
     }
 }
 
+async function alternarAlertasGlobalesCelular() {
+    if (!('Notification' in window)) {
+        alert('Tu navegador no soporta notificaciones nativas. Te recomendamos agregar tu correo en "Mi Perfil" para recibir recordatorios.');
+        return;
+    }
+
+    if (Notification.permission === 'granted') {
+        const pausadas = localStorage.getItem('sherekepet_alertas_pausadas') === '1';
+        if (pausadas) {
+            localStorage.removeItem('sherekepet_alertas_pausadas');
+            actualizarEstadoBotonAlarma();
+            await programarAlarmasDosisPendientes(true);
+            mostrarToast('🔔 ¡Alertas reactivadas para todas tus citas y pastillas!');
+        } else {
+            localStorage.setItem('sherekepet_alertas_pausadas', '1');
+            actualizarEstadoBotonAlarma();
+            mostrarToast('🔕 Alertas en celular pausadas. Puedes reactivarlas cuando quieras.');
+        }
+        return;
+    }
+
+    await activarNotificacionesCelular();
+}
+
 async function lanzarNotificacionNativaCitaConfirmada(cita) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!sonAlertasGlobalesActivas()) return;
     try {
         const reg = await navigator.serviceWorker?.ready;
         const sw = reg?.active || navigator.serviceWorker?.controller;
@@ -1424,7 +1479,7 @@ async function verificarEstadoCitasEnTiempoReal() {
 }
 
 async function programarAlarmasDosisPendientes(forzarNotificacionPrueba = false) {
-    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    if (!sonAlertasGlobalesActivas()) return;
     const reg = await navigator.serviceWorker?.ready;
     const sw = reg?.active || navigator.serviceWorker?.controller;
     if (!sw) return;
@@ -1457,8 +1512,8 @@ async function programarAlarmasDosisPendientes(forzarNotificacionPrueba = false)
     if (forzarNotificacionPrueba) {
         sw.postMessage({
             type: 'SHOW_DOSE_NOTIFICATION',
-            title: '🔔 ¡Alertas de Citas y Pastillas activadas!',
-            body: 'Tu celular te avisará cuando el veterinario confirme tu cita o le toque medicina a tu mascota.',
+            title: '🔔 ¡Alertas activadas para todo!',
+            body: 'Tu celular te avisará automáticamente para todas tus citas y recordatorios de pastillas.',
             tag: 'sherekepet-test-alarm',
             url: '/portal/dashboard'
         });
@@ -1472,9 +1527,10 @@ async function activarNotificacionesCelular() {
     }
     const perm = await Notification.requestPermission();
     if (perm === 'granted') {
+        localStorage.removeItem('sherekepet_alertas_pausadas');
         actualizarEstadoBotonAlarma();
         await programarAlarmasDosisPendientes(true);
-        mostrarToast('¡Notificaciones de citas y pastillas activadas!');
+        mostrarToast('¡Alertas activadas para todas tus citas y pastillas!');
     } else {
         alert('Permiso de notificaciones denegado. Puedes activarlo en la configuración del navegador o agregar tu correo en "Mi Perfil".');
     }

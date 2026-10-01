@@ -74,7 +74,7 @@
     {% endif %}
 
     <!-- Tarjetas de Métricas Rápidas del Día -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3.5">
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
             <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Total Citas</span>
             <p class="text-2xl font-black text-slate-900 mt-0.5">{{ total_hoy }}</p>
@@ -87,7 +87,11 @@
             <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block">Confirmadas</span>
             <p class="text-2xl font-black text-emerald-800 mt-0.5">{{ total_confirmadas }}</p>
         </div>
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+        <div class="bg-white p-4 rounded-2xl border border-teal-200 bg-teal-50/40 shadow-2xs">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-teal-700 block">Atendidas</span>
+            <p class="text-2xl font-black text-teal-800 mt-0.5">{{ total_atendidas or 0 }}</p>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs col-span-2 sm:col-span-1">
             <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">Canceladas</span>
             <p class="text-2xl font-black text-slate-500 mt-0.5">{{ total_canceladas }}</p>
         </div>
@@ -95,23 +99,26 @@
 
     <!-- Lista Cronológica de Citas -->
     <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
             <h2 class="text-base font-bold text-slate-900 flex items-center gap-2">
                 <i data-lucide="clock-3" class="w-5 h-5 text-slate-700" aria-hidden="true"></i>
                 <span>Citas para el {{ fecha_seleccionada.strftime('%d/%m/%Y') }}</span>
             </h2>
-            <span class="text-xs text-slate-400 font-medium">Orden cronológico</span>
+            <span class="text-xs text-slate-400 font-medium">Las citas ya atendidas se muestran al final durante el resto del día</span>
         </div>
 
         {% if citas %}
         <div class="divide-y divide-slate-100">
             {% for c in citas %}
-            <div id="cita-row-{{ c.id }}" class="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {% set estado_up = (c.estado or '')|upper %}
+            {% set es_atendida = estado_up in ['ATENDIDA', 'ATENDIDO', 'COMPLETADA'] %}
+            {% set es_cancelada = estado_up == 'CANCELADA' %}
+            <div id="cita-row-{{ c.id }}" class="p-4 sm:p-5 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 {% if es_atendida %}bg-slate-50/80 opacity-80{% elif es_cancelada %}bg-rose-50/20 opacity-65{% else %}hover:bg-slate-50/70{% endif %}">
                 
                 <!-- Hora y Mascota -->
                 <div class="flex items-start sm:items-center space-x-4 min-w-0">
                     <!-- Badge Hora Exacta -->
-                    <div class="w-16 h-14 rounded-2xl bg-teal-50 border border-teal-200 flex flex-col items-center justify-center text-teal-800 shrink-0 font-mono">
+                    <div class="w-16 h-14 rounded-2xl {% if es_atendida %}bg-slate-100 border-slate-200 text-slate-600{% else %}bg-teal-50 border-teal-200 text-teal-800{% endif %} border flex flex-col items-center justify-center shrink-0 font-mono">
                         <span class="text-sm font-black">{{ c.hora.strftime('%I:%M') }}</span>
                         <span class="text-[10px] font-bold uppercase">{{ c.hora.strftime('%p') }}</span>
                     </div>
@@ -128,7 +135,7 @@
                         </div>
 
                         <div class="min-w-0">
-                            <a href="/pacientes/{{ c.mascota.id }}" class="text-sm font-black text-slate-900 hover:text-teal-700 transition-colors truncate block">
+                            <a id="link-mascota-{{ c.id }}" href="/pacientes/{{ c.mascota.id }}" class="text-sm font-black text-slate-900 hover:text-teal-700 transition-colors truncate block">
                                 {{ c.mascota.nombre }}
                             </a>
                             <p class="text-xs text-slate-500 truncate">
@@ -168,36 +175,49 @@
                 </div>
 
                 <!-- Estado y Botones de Acción -->
-                <div class="flex items-center space-x-2 sm:self-center shrink-0">
-                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if c.estado|upper == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif c.estado|upper == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                <div class="flex items-center gap-2 sm:self-center shrink-0 flex-wrap">
+                    {% if es_atendida %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-extrabold uppercase tracking-wider px-3 py-1 rounded-full bg-teal-50 text-teal-800 border border-teal-200 inline-flex items-center gap-1">
+                        <i data-lucide="check-check" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                        <span>Atendido</span>
+                    </span>
+                    <a 
+                        href="/pacientes/{{ c.mascota.id }}" 
+                        class="btn-touch px-3 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all inline-flex items-center gap-1.5"
+                        title="Ver historial clínico de la mascota"
+                    >
+                        <i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500" aria-hidden="true"></i>
+                        <span>Ver Ficha</span>
+                    </a>
+                    {% else %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if estado_up == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif es_cancelada %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                         {{ c.estado }}
                     </span>
 
-                    {% if c.estado|upper != 'CONFIRMADA' %}
+                    {% if estado_up == 'PENDIENTE' %}
                     <button 
                         type="button" 
                         id="btn-confirmar-{{ c.id }}"
                         onclick="cambiarEstadoCita({{ c.id }}, 'confirmar')"
                         class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-xs transition-all flex items-center space-x-1"
-                        title="Confirmar cita"
+                        title="Confirmar cita y vincular mascota a tu clínica"
                     >
                         <i data-lucide="check" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         <span>Confirmar</span>
                     </button>
                     {% endif %}
 
-                    {% if 'vacun' in c.motivo.lower() %}
+                    {% if not es_cancelada %}
                     <a 
-                        href="/pacientes/{{ c.mascota.id }}?atencion=vacunacion" 
-                        class="btn-touch px-3 py-1.5 text-xs font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition-all inline-flex items-center gap-1"
-                        title="Digitalizar dosis de vacuna en el carnet"
+                        id="btn-atender-{{ c.id }}"
+                        href="/pacientes/{{ c.mascota.id }}?atender_cita={{ c.id }}&motivo={{ c.motivo|urlencode }}" 
+                        class="btn-touch px-3.5 py-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5"
+                        title="Abrir ficha de la mascota y registrar su atención médica"
                     >
-                        <i data-lucide="syringe" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
-                        <span class="hidden sm:inline">Vacuna</span>
+                        <i data-lucide="stethoscope" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                        <span>Atender Paciente</span>
                     </a>
-                    {% endif %}
 
-                    {% if c.estado != 'CANCELADA' %}
                     <button 
                         type="button" 
                         id="btn-cancelar-{{ c.id }}"
@@ -208,6 +228,7 @@
                         <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         <span>Cancelar</span>
                     </button>
+                    {% endif %}
                     {% endif %}
                 </div>
 
@@ -284,16 +305,14 @@
                     <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full {% if pc.estado|upper == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif pc.estado|upper == 'CANCELADA' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
                         {{ pc.estado }}
                     </span>
-                    {% if 'vacun' in pc.motivo.lower() %}
                     <a 
-                        href="/pacientes/{{ pc.mascota.id }}?atencion=vacunacion" 
-                        class="btn-touch px-2.5 py-1 text-[11px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-lg inline-flex items-center gap-1"
-                        title="Digitalizar dosis de vacuna en el carnet"
+                        href="/pacientes/{{ pc.mascota.id }}?atender_cita={{ pc.id }}&motivo={{ pc.motivo|urlencode }}" 
+                        class="btn-touch px-2.5 py-1 text-[11px] font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg inline-flex items-center gap-1"
+                        title="Abrir ficha y registrar atención"
                     >
-                        <i data-lucide="syringe" class="w-3.5 h-3.5 text-teal-600"></i>
-                        <span>Vacunar</span>
+                        <i data-lucide="stethoscope" class="w-3.5 h-3.5"></i>
+                        <span>Atender</span>
                     </a>
-                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -332,6 +351,16 @@ async function cambiarEstadoCita(citaId, accion) {
             const badge = document.getElementById(`badge-estado-${citaId}`);
             const btnConfirmar = document.getElementById(`btn-confirmar-${citaId}`);
             const btnCancelar = document.getElementById(`btn-cancelar-${citaId}`);
+            const btnAtender = document.getElementById(`btn-atender-${citaId}`);
+            const linkMascota = document.getElementById(`link-mascota-${citaId}`);
+
+            if (data.mascota_id) {
+                if (linkMascota) linkMascota.href = `/pacientes/${data.mascota_id}`;
+                if (btnAtender) {
+                    const urlObj = new URL(btnAtender.href, window.location.origin);
+                    btnAtender.href = `/pacientes/${data.mascota_id}${urlObj.search}`;
+                }
+            }
 
             if (badge) {
                 badge.textContent = data.estado;
@@ -343,6 +372,7 @@ async function cambiarEstadoCita(citaId, accion) {
                     badge.className = "text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200";
                     if (btnCancelar) btnCancelar.remove();
                     if (btnConfirmar) btnConfirmar.remove();
+                    if (btnAtender) btnAtender.remove();
                 }
             }
         } else {

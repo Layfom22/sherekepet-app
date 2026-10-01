@@ -635,6 +635,8 @@ const CATALOGO_VACUNAS = {
     "KC / Tos de las Perreras": ["Bordetella bronchiseptica", "Parainfluenza"]
 };
 
+let citaIdDesdeAgenda = null;
+
 function abrirModalAtencion() {
     const modal = document.getElementById('modalAtencion');
     modal.classList.remove('hidden');
@@ -648,6 +650,41 @@ function abrirModalAtencion() {
 function cerrarModalAtencion() {
     document.getElementById('modalAtencion').classList.add('hidden');
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const atenderCita = params.get('atender_cita');
+    const motivoCita = params.get('motivo');
+    const atencionParam = params.get('atencion');
+
+    if (atenderCita || atencionParam) {
+        if (atenderCita) {
+            citaIdDesdeAgenda = atenderCita;
+        }
+        const inputMotivo = document.getElementById('motivo');
+        if (motivoCita && inputMotivo) {
+            inputMotivo.value = motivoCita;
+        }
+
+        const selectTipo = document.getElementById('tipo_atencion');
+        const textoRef = ((motivoCita || '') + ' ' + (atencionParam || '')).toLowerCase();
+        if (selectTipo) {
+            if (textoRef.includes('vacun')) {
+                selectTipo.value = 'VACUNACION';
+            } else if (textoRef.includes('baño') || textoRef.includes('bano') || textoRef.includes('grooming') || textoRef.includes('corte')) {
+                selectTipo.value = 'GROOMING';
+            } else if (textoRef.includes('desparasit') || textoRef.includes('antipulga')) {
+                selectTipo.value = 'DESPARASITACION';
+            } else if (textoRef.includes('cirug') || textoRef.includes('esteriliz') || textoRef.includes('castrac')) {
+                selectTipo.value = 'CIRUGIA';
+            } else {
+                selectTipo.value = 'CONSULTA';
+            }
+            toggleCamposVacuna();
+        }
+        abrirModalAtencion();
+    }
+});
 
 let misProductosAtencion = [];
 let misProductosCargados = false;
@@ -872,7 +909,8 @@ document.getElementById('formAtencion').addEventListener('submit', async functio
         receta_medicamento: med || null,
         receta_frecuencia: frec || null,
         receta_dosis: dosis || null,
-        servicio_bano_id: servicioBanoId
+        servicio_bano_id: servicioBanoId,
+        cita_id: citaIdDesdeAgenda ? parseInt(citaIdDesdeAgenda) : null
     };
 
     try {
@@ -884,11 +922,14 @@ document.getElementById('formAtencion').addEventListener('submit', async functio
 
         if (resp.ok) {
             const dataAtencion = await resp.json();
+            if (window.location.search) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
             if (payload.tipo_atencion === 'GROOMING') {
                 cerrarModalAtencion();
                 abrirModalRetencionBano();
             } else {
-                window.location.reload();
+                window.location.href = window.location.pathname;
             }
         } else {
             const err = await resp.json();

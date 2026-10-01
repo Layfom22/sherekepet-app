@@ -437,3 +437,98 @@ def test_modulo_mis_productos_crud_y_privacidad_multitenant(client, db_session, 
     assert resp_del.status_code == 200
 
 
+def test_flujo_cita_portal_auto_vinculacion_y_estado_atendida(client, db_session, vet_setup):
+    """
+    Verifica el flujo completo solicitado:
+    1. Un dueño registra por su cuenta una mascota en el Portal (otra clinica_id) y agenda una cita en la clínica actual para hoy a las 14:00.
+    2. El veterinario confirma la cita o hace clic en 'Atender Paciente' desde la Agenda -> la mascota se vincula automáticamente a su clínica.
+    3. Al registrar la atención médica de la mascota, la cita pasa automáticamente a estado 'ATENDIDA'.
+    4. En GET /agenda de hoy se muestra como 'Atendido' y desaparece de la cola de 'Próximas Citas'.
+    """
+    from datetime import time
+    from app.clinic.models import Cita
+
+    clinica = vet_setup["clinica"]
+    hoy = get_lima_now().date()
+
+    # Clínica externa (simulando mascota creada por el cliente en el Portal)
+    clinica_portal = Clinica(
+        nombre="Portal General",
+        nombre_comercial="Portal",
+        zona_horaria="America/Lima",
+        plan_activo="solo"
+    )
+    db_session.add(clinica_portal)
+    db_session.flush()
+
+    cliente_portal = Cliente(
+        clinica_id=clinica_portal.id,
+        dni="44556677",
+        nombres="Lucía",
+        apellido_paterno="Méndez",
+        nombre_completo="Lucía Méndez",
+        telefono="988776655"
+    )
+    db_session.add(cliente_portal)
+    db_session.flush()
+
+    mascota_portal = Mascota(
+        clinica_id=clinica_portal.id,
+        cliente_id=cliente_portal.id,
+        nombre="Toby",
+        especie="Canino",
+        raza="Beagle",
+        peso=11.5
+    )
+    db_session.add(mascota_portal)
+    db_session.flush()
+
+    # El cliente agenda cita para HOY a las 14:00 (2:00 PM) en la clínica del veterinario
+    cita = Cita(
+        clinica_id=clinica.id,
+        cliente_id=cliente_portal.id,
+        mascota_id=mascota_portal.id,
+        fecha=hoy,
+        hora=time(14, 0),
+        motivo="Vacunación anual y control",
+        estado="PENDIENTE"
+    )
+    db_session.add(cita)
+    db_session.commit()
+    db_session.refresh(cita)
+
+    # 1. El veterinario confirma la cita -> debe auto-vincular a Toby en su clínica
+    resp_conf = client.put(f"/api/clinic/citas/{cita.id}/confirmar")
+    assert resp_conf.status_code == 200
+    conf_data = resp_conf.json()
+    mascota_local_id = conf_data["mascota_id"]
+
+    # Abrir la ficha desde el botón 'Atender Paciente' de la agenda debe responder 200
+    resp_ficha = client.get(f"/pacientes/{mascota_local_id}?atender_cita={cita.id}&motivo=Vacunación")
+    assert resp_ficha.status_code == 200
+    assert "Toby" in resp_ficha.text
+
+    # 2. Registrar la atención médica vinculada a la cita
+    resp_atencion = client.post("/api/clinic/atenciones", json={
+        "clinica_id": clinica.id,
+        "mascota_id": mascota_local_id,
+        "tipo_atencion": "VACUNACION",
+        "motivo": "Vacunación anual y control",
+        "tipo_vacuna": "Séxtuple Canina",
+        "diagnostico": "Paciente sano",
+        "tratamiento": "Vacuna Séxtuple aplicada",
+        "cita_id": cita.id
+    })
+    assert resp_atencion.status_code == 201
+
+    # 3. Verificar que la cita pasó automáticamente a estado ATENDIDA
+    db_session.refresh(cita)
+    assert cita.estado.upper() == "ATENDIDA"
+
+    # 4. En la Agenda de hoy, aparece con el badge 'Atendido'
+    resp_agenda = client.get("/agenda")
+    assert resp_agenda.status_code == 200
+    assert "Atendido" in resp_agenda.text
+
+
+

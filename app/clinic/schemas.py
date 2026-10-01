@@ -123,6 +123,7 @@ class AtencionCreateRequest(BaseModel):
 
     # Mini-ERP: Selección de Tipo de Baño para descuento de stock
     servicio_bano_id: Optional[int] = Field(None, description="ID del servicio de baño para descontar insumo")
+    cita_id: Optional[int] = Field(None, description="ID de la cita asociada para marcarla como ATENDIDA automáticamente")
 
     @field_validator("tipo_atencion")
     @classmethod

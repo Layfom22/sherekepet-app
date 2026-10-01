@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status, Body, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_, func
+from sqlalchemy import or_, and_, func
 from sqlalchemy.orm import Session
 
 from app.core.timezone import get_lima_now
@@ -1024,6 +1024,92 @@ def buscar_cliente_global_por_dni(
     }
 
 
+def _asegurar_mascota_local_clinica(
+    db: Session,
+    mascota_id: int,
+    target_clinica_id: int
+) -> Optional[Mascota]:
+    """
+    Asegura que una mascota (creada por el dueño en el Portal o en otra sede)
+    tenga su ficha y propietario vinculados en `target_clinica_id`, actualizando
+    cualquier cita de esta clínica para apuntar a la ficha local.
+    """
+    mascota_original = db.query(Mascota).filter(
+        Mascota.id == mascota_id,
+        Mascota.is_deleted == False
+    ).first()
+    if not mascota_original:
+        return None
+
+    if mascota_original.clinica_id == target_clinica_id:
+        return mascota_original
+
+    cliente_original = mascota_original.cliente
+    cliente_local = db.query(Cliente).filter(
+        Cliente.clinica_id == target_clinica_id,
+        Cliente.dni == cliente_original.dni,
+        Cliente.is_deleted == False
+    ).first()
+
+    if not cliente_local:
+        cliente_local = Cliente(
+            clinica_id=target_clinica_id,
+            dni=cliente_original.dni,
+            nombre_completo=cliente_original.nombre_completo,
+            telefono=cliente_original.telefono,
+            email=cliente_original.email,
+            nombres=cliente_original.nombres,
+            apellido_paterno=cliente_original.apellido_paterno,
+            apellido_materno=cliente_original.apellido_materno,
+            pin_hash=cliente_original.pin_hash
+        )
+        db.add(cliente_local)
+        db.flush()
+
+    mascota_local = db.query(Mascota).filter(
+        Mascota.clinica_id == target_clinica_id,
+        Mascota.cliente_id == cliente_local.id,
+        func.lower(func.trim(Mascota.nombre)) == mascota_original.nombre.strip().lower(),
+        Mascota.is_deleted == False
+    ).first()
+
+    if not mascota_local:
+        mascota_local = Mascota(
+            clinica_id=target_clinica_id,
+            cliente_id=cliente_local.id,
+            especie_id=mascota_original.especie_id,
+            raza_id=mascota_original.raza_id,
+            nombre=mascota_original.nombre,
+            especie=mascota_original.especie,
+            raza=mascota_original.raza,
+            sexo=mascota_original.sexo,
+            fecha_nacimiento=mascota_original.fecha_nacimiento,
+            peso=mascota_original.peso,
+            foto_url=mascota_original.foto_url,
+            rasgos_distintivos=mascota_original.rasgos_distintivos,
+            alergias=mascota_original.alergias,
+            tiene_alergias=mascota_original.tiene_alergias,
+            detalle_alergias=mascota_original.detalle_alergias,
+            condiciones_previas=mascota_original.condiciones_previas
+        )
+        db.add(mascota_local)
+        db.flush()
+
+    # Actualizar citas de esta clínica que apuntaban al ID externo para que apunten a la ficha local
+    citas_ext = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.mascota_id == mascota_original.id,
+        Cita.is_deleted == False
+    ).all()
+    for c_item in citas_ext:
+        c_item.mascota_id = mascota_local.id
+        c_item.cliente_id = cliente_local.id
+
+    db.commit()
+    db.refresh(mascota_local)
+    return mascota_local
+
+
 @router.post(
     "/api/clinic/vincular-mascota/{mascota_id}",
     summary="Vincular Mascota Existente a Clínica Actual",
@@ -1038,79 +1124,13 @@ def vincular_mascota_a_clinica(
     current_user = obtener_veterinario_actual(request, db)
     target_clinica_id = current_user.clinica_id if current_user else 1
 
-    mascota_original = db.query(Mascota).filter(
-        Mascota.id == mascota_id,
-        Mascota.is_deleted == False
-    ).first()
-    if not mascota_original:
+    mascota_local = _asegurar_mascota_local_clinica(db, mascota_id, target_clinica_id)
+    if not mascota_local:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
-
-    # Si ya pertenece a la clínica actual, retornar id directo
-    if mascota_original.clinica_id == target_clinica_id:
-        return {
-            "mensaje": "Mascota ya asociada a su clínica.",
-            "mascota_id": mascota_original.id
-        }
-
-    # Asegurar cliente en la clínica local
-    cliente_original = mascota_original.cliente
-    cliente_local = db.query(Cliente).filter(
-        Cliente.clinica_id == target_clinica_id,
-        Cliente.dni == cliente_original.dni,
-        Cliente.is_deleted == False
-    ).first()
-
-    if not cliente_local:
-        cliente_local = Cliente(
-            clinica_id=target_clinica_id,
-            dni=cliente_original.dni,
-            nombre_completo=cliente_original.nombre_completo,
-            telefono=cliente_original.telefono,
-            nombres=cliente_original.nombres,
-            apellido_paterno=cliente_original.apellido_paterno,
-            apellido_materno=cliente_original.apellido_materno
-        )
-        db.add(cliente_local)
-        db.flush()
-
-    # Comprobar si ya existe una mascota local con ese mismo nombre
-    mascota_local = db.query(Mascota).filter(
-        Mascota.clinica_id == target_clinica_id,
-        Mascota.cliente_id == cliente_local.id,
-        func.lower(func.trim(Mascota.nombre)) == mascota_original.nombre.strip().lower(),
-        Mascota.is_deleted == False
-    ).first()
-
-    if mascota_local:
-        return {
-            "mensaje": "Mascota ya asociada a su clínica.",
-            "mascota_id": mascota_local.id
-        }
-
-    nueva_mascota = Mascota(
-        clinica_id=target_clinica_id,
-        cliente_id=cliente_local.id,
-        especie_id=mascota_original.especie_id,
-        raza_id=mascota_original.raza_id,
-        nombre=mascota_original.nombre,
-        especie=mascota_original.especie,
-        raza=mascota_original.raza,
-        sexo=mascota_original.sexo,
-        fecha_nacimiento=mascota_original.fecha_nacimiento,
-        peso=mascota_original.peso,
-        foto_url=mascota_original.foto_url,
-        rasgos_distintivos=mascota_original.rasgos_distintivos,
-        alergias=mascota_original.alergias,
-        tiene_alergias=mascota_original.tiene_alergias,
-        detalle_alergias=mascota_original.detalle_alergias
-    )
-    db.add(nueva_mascota)
-    db.commit()
-    db.refresh(nueva_mascota)
 
     return {
         "mensaje": "Mascota vinculada exitosamente a su clínica.",
-        "mascota_id": nueva_mascota.id
+        "mascota_id": mascota_local.id
     }
 
 
@@ -1535,6 +1555,37 @@ def registrar_atencion(
                 insumo_nombre = prod_med.nombre
                 stock_restante = prod_med.stock_actual
             db.flush()
+
+    # Marcar automáticamente como ATENDIDA la cita asociada (o las citas activas de hoy para esta mascota)
+    hoy_lima = get_lima_now().date()
+    if payload.cita_id:
+        cita_asociada = db.query(Cita).filter(
+            Cita.id == payload.cita_id,
+            Cita.clinica_id == payload.clinica_id,
+            Cita.is_deleted == False
+        ).first()
+        if cita_asociada:
+            cita_asociada.estado = "ATENDIDA"
+            cita_asociada.mascota_id = mascota.id
+            cita_asociada.cliente_id = mascota.cliente_id
+
+    citas_hoy_mascota = db.query(Cita).join(Mascota, Cita.mascota_id == Mascota.id).join(Cliente, Cita.cliente_id == Cliente.id).filter(
+        Cita.clinica_id == payload.clinica_id,
+        Cita.fecha == hoy_lima,
+        Cita.is_deleted == False,
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
+        or_(
+            Cita.mascota_id == mascota.id,
+            and_(
+                Cliente.dni == mascota.cliente.dni,
+                func.lower(func.trim(Mascota.nombre)) == mascota.nombre.strip().lower()
+            )
+        )
+    ).all()
+    for c_hoy in citas_hoy_mascota:
+        c_hoy.estado = "ATENDIDA"
+        c_hoy.mascota_id = mascota.id
+        c_hoy.cliente_id = mascota.cliente_id
 
     db.commit()
 
@@ -2154,7 +2205,7 @@ def vista_lista_pacientes(
 
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
 
-    # 1. Obtener clientes vinculados a esta clínica (registrados directamente o con mascotas/atenciones)
+    # 1. Obtener clientes vinculados a esta clínica (registrados directamente, con mascotas o con citas agendadas)
     clientes_raw = db.query(Cliente).filter(
         Cliente.is_deleted == False,
         or_(
@@ -2163,6 +2214,12 @@ def vista_lista_pacientes(
                 db.query(Mascota.cliente_id).filter(
                     Mascota.clinica_id == target_clinica_id,
                     Mascota.is_deleted == False
+                )
+            ),
+            Cliente.id.in_(
+                db.query(Cita.cliente_id).filter(
+                    Cita.clinica_id == target_clinica_id,
+                    Cita.is_deleted == False
                 )
             )
         )
@@ -2331,7 +2388,7 @@ def vista_ficha_mascota(
         Mascota.clinica_id == target_clinica_id
     ).first()
 
-    # 2. Si no pertenece a esta clínica, verificar si ya tiene ficha local por nombre unificado
+    # 2. Si no pertenece a esta clínica, verificar si ya tiene ficha local o si proviene de una cita en esta clínica
     if not mascota:
         mascota_externa = db.query(Mascota).filter(
             Mascota.id == mascota_id,
@@ -2339,6 +2396,7 @@ def vista_ficha_mascota(
         ).first()
 
         if mascota_externa and mascota_externa.cliente and mascota_externa.cliente.dni:
+            qs = f"?{request.url.query}" if request.url.query else ""
             mascota_local = db.query(Mascota).join(Cliente).filter(
                 Cliente.dni == mascota_externa.cliente.dni,
                 Mascota.clinica_id == target_clinica_id,
@@ -2347,7 +2405,19 @@ def vista_ficha_mascota(
             ).first()
 
             if mascota_local:
-                return RedirectResponse(url=f"/pacientes/{mascota_local.id}", status_code=status.HTTP_302_FOUND)
+                return RedirectResponse(url=f"/pacientes/{mascota_local.id}{qs}", status_code=status.HTTP_302_FOUND)
+
+            # Si la mascota tiene una cita agendada en esta clínica (o viene del flujo de atender cita), auto-vincular su ficha
+            tiene_cita_en_clinica = db.query(Cita).filter(
+                Cita.clinica_id == target_clinica_id,
+                Cita.mascota_id == mascota_externa.id,
+                Cita.is_deleted == False
+            ).first() is not None
+
+            if tiene_cita_en_clinica or request.query_params.get("atender_cita"):
+                mascota_vinculada = _asegurar_mascota_local_clinica(db, mascota_externa.id, target_clinica_id)
+                if mascota_vinculada:
+                    return RedirectResponse(url=f"/pacientes/{mascota_vinculada.id}{qs}", status_code=status.HTTP_302_FOUND)
 
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
 
@@ -2547,16 +2617,28 @@ def vista_agenda_citas(
             fecha_filtro = hoy
 
     # Citas de la fecha seleccionada en la clínica
-    citas = db.query(Cita).filter(
+    citas_raw = db.query(Cita).filter(
         Cita.clinica_id == target_clinica_id,
         Cita.fecha == fecha_filtro,
         Cita.is_deleted == False
     ).order_by(Cita.hora.asc()).all()
 
+    # Ordenar: primero las citas activas (PENDIENTE, CONFIRMADA) por hora, y debajo las ya ATENDIDAS o CANCELADAS
+    def _prioridad_estado_cita(cita_obj: Cita) -> int:
+        est = (cita_obj.estado or "").upper()
+        if est in ("PENDIENTE", "CONFIRMADA"):
+            return 0
+        if est in ("ATENDIDA", "ATENDIDO", "COMPLETADA"):
+            return 1
+        return 2
+
+    citas = sorted(citas_raw, key=lambda item: (_prioridad_estado_cita(item), item.hora))
+
     total_hoy = len(citas)
-    total_pendientes = sum(1 for c in citas if c.estado.upper() == "PENDIENTE")
-    total_confirmadas = sum(1 for c in citas if c.estado.upper() == "CONFIRMADA")
-    total_canceladas = sum(1 for c in citas if c.estado.upper() == "CANCELADA")
+    total_pendientes = sum(1 for c in citas if (c.estado or "").upper() == "PENDIENTE")
+    total_confirmadas = sum(1 for c in citas if (c.estado or "").upper() == "CONFIRMADA")
+    total_atendidas = sum(1 for c in citas if (c.estado or "").upper() in ("ATENDIDA", "ATENDIDO", "COMPLETADA"))
+    total_canceladas = sum(1 for c in citas if (c.estado or "").upper() == "CANCELADA")
 
     # Citas pendientes en OTRAS fechas futuras para alertar al veterinario
     otras_fechas_query = db.query(Cita).filter(
@@ -2589,7 +2671,7 @@ def vista_agenda_citas(
         Cita.fecha >= hoy
     ).count()
 
-    # Próximas 15 a 20 citas futuras (ordenadas cronológicamente para panel avanzado)
+    # Próximas 15 a 20 citas futuras (solo PENDIENTE y CONFIRMADA; las ya ATENDIDAS desaparecen de la cola)
     proximas_citas = db.query(Cita).filter(
         Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False,
@@ -2610,6 +2692,7 @@ def vista_agenda_citas(
             "total_hoy": total_hoy,
             "total_pendientes": total_pendientes,
             "total_confirmadas": total_confirmadas,
+            "total_atendidas": total_atendidas,
             "total_canceladas": total_canceladas,
             "otras_fechas_pendientes": list(resumen_otras_fechas.values()),
             "citas_pendientes_count": total_pendientes_global
@@ -2655,6 +2738,13 @@ def confirmar_cita_veterinario(
     original_mascota_id = cita.mascota_id
     original_cliente_id = cita.cliente_id
 
+    # Si la mascota fue registrada por el dueño en el Portal (otra clinica_id), vincularla automáticamente a esta clínica
+    if original_mascota_id and original_clinica_id:
+        mascota_local = _asegurar_mascota_local_clinica(db, original_mascota_id, original_clinica_id)
+        if mascota_local:
+            original_mascota_id = mascota_local.id
+            original_cliente_id = mascota_local.cliente_id
+
     # Actualizar estado a 'Confirmada'
     cita.estado = "Confirmada"
 
@@ -2698,6 +2788,47 @@ def confirmar_cita_veterinario(
         "clinica_id": cita.clinica_id,
         "mascota_id": cita.mascota_id,
         "cliente_id": cita.cliente_id
+    }
+
+
+@router.put(
+    "/api/clinic/citas/{cita_id}/atendida",
+    summary="Marcar Cita como Atendida",
+    description="Actualiza el estado de la cita a ATENDIDA y asegura la ficha local de la mascota.",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def marcar_cita_atendida_veterinario(
+    cita_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    cita = db.query(Cita).filter(
+        Cita.id == cita_id,
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    if cita.mascota_id:
+        mascota_local = _asegurar_mascota_local_clinica(db, cita.mascota_id, target_clinica_id)
+        if mascota_local:
+            cita.mascota_id = mascota_local.id
+            cita.cliente_id = mascota_local.cliente_id
+
+    cita.estado = "ATENDIDA"
+    db.commit()
+    db.refresh(cita)
+
+    return {
+        "mensaje": "Cita marcada como atendida.",
+        "cita_id": cita.id,
+        "mascota_id": cita.mascota_id,
+        "estado": cita.estado
     }
 
 

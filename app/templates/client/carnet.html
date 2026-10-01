@@ -61,14 +61,17 @@
         <!-- Cuerpo del DNI: Foto y Datos de Filiación -->
         <div class="flex items-start space-x-4">
             
-            <!-- Foto de Perfil con Input de Carga WebP -->
+            <!-- Foto de Perfil con Input de Carga WebP y Vista en Pantalla Completa -->
             <div class="flex flex-col items-center flex-shrink-0 space-y-1.5">
-                <div id="petAvatarContainer" class="w-24 h-28 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-4xl shadow-md overflow-hidden relative transition-colors duration-300">
+                <div id="petAvatarContainer" onclick="abrirVisorFotoMascota()" title="Clic para ver foto en pantalla completa" class="w-24 h-28 rounded-2xl bg-slate-100 border-2 border-slate-300 flex items-center justify-center text-4xl shadow-md overflow-hidden relative transition-all duration-300 cursor-pointer group hover:ring-2 hover:ring-indigo-400">
                     {% if mascota.foto_url %}
-                    <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
+                    <img id="petAvatarImg" src="{{ mascota.foto_url }}" alt="{{ mascota.nombre }}" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.style.display='none'; this.nextElementSibling?.classList.remove('hidden');">
                     <span class="hidden text-slate-400">
                         <i data-lucide="paw-print" class="w-12 h-12" aria-hidden="true"></i>
                     </span>
+                    <div class="absolute bottom-1 right-1 bg-slate-900/60 text-white p-1 rounded-lg opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none" title="Pantalla completa">
+                        <i data-lucide="maximize-2" class="w-3 h-3" aria-hidden="true"></i>
+                    </div>
                     {% else %}
                     <span id="petAvatarEmoji" class="text-slate-400">
                         <i data-lucide="paw-print" class="w-12 h-12" aria-hidden="true"></i>
@@ -619,6 +622,37 @@
     </div>
 </div>
 
+<!-- Modal Visor de Foto en Pantalla Completa (Lightbox) -->
+<div id="modalVisorFotoMascota" onclick="cerrarVisorFotoMascota(event)" class="hidden fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 select-none animate-fade-in">
+    <!-- Barra Superior del Visor -->
+    <div class="w-full max-w-2xl flex items-center justify-between text-white z-10" onclick="event.stopPropagation()">
+        <div class="flex items-center space-x-2 min-w-0">
+            <i data-lucide="paw-print" class="w-5 h-5 text-indigo-400 shrink-0" aria-hidden="true"></i>
+            <span id="visorFotoTitulo" class="font-black text-base sm:text-lg truncate">{{ mascota.nombre }}</span>
+        </div>
+        <button type="button" onclick="cerrarVisorFotoMascota()" class="btn-touch px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 active:bg-white/30 text-white text-xs font-bold flex items-center space-x-1.5 border border-white/15 transition">
+            <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+            <span>Cerrar</span>
+        </button>
+    </div>
+
+    <!-- Imagen Central en Pantalla Completa -->
+    <div class="flex-1 flex items-center justify-center w-full max-w-3xl my-3 overflow-hidden">
+        <img id="visorFotoImg" src="{{ mascota.foto_url or '' }}" alt="{{ mascota.nombre }}" onclick="event.stopPropagation()" class="max-w-full max-h-[78vh] w-auto h-auto object-contain rounded-2xl shadow-2xl border border-white/15 transition-transform duration-200">
+    </div>
+
+    <!-- Barra Inferior del Visor -->
+    <div class="w-full max-w-2xl flex items-center justify-center space-x-3 z-10 pb-2" onclick="event.stopPropagation()">
+        <button type="button" onclick="cerrarVisorFotoMascota(); document.getElementById('fotoMascotaInput')?.click();" class="btn-touch px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-lg transition">
+            <i data-lucide="camera" class="w-4 h-4" aria-hidden="true"></i>
+            <span>Cambiar foto</span>
+        </button>
+        <button type="button" onclick="cerrarVisorFotoMascota()" class="btn-touch px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/15 transition">
+            Volver al Carnet
+        </button>
+    </div>
+</div>
+
 <!-- Modal / Toast de Confirmación Exitosa -->
 <div id="toastExito" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-2.5 text-xs font-bold transition-all">
     <i data-lucide="circle-check" class="w-5 h-5 text-emerald-400 shrink-0" aria-hidden="true"></i>
@@ -820,12 +854,16 @@ async function subirFotoMascota(input, mascotaId) {
     const container = document.getElementById("petAvatarContainer");
     if (container) {
         container.innerHTML = `
-            <img id="petAvatarImg" src="${objectUrl}" alt="Foto de la mascota" class="w-full h-full object-cover">
+            <img id="petAvatarImg" src="${objectUrl}" alt="Foto de la mascota" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+            <div class="absolute bottom-1 right-1 bg-slate-900/60 text-white p-1 rounded-lg opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none" title="Pantalla completa">
+                <i data-lucide="maximize-2" class="w-3 h-3" aria-hidden="true"></i>
+            </div>
             <div id="fotoUploadLoader" class="absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
                 <svg class="animate-spin w-4 h-4 mb-0.5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                 <span>Subiendo foto...</span>
             </div>
         `;
+        window.initLucideIcons?.();
     }
 
     const loader = document.getElementById("fotoUploadLoader");
@@ -849,12 +887,18 @@ async function subirFotoMascota(input, mascotaId) {
             const data = await resp.json();
             const container = document.getElementById("petAvatarContainer");
             container.innerHTML = `
-                <img id="petAvatarImg" src="${data.foto_url}" alt="Foto de la mascota" class="w-full h-full object-cover">
+                <img id="petAvatarImg" src="${data.foto_url}" alt="Foto de la mascota" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                <div class="absolute bottom-1 right-1 bg-slate-900/60 text-white p-1 rounded-lg opacity-80 group-hover:opacity-100 transition-opacity pointer-events-none" title="Pantalla completa">
+                    <i data-lucide="maximize-2" class="w-3 h-3" aria-hidden="true"></i>
+                </div>
                 <div id="fotoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 text-center leading-tight">
                     <svg class="animate-spin w-4 h-4 mb-0.5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
                     <span>Subiendo foto...</span>
                 </div>
             `;
+            const visorImg = document.getElementById("visorFotoImg");
+            if (visorImg) visorImg.src = data.foto_url;
+            window.initLucideIcons?.();
             mostrarToast("¡Foto actualizada con éxito!");
         } else {
             const err = await resp.json();
@@ -869,6 +913,41 @@ async function subirFotoMascota(input, mascotaId) {
         input.value = "";
     }
 }
+
+function abrirVisorFotoMascota() {
+    const imgEl = document.getElementById("petAvatarImg");
+    const src = imgEl?.getAttribute("src");
+    // Si aún no tiene foto o falló la carga, abrir selector para subir foto
+    if (!imgEl || !src || imgEl.style.display === "none") {
+        document.getElementById("fotoMascotaInput")?.click();
+        return;
+    }
+    const modal = document.getElementById("modalVisorFotoMascota");
+    const visorImg = document.getElementById("visorFotoImg");
+    const visorTitulo = document.getElementById("visorFotoTitulo");
+    const dniNom = document.getElementById("dniNombre");
+    if (visorImg) visorImg.src = src;
+    if (visorTitulo && dniNom) visorTitulo.textContent = dniNom.textContent;
+    if (modal) {
+        modal.classList.remove("hidden");
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function cerrarVisorFotoMascota(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const modal = document.getElementById("modalVisorFotoMascota");
+    if (modal) {
+        modal.classList.add("hidden");
+        document.body.style.overflow = "";
+    }
+}
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        cerrarVisorFotoMascota();
+    }
+});
 
 function abrirModalEditarPerfil() {
     const modal = document.getElementById("modalEditarPerfil");

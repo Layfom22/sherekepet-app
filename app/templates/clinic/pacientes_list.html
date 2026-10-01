@@ -102,8 +102,21 @@
                         </div>
                     </div>
 
-                    <!-- Contacto Rápido y Total de Mascotas del Dueño -->
+                    <!-- Contacto Rápido, Invitación al Portal y Total de Mascotas del Dueño -->
                     <div class="flex items-center space-x-2 self-start sm:self-center shrink-0 flex-wrap gap-y-2">
+                        <button 
+                            type="button" 
+                            data-telefono="{{ p.cliente.telefono or '' }}"
+                            data-dueno="{{ p.cliente.nombre_completo or p.cliente.dni or 'Estimado(a)' }}"
+                            data-mascotas="{{ p.mascotas|map(attribute='nombre')|join(', ') }}"
+                            onclick="invitarDuenoPortalDirectorio(this)"
+                            class="btn-touch px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-xs transition-all flex items-center space-x-1.5"
+                            title="Enviar invitación por WhatsApp para ingresar al Portal del Dueño"
+                        >
+                            <i data-lucide="smartphone" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>Invitar al Portal</span>
+                        </button>
+
                         {% if p.cliente.telefono %}
                         <a 
                             href="https://wa.me/51{{ p.cliente.telefono|replace(' ', '')|replace('-', '') }}" 
@@ -336,6 +349,25 @@ async function vincularYAbrirFicha(mascotaId, btn) {
         btn.innerHTML = originalText;
         window.initLucideIcons?.();
     }
+}
+
+function invitarDuenoPortalDirectorio(btn) {
+    const telefonoRaw = btn.getAttribute("data-telefono") || "";
+    const telefono = telefonoRaw.replace(/\D/g, "");
+    const dueno = btn.getAttribute("data-dueno") || "Estimado(a)";
+    const mascotas = btn.getAttribute("data-mascotas") || "tu mascota";
+    const urlBase = window.location.origin;
+
+    if (!telefono) {
+        alert("El propietario no tiene un número telefónico registrado para enviar la invitación.");
+        return;
+    }
+
+    const textoMascotas = mascotas.includes(",") ? `tus mascotas (${mascotas})` : `${mascotas}`;
+    const mensaje = `Hola ${dueno}, ya creamos el Carnet Digital de ${textoMascotas} 🐾. Ingresa a este link: ${urlBase}/portal/login con tu DNI para ver sus vacunas, próximas citas y subir su foto de perfil.`;
+    const numFinal = telefono.startsWith("51") ? telefono : `51${telefono}`;
+    const enlace = `https://wa.me/${numFinal}?text=${encodeURIComponent(mensaje)}`;
+    window.open(enlace, "_blank");
 }
 </script>
 {% endblock %}

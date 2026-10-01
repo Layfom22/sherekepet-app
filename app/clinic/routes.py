@@ -452,6 +452,8 @@ def obtener_o_inicializar_servicios_bano(clinica_id: int, db: Session) -> List[S
             shampoo_neutro = Producto(
                 clinica_id=clinica_id,
                 nombre="Shampoo Básico Neutro",
+                tipo="Champú",
+                controlar_stock=True,
                 stock_actual=2500.0,
                 unidad_medida="ml",
                 stock_minimo=250.0,
@@ -470,6 +472,8 @@ def obtener_o_inicializar_servicios_bano(clinica_id: int, db: Session) -> List[S
             shampoo_hipo = Producto(
                 clinica_id=clinica_id,
                 nombre="Shampoo Hipoalergénico Avena",
+                tipo="Champú",
+                controlar_stock=True,
                 stock_actual=1500.0,
                 unidad_medida="ml",
                 stock_minimo=200.0,
@@ -488,6 +492,8 @@ def obtener_o_inicializar_servicios_bano(clinica_id: int, db: Session) -> List[S
             shampoo_med = Producto(
                 clinica_id=clinica_id,
                 nombre="Shampoo Medicado Clorhexidina",
+                tipo="Champú",
+                controlar_stock=True,
                 stock_actual=1200.0,
                 unidad_medida="ml",
                 stock_minimo=150.0,
@@ -701,14 +707,16 @@ def crear_producto_inventario(
             detail="El nombre del producto es obligatorio."
         )
 
+    usa_stock = bool(payload.controlar_stock)
     nuevo_prod = Producto(
         clinica_id=target_clinica_id,
         nombre=nombre_limpio,
         tipo=(payload.tipo or "Medicina").strip(),
         codigo=payload.codigo.strip() if payload.codigo else None,
-        stock_actual=payload.stock_actual,
+        controlar_stock=usa_stock,
+        stock_actual=payload.stock_actual if usa_stock else 0.0,
         unidad_medida=(payload.unidad_medida or "unidades").strip(),
-        stock_minimo=payload.stock_minimo,
+        stock_minimo=payload.stock_minimo if usa_stock else 0.0,
         precio_costo=payload.precio_costo,
         precio_venta=payload.precio_venta
     )
@@ -751,11 +759,16 @@ def actualizar_producto_inventario(
         prod.tipo = payload.tipo.strip()
     if payload.codigo is not None:
         prod.codigo = payload.codigo.strip() or None
-    if payload.stock_actual is not None:
+    if payload.controlar_stock is not None:
+        prod.controlar_stock = payload.controlar_stock
+        if not payload.controlar_stock:
+            prod.stock_actual = 0.0
+            prod.stock_minimo = 0.0
+    if payload.stock_actual is not None and prod.controlar_stock:
         prod.stock_actual = payload.stock_actual
     if payload.unidad_medida is not None and payload.unidad_medida.strip():
         prod.unidad_medida = payload.unidad_medida.strip()
-    if payload.stock_minimo is not None:
+    if payload.stock_minimo is not None and prod.controlar_stock:
         prod.stock_minimo = payload.stock_minimo
     if payload.precio_costo is not None:
         prod.precio_costo = payload.precio_costo
@@ -1502,7 +1515,7 @@ def registrar_atencion(
             func.lower(Producto.nombre) == payload.tipo_vacuna.strip().lower(),
             Producto.is_deleted == False
         ).first()
-        if prod_vacuna and prod_vacuna.stock_actual > 0:
+        if prod_vacuna and prod_vacuna.controlar_stock and prod_vacuna.stock_actual > 0:
             prod_vacuna.stock_actual = max(0.0, round(float(prod_vacuna.stock_actual) - 1.0, 2))
             stock_descontado = 1.0
             insumo_nombre = prod_vacuna.nombre
@@ -1515,7 +1528,7 @@ def registrar_atencion(
             func.lower(Producto.nombre) == payload.receta_medicamento.strip().lower(),
             Producto.is_deleted == False
         ).first()
-        if prod_med and prod_med.stock_actual > 0:
+        if prod_med and prod_med.controlar_stock and prod_med.stock_actual > 0:
             prod_med.stock_actual = max(0.0, round(float(prod_med.stock_actual) - 1.0, 2))
             if stock_descontado is None:
                 stock_descontado = 1.0

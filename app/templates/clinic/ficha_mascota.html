@@ -603,18 +603,20 @@ async function cargarMisProductosAtencion() {
             const misVacunas = misProductosAtencion.filter(p => (p.tipo || '').toLowerCase() === 'vacuna');
             if (optgroupVacunas && misVacunas.length > 0) {
                 optgroupVacunas.classList.remove('hidden');
-                optgroupVacunas.innerHTML = misVacunas.map(v => 
-                    `<option value="${v.nombre}">💉 ${v.nombre} (Stock: ${v.stock_actual} ${v.unidad_medida})</option>`
-                ).join('');
+                optgroupVacunas.innerHTML = misVacunas.map(v => {
+                    const extra = v.controlar_stock ? ` (Stock: ${v.stock_actual} ${v.unidad_medida})` : (v.codigo ? ` (${v.codigo})` : '');
+                    return `<option value="${v.nombre}">💉 ${v.nombre}${extra}</option>`;
+                }).join('');
             }
 
             // 2. Poblar Mis Medicinas / Desparasitantes en el datalist de Receta
             const datalistMed = document.getElementById('datalistMisMedicinas');
             const misMedicinas = misProductosAtencion.filter(p => ['medicina', 'desparasitante'].includes((p.tipo || '').toLowerCase()));
             if (datalistMed && misMedicinas.length > 0) {
-                datalistMed.innerHTML = misMedicinas.map(m => 
-                    `<option value="${m.nombre}">Stock: ${m.stock_actual} ${m.unidad_medida}</option>`
-                ).join('');
+                datalistMed.innerHTML = misMedicinas.map(m => {
+                    const detalle = m.controlar_stock ? `Stock: ${m.stock_actual} ${m.unidad_medida}` : (m.tipo || 'Catálogo propio');
+                    return `<option value="${m.nombre}">${detalle}</option>`;
+                }).join('');
             }
         }
     } catch (e) {

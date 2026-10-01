@@ -394,14 +394,11 @@ def test_modulo_mis_productos_crud_y_privacidad_multitenant(client, db_session, 
     assert "Mis Productos" in resp_vista.text
     assert 'href="/productos"' in resp_vista.text
 
-    # 3. Crear una Vacuna propia del veterinario
+    # 3. Crear una Vacuna propia del veterinario SIN control de stock (por defecto)
     resp_crear = client.post("/api/clinic/productos", json={
         "nombre": "Séxtuple Vanguard Plus",
         "tipo": "Vacuna",
         "codigo": "LOTE-Z99",
-        "stock_actual": 15,
-        "unidad_medida": "dosis",
-        "stock_minimo": 5,
         "precio_venta": 65.0
     })
     assert resp_crear.status_code == 201
@@ -409,6 +406,8 @@ def test_modulo_mis_productos_crud_y_privacidad_multitenant(client, db_session, 
     assert mi_vacuna["nombre"] == "Séxtuple Vanguard Plus"
     assert mi_vacuna["tipo"] == "Vacuna"
     assert mi_vacuna["codigo"] == "LOTE-Z99"
+    assert mi_vacuna["controlar_stock"] is False
+    assert mi_vacuna["stock_actual"] == 0.0
     assert mi_vacuna["clinica_id"] == clinica.id
 
     # 4. Listar productos del veterinario y comprobar que NO aparece el de otra clínica
@@ -422,13 +421,16 @@ def test_modulo_mis_productos_crud_y_privacidad_multitenant(client, db_session, 
     resp_del_ajeno = client.delete(f"/api/clinic/productos/{prod_ajeno.id}")
     assert resp_del_ajeno.status_code == 404
 
-    # 6. Editar y eliminar el producto propio
+    # 6. Activar el toggle opcional de stock (controlar_stock=True) y editar el producto propio
     resp_edit = client.put(f"/api/clinic/productos/{mi_vacuna['id']}", json={
         "nombre": "Séxtuple Vanguard Plus 5",
-        "stock_actual": 20
+        "controlar_stock": True,
+        "stock_actual": 20,
+        "stock_minimo": 5
     })
     assert resp_edit.status_code == 200
     assert resp_edit.json()["nombre"] == "Séxtuple Vanguard Plus 5"
+    assert resp_edit.json()["controlar_stock"] is True
     assert resp_edit.json()["stock_actual"] == 20.0
 
     resp_del = client.delete(f"/api/clinic/productos/{mi_vacuna['id']}")

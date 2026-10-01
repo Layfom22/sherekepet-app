@@ -415,9 +415,10 @@ class Producto(Base, SoftDeleteMixin, TimestampMixin):
     nombre: Mapped[str] = mapped_column(String(150), nullable=False)
     tipo: Mapped[str] = mapped_column(String(50), default="Champú", nullable=False)
     codigo: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    controlar_stock: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     stock_actual: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     unidad_medida: Mapped[str] = mapped_column(String(30), default="ml", nullable=False)
-    stock_minimo: Mapped[float] = mapped_column(Float, default=100.0, nullable=False)
+    stock_minimo: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     precio_costo: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     precio_venta: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 

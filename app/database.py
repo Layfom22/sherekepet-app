@@ -123,6 +123,8 @@ def run_auto_migrations(target_engine) -> None:
             with target_engine.begin() as conn:
                 if "tipo" not in cols:
                     conn.execute(text("ALTER TABLE sp_productos ADD COLUMN tipo VARCHAR(50) DEFAULT 'Champú';"))
+                if "controlar_stock" not in cols:
+                    conn.execute(text("ALTER TABLE sp_productos ADD COLUMN controlar_stock BOOLEAN DEFAULT FALSE;"))
 
         # Crear sp_servicios_bano si no existe
         if "sp_servicios_bano" not in tables:

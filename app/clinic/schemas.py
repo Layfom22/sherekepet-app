@@ -217,6 +217,7 @@ class ProductoItem(BaseModel):
     nombre: str
     tipo: str = "Champú"
     codigo: Optional[str] = None
+    controlar_stock: bool = False
     stock_actual: float
     unidad_medida: str
     stock_minimo: float
@@ -228,9 +229,10 @@ class ProductoCreateRequest(BaseModel):
     nombre: str = Field(..., min_length=2, max_length=150)
     tipo: str = Field(default="Medicina", max_length=50)
     codigo: Optional[str] = Field(default=None, max_length=50)
+    controlar_stock: bool = Field(default=False)
     stock_actual: float = Field(default=0.0, ge=0)
     unidad_medida: str = Field(default="unidades", max_length=30)
-    stock_minimo: float = Field(default=5.0, ge=0)
+    stock_minimo: float = Field(default=0.0, ge=0)
     precio_costo: Optional[float] = Field(default=None, ge=0)
     precio_venta: Optional[float] = Field(default=None, ge=0)
 
@@ -239,6 +241,7 @@ class ProductoUpdateRequest(BaseModel):
     nombre: Optional[str] = Field(default=None, min_length=2, max_length=150)
     tipo: Optional[str] = Field(default=None, max_length=50)
     codigo: Optional[str] = Field(default=None, max_length=50)
+    controlar_stock: Optional[bool] = None
     stock_actual: Optional[float] = Field(default=None, ge=0)
     unidad_medida: Optional[str] = Field(default=None, max_length=30)
     stock_minimo: Optional[float] = Field(default=None, ge=0)

@@ -102,7 +102,7 @@
                         </div>
                     </div>
 
-                    <!-- Contacto Rápido, Invitación al Portal y Total de Mascotas del Dueño -->
+                    <!-- Contacto Rápido, Invitación al Portal, Restablecer PIN y Total de Mascotas del Dueño -->
                     <div class="flex items-center space-x-2 self-start sm:self-center shrink-0 flex-wrap gap-y-2">
                         <button 
                             type="button" 
@@ -115,6 +115,16 @@
                         >
                             <i data-lucide="smartphone" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span>Invitar al Portal</span>
+                        </button>
+
+                        <button 
+                            type="button" 
+                            onclick="resetearPinClienteDirectorio({{ p.cliente.id }}, this)"
+                            class="btn-touch px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-300 rounded-xl shadow-2xs transition-all flex items-center space-x-1.5"
+                            title="Borrar PIN actual del dueño para que cree uno nuevo al ingresar al portal"
+                        >
+                            <i data-lucide="key-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>Restablecer PIN</span>
                         </button>
 
                         {% if p.cliente.telefono %}
@@ -368,6 +378,38 @@ function invitarDuenoPortalDirectorio(btn) {
     const numFinal = telefono.startsWith("51") ? telefono : `51${telefono}`;
     const enlace = `https://wa.me/${numFinal}?text=${encodeURIComponent(mensaje)}`;
     window.open(enlace, "_blank");
+}
+
+async function resetearPinClienteDirectorio(clienteId, btn) {
+    if (!confirm("¿Seguro que deseas restablecer el PIN de este propietario? Se le pedirá crear un PIN nuevo de 4 dígitos la próxima vez que ingrese al portal.")) {
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add("opacity-50");
+    }
+
+    try {
+        const resp = await fetch(`/api/clinic/clientes/${clienteId}/reset-pin`, {
+            method: "PATCH"
+        });
+
+        if (resp.ok) {
+            alert("El PIN del propietario ha sido restablecido. Se le pedirá crear uno nuevo en su próximo ingreso al portal.");
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error al restablecer PIN: " + (err.detail || "No se pudo completar la acción."));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al restablecer PIN.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("opacity-50");
+        }
+    }
 }
 </script>
 {% endblock %}

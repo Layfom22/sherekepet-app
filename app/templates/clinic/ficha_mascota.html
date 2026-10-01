@@ -119,35 +119,6 @@
                         </div>
                     </div>
                     {% endif %}
-
-                    <!-- Gestión de Seguridad e Invitación al Portal del Dueño -->
-                    <div class="pt-3 border-t border-slate-100 space-y-2.5">
-                        <div class="flex items-center justify-between">
-                            <div>
-                                <span class="text-slate-500 font-bold block text-[11px]">Acceso al Portal PWA</span>
-                                <span class="text-[10px] text-slate-400">PIN de seguridad de 4 dígitos</span>
-                            </div>
-                            <button 
-                                type="button" 
-                                id="btnResetPin"
-                                onclick="resetearPinCliente({{ cliente.id }})" 
-                                class="btn-touch px-2.5 py-1.5 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-300 rounded-xl transition-all inline-flex items-center space-x-1 shadow-2xs"
-                                title="Borrar PIN actual del cliente para exigirle crear uno nuevo al ingresar"
-                            >
-                                <i data-lucide="key-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                                <span>Restablecer PIN</span>
-                            </button>
-                        </div>
-                        <button 
-                            type="button" 
-                            onclick="invitarDuenoPortal()"
-                            class="btn-touch w-full py-2 px-3 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200 rounded-xl transition-all flex items-center justify-center space-x-1.5"
-                            title="Enviar invitación por WhatsApp para ingresar al Portal del Dueño"
-                        >
-                            <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-600" aria-hidden="true"></i>
-                            <span>Invitar al Portal por WhatsApp</span>
-                        </button>
-                    </div>
                 </div>
             </div>
 

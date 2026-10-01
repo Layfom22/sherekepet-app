@@ -1617,6 +1617,14 @@ def resetear_pin_cliente(
         )
 
     cliente.pin_hash = None
+    if cliente.dni:
+        otros_registros = db.query(Cliente).filter(
+            Cliente.dni == cliente.dni,
+            Cliente.is_deleted == False
+        ).all()
+        for reg in otros_registros:
+            reg.pin_hash = None
+
     db.commit()
     db.refresh(cliente)
 

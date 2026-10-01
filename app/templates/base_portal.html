@@ -95,8 +95,19 @@
                     </a>
                 </div>
 
-                <!-- Derecha: Icono de Perfil y Botón de Salir Animado -->
-                <div class="flex items-center justify-end space-x-2">
+                <!-- Derecha: Botón Actualizar, Icono de Perfil y Botón de Salir -->
+                <div class="flex items-center justify-end space-x-1.5 sm:space-x-2">
+                    <button 
+                        type="button"
+                        id="btnActualizarPaginaPortal"
+                        onclick="recargarPortal(this)"
+                        class="btn-touch px-2.5 py-1.5 rounded-xl text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 shadow-sm transition-all inline-flex items-center justify-center space-x-1" 
+                        title="Actualizar página"
+                        aria-label="Actualizar página"
+                    >
+                        <i id="iconoActualizarPortal" data-lucide="refresh-cw" class="w-4 h-4 shrink-0 transition-transform duration-500" aria-hidden="true"></i>
+                        <span class="text-[11px] font-bold hidden sm:inline">Actualizar</span>
+                    </button>
                     <a 
                         href="/portal/dashboard#seccionPerfil" 
                         class="btn-touch p-2 rounded-xl text-white bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 shadow-sm transition-all inline-flex items-center justify-center" 
@@ -146,7 +157,7 @@
     <!-- Cookie Consent Banner Global -->
     {% include "components/cookie_banner.html" %}
 
-    <!-- Inicialización de Lucide Icons -->
+    <!-- Inicialización de Lucide Icons y Botón Actualizar PWA -->
     <script>
         function initLucideIcons() {
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -160,6 +171,15 @@
         }
         document.addEventListener('DOMContentLoaded', initLucideIcons);
         window.initLucideIcons = initLucideIcons;
+
+        function recargarPortal(btn) {
+            if (btn) {
+                btn.disabled = true;
+                const svg = btn.querySelector('svg') || document.getElementById('iconoActualizarPortal');
+                if (svg) svg.classList.add('animate-spin');
+            }
+            window.location.reload();
+        }
     </script>
 
     {% block scripts %}{% endblock %}

@@ -169,56 +169,7 @@
     </div>
     {% endif %}
 
-    <!-- Contenedor Dinámico de Alerta en Tiempo Real cuando el Veterinario acepta una cita -->
-    <div id="alertaCitaRecienConfirmada" class="hidden bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-3xl p-4 sm:p-5 shadow-lg border-2 border-emerald-300 animate-in fade-in slide-in-from-top-4 duration-300">
-        <div class="flex items-start space-x-3.5">
-            <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                <i data-lucide="calendar-check-2" class="w-6 h-6 text-white" aria-hidden="true"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-                <span class="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-md">
-                    Notificación en Tiempo Real
-                </span>
-                <h3 id="tituloCitaRecienConfirmada" class="text-sm sm:text-base font-black mt-1">
-                    ¡El veterinario acaba de aceptar tu cita!
-                </h3>
-                <p id="detalleCitaRecienConfirmada" class="text-xs text-emerald-50 font-medium mt-0.5"></p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Banner de Citas Aceptadas por el Veterinario -->
-    {% if citas_confirmadas %}
-    <div class="bg-gradient-to-br from-emerald-50 via-teal-50/80 to-white rounded-3xl p-4 sm:p-5 border-2 border-emerald-400 shadow-sm space-y-2.5">
-        {% for cc in citas_confirmadas %}
-        <div class="flex items-start space-x-3">
-            <div class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                <i data-lucide="check-check" class="w-5 h-5" aria-hidden="true"></i>
-            </div>
-            <div class="min-w-0 flex-1 text-xs">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-600 text-white">
-                        ✅ Cita Confirmada por Veterinario
-                    </span>
-                    {% if hoy_lima and cc.fecha == hoy_lima %}
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300">
-                        📅 ¡ES HOY!
-                    </span>
-                    {% endif %}
-                </div>
-                <p class="text-sm font-black text-slate-900 mt-1">
-                    {{ cc.clinica.nombre_comercial or cc.clinica.nombre }} aceptó la cita de <span class="text-emerald-700 underline decoration-emerald-300 decoration-2">{{ cc.mascota.nombre }}</span>
-                </p>
-                <p class="text-[11px] font-semibold text-slate-600 mt-0.5">
-                    📆 {{ cc.fecha.strftime('%d/%m/%Y') }} a las <strong>{{ cc.hora.strftime('%I:%M %p') }}</strong> &bull; {{ cc.motivo }}
-                </p>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Sección: Mis Próximas Citas (si existen) -->
+    <!-- Sección: Mis Próximas Citas (única tarjeta limpia sin redundancia) -->
     {% if citas_cliente %}
     <div id="seccionProximasCitas" class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
         <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
@@ -265,7 +216,7 @@
                             {% endif %}
                         </div>
                         {% if es_confirmada %}
-                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white inline-flex items-center space-x-1">
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white inline-flex items-center space-x-1" title="Cita Confirmada por Veterinario">
                             <span>✓ Confirmada</span>
                         </span>
                         {% else %}
@@ -288,7 +239,7 @@
                     </p>
                     {% else %}
                     <p class="text-[10px] font-medium text-amber-700 mt-1">
-                        🔔 Te notificaremos aquí y por correo apenas el veterinario confirme.
+                        🔔 Te notificaremos apenas el veterinario confirme.
                     </p>
                     {% endif %}
                 </div>
@@ -460,23 +411,84 @@
         {% endif %}
     </div>
 
-    <!-- Banner PWA -->
-    <div id="pwaInstallBanner" class="hidden bg-slate-900 text-white p-4 rounded-2xl flex items-center justify-between shadow-lg">
-        <div class="flex items-center space-x-3">
-            <i data-lucide="smartphone" class="w-6 h-6 text-teal-400 shrink-0" aria-hidden="true"></i>
-            <div>
-                <p class="text-xs font-bold">Instalar SherekePet App</p>
-                <p class="text-[11px] text-slate-400">Acceso directo en tu celular sin descargar nada</p>
+    <!-- Banner PWA: Instalar / Anclar App en Pantalla de Inicio -->
+    <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 rounded-3xl flex items-center justify-between gap-3 shadow-lg border border-indigo-500/30">
+        <div class="flex items-center space-x-3 min-w-0">
+            <div class="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-400/40 flex items-center justify-center shrink-0">
+                <i data-lucide="smartphone" class="w-5 h-5 text-teal-400" aria-hidden="true"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs font-black text-white truncate">Instalar SherekePet en tu Celular</p>
+                <p class="text-[11px] text-slate-300 leading-tight">Ancla el carnet a tu pantalla de inicio como App</p>
             </div>
         </div>
-        <button 
-            id="btnInstallPwa"
-            class="btn-touch px-3 py-1.5 text-xs font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl"
-        >
-            Instalar
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+            <button 
+                type="button"
+                id="btnInstallPwa"
+                onclick="instalarPwaCelular()"
+                class="btn-touch px-3.5 py-2 text-xs font-black bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 rounded-xl shadow-sm transition-all inline-flex items-center space-x-1"
+            >
+                <i data-lucide="download" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>Instalar App</span>
+            </button>
+            <button 
+                type="button"
+                onclick="ocultarBannerPwa()"
+                class="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
+                title="Ocultar aviso"
+                aria-label="Ocultar aviso"
+            >
+                <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+            </button>
+        </div>
     </div>
 
+</div>
+
+<!-- MODAL GUÍA RÁPIDA: INSTALAR APP EN CELULAR (ANDROID / IPHONE) -->
+<div id="modalGuiaInstalarPwa" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-100">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-black text-slate-900 flex items-center space-x-2">
+                <i data-lucide="smartphone" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                <span>Anclar a Pantalla de Inicio</span>
+            </h3>
+            <button type="button" onclick="cerrarModalGuiaPwa()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors" aria-label="Cerrar">
+                <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="space-y-3 text-xs text-slate-700">
+            <div class="p-3.5 rounded-2xl bg-teal-50/80 border border-teal-200 space-y-1.5">
+                <p class="font-black text-teal-900 flex items-center space-x-1.5">
+                    <span>🤖 En Android (Chrome):</span>
+                </p>
+                <ol class="list-decimal list-inside space-y-1 text-[11px] font-medium text-slate-700">
+                    <li>Toca los <strong>3 puntitos (⋮)</strong> arriba a la derecha en tu navegador.</li>
+                    <li>Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong> (sin activar sitio para computadora).</li>
+                </ol>
+            </div>
+
+            <div class="p-3.5 rounded-2xl bg-indigo-50/80 border border-indigo-200 space-y-1.5">
+                <p class="font-black text-indigo-900 flex items-center space-x-1.5">
+                    <span>🍎 En iPhone (Safari):</span>
+                </p>
+                <ol class="list-decimal list-inside space-y-1 text-[11px] font-medium text-slate-700">
+                    <li>Toca el botón <strong>Compartir (⬆️)</strong> en la barra inferior.</li>
+                    <li>Desliza hacia abajo y toca <strong>"Agregar a inicio"</strong>.</li>
+                </ol>
+            </div>
+        </div>
+
+        <button 
+            type="button" 
+            onclick="cerrarModalGuiaPwa()" 
+            class="btn-touch w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-sm"
+        >
+            ¡Entendido!
+        </button>
+    </div>
 </div>
 
 <!-- MODAL 1: EDITAR PERFIL DEL DUEÑO -->
@@ -1387,17 +1399,6 @@ async function verificarEstadoCitasEnTiempoReal() {
             // Si la cita está CONFIRMADA y antes estaba PENDIENTE (o aún no se ha notificado al dueño)
             if (c.estado === 'CONFIRMADA' && (!notificadasMap[c.id] || estadoAnterior === 'PENDIENTE' || estadoEnDom === 'PENDIENTE')) {
                 notificadasMap[c.id] = true;
-
-                // Mostrar alerta visual destacada en la Web App
-                const banner = document.getElementById('alertaCitaRecienConfirmada');
-                const titulo = document.getElementById('tituloCitaRecienConfirmada');
-                const detalle = document.getElementById('detalleCitaRecienConfirmada');
-                if (banner && titulo && detalle) {
-                    titulo.textContent = `🎉 ¡${c.clinica} aceptó la cita de ${c.mascota}!`;
-                    detalle.textContent = `Confirmada para el ${c.fecha} a las ${c.hora} (${c.motivo}).`;
-                    banner.classList.remove('hidden');
-                }
-
                 mostrarToast(`✅ ¡${c.clinica} confirmó tu cita para ${c.mascota} (${c.hora})!`);
                 await lanzarNotificacionNativaCitaConfirmada(c);
 
@@ -1414,7 +1415,7 @@ async function verificarEstadoCitasEnTiempoReal() {
         } catch (_) {}
 
         if (huboCambioEnPantalla) {
-            setTimeout(() => window.location.reload(), 2200);
+            setTimeout(() => window.location.reload(), 1500);
         }
     } catch (e) {
         // Silencioso en caso de pérdida momentánea de red
@@ -1478,9 +1479,68 @@ async function activarNotificacionesCelular() {
     }
 }
 
+// Instalación PWA en Celular (Android Chrome / iPhone Safari)
+let deferredPwaPrompt = null;
+
+function esModoStandalonePwa() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function inicializarBannerInstalarPwa() {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (!banner) return;
+    if (esModoStandalonePwa()) {
+        banner.classList.add('hidden');
+        return;
+    }
+    if (sessionStorage.getItem('sherekepet_pwa_banner_oculto') === '1') {
+        return;
+    }
+    banner.classList.remove('hidden');
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPwaPrompt = e;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner && !esModoStandalonePwa()) {
+        banner.classList.remove('hidden');
+    }
+});
+
+window.addEventListener('appinstalled', () => {
+    deferredPwaPrompt = null;
+    document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+    mostrarToast('¡SherekePet instalada en tu pantalla de inicio!');
+});
+
+async function instalarPwaCelular() {
+    if (deferredPwaPrompt) {
+        deferredPwaPrompt.prompt();
+        const { outcome } = await deferredPwaPrompt.userChoice;
+        deferredPwaPrompt = null;
+        if (outcome === 'accepted') {
+            document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+        }
+    } else {
+        // Mostrar guía rápida paso a paso para Android (Chrome) y iPhone (Safari)
+        document.getElementById('modalGuiaInstalarPwa')?.classList.remove('hidden');
+    }
+}
+
+function ocultarBannerPwa() {
+    sessionStorage.setItem('sherekepet_pwa_banner_oculto', '1');
+    document.getElementById('pwaInstallBanner')?.classList.add('hidden');
+}
+
+function cerrarModalGuiaPwa() {
+    document.getElementById('modalGuiaInstalarPwa')?.classList.add('hidden');
+}
+
 // Service Worker PWA y Monitoreo en Tiempo Real de Confirmación de Citas
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+        inicializarBannerInstalarPwa();
         navigator.serviceWorker.register('/service-worker.js')
             .then(() => {
                 actualizarEstadoBotonAlarma();
@@ -1492,6 +1552,7 @@ if ('serviceWorker' in navigator) {
     });
 } else {
     window.addEventListener('load', () => {
+        inicializarBannerInstalarPwa();
         verificarEstadoCitasEnTiempoReal();
         setInterval(verificarEstadoCitasEnTiempoReal, 12000);
     });

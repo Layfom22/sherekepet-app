@@ -42,23 +42,28 @@ router = APIRouter(tags=["Seguimiento de Medicación y Portal Cliente"])
 @router.get("/manifest.json", summary="PWA Web App Manifest")
 def get_manifest():
     manifest_data = {
+        "id": "/portal/dashboard",
         "name": "SherekePet - Portal de Medicación",
         "short_name": "SherekePet",
-        "description": "Portal móvil para dueños de mascotas y control de medicación",
+        "description": "Portal móvil para dueños de mascotas, carnet digital y control de medicación",
         "start_url": "/portal/dashboard",
+        "scope": "/",
         "display": "standalone",
+        "orientation": "portrait",
         "background_color": "#ffffff",
-        "theme_color": "#0d9488",
+        "theme_color": "#4f46e5",
         "icons": [
             {
                 "src": "/static/img/icon-192.png",
                 "sizes": "192x192",
-                "type": "image/png"
+                "type": "image/png",
+                "purpose": "any maskable"
             },
             {
                 "src": "/static/img/icon-512.png",
                 "sizes": "512x512",
-                "type": "image/png"
+                "type": "image/png",
+                "purpose": "any maskable"
             }
         ]
     }

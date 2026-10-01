@@ -595,12 +595,17 @@ def test_confirmacion_cita_veterinario_visible_y_notificada_en_portal_dueno(clie
     assert resp_dash.status_code == 200
     html = resp_dash.text
 
-    # Header neutral en la barra superior
+    # Header neutral en la barra superior + Botón Actualizar página
     assert "SherekePet &bull; Portal de Mascotas" in html
-    # Banner y tarjeta de cita confirmada por el veterinario
-    assert "Cita Confirmada por Veterinario" in html
-    assert "aceptó la cita de" in html
+    assert 'id="btnActualizarPaginaPortal"' in html
+    # Tarjeta única y limpia de cita confirmada por el veterinario (sin banners redundantes)
+    assert "alertaCitaRecienConfirmada" not in html
+    assert "✓ Confirmada" in html
     assert "El veterinario aceptó y confirmó tu cita." in html
+    # Banner y guía de instalación en pantalla de inicio del celular
+    assert 'id="pwaInstallBanner"' in html
+    assert 'id="modalGuiaInstalarPwa"' in html
+
 
 
 

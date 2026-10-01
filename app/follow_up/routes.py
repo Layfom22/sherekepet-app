@@ -599,20 +599,20 @@ def portal_dashboard(
 
     ahora_lima = get_lima_now()
     hoy_lima = ahora_lima.date()
-    hora_actual = ahora_lima.time()
 
-    # Citas agendadas vigentes del cliente (por DNI) — excluir citas pasadas (fechas anteriores o horas de hoy que ya pasaron)
-    citas_raw = db.query(Cita).join(Cliente).filter(
+    # Citas agendadas vigentes del cliente (por DNI) — excluir citas de fechas pasadas (Cita.fecha < hoy_lima)
+    # Usar func.upper(Cita.estado) porque el veterinario confirma guardando "Confirmada"
+    citas_cliente = db.query(Cita).join(Cliente).filter(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
-    citas_cliente = [
-        c for c in citas_raw
-        if c.fecha > hoy_lima or (c.fecha == hoy_lima and (not c.hora or c.hora >= hora_actual))
+    citas_confirmadas = [
+        c for c in citas_cliente
+        if (c.estado or "").upper() == "CONFIRMADA"
     ]
 
     # Citas sugeridas por la veterinaria (ej: Próximo Baño sugerido) para retención y confirmación móvil
@@ -620,7 +620,7 @@ def portal_dashboard(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        Cita.estado == "SUGERIDA",
+        func.upper(Cita.estado) == "SUGERIDA",
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc()).all()
 
@@ -655,11 +655,48 @@ def portal_dashboard(
             "clinicas_cliente": clinicas_cliente,
             "mascotas": mascotas,
             "citas_cliente": citas_cliente,
+            "citas_confirmadas": citas_confirmadas,
             "citas_sugeridas": citas_sugeridas,
             "dosis_pendientes": dosis_pendientes,
+            "hoy_lima": hoy_lima,
             "ahora": ahora_lima
         }
     )
+
+
+@router.get(
+    "/api/portal/citas/estado",
+    summary="Consultar estado en tiempo real de las citas vigentes del dueño"
+)
+def api_estado_citas_portal(request: Request, db: Session = Depends(get_db)):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=401, detail="Sesión no iniciada.")
+
+    hoy_lima = get_lima_now().date()
+    citas = db.query(Cita).join(Cliente).filter(
+        Cliente.dni == cliente.dni,
+        Cliente.is_deleted == False,
+        Cita.is_deleted == False,
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.fecha >= hoy_lima
+    ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
+
+    return {
+        "citas": [
+            {
+                "id": c.id,
+                "mascota": c.mascota.nombre if c.mascota else "Mascota",
+                "clinica": (c.clinica.nombre_comercial or c.clinica.nombre) if c.clinica else "Veterinaria",
+                "fecha": c.fecha.strftime("%d/%m/%Y") if c.fecha else "",
+                "es_hoy": c.fecha == hoy_lima if c.fecha else False,
+                "hora": c.hora.strftime("%I:%M %p") if c.hora else "",
+                "motivo": c.motivo or "Consulta",
+                "estado": (c.estado or "PENDIENTE").upper()
+            }
+            for c in citas
+        ]
+    }
 
 
 def extraer_detalle_receta(texto_tratamiento: Optional[str]):

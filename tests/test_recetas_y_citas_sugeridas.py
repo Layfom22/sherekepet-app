@@ -513,3 +513,94 @@ def test_reprogramar_dosis_manana_y_noche(client, db_session):
     assert data_n["hora_formateada"] == "08:00 PM"
 
 
+def test_confirmacion_cita_veterinario_visible_y_notificada_en_portal_dueno(client, db_session):
+    """
+    Validar que:
+    1. El header superior del portal sea neutral ('SherekePet &bull; Portal de Mascotas').
+    2. Cuando el veterinario confirma una cita para hoy (guardando estado='Confirmada'),
+       el portal del dueño la muestre con el banner de 'Cita Confirmada por Veterinario'
+       y el endpoint de tiempo real /api/portal/citas/estado retorne estado='CONFIRMADA'.
+    """
+    from app.clinic.models import Veterinario
+
+    clinica = Clinica(
+        nombre="RoyVet S.A.C.",
+        nombre_comercial="RoyVetComercial",
+        zona_horaria="America/Lima",
+        plan_activo="solo"
+    )
+    db_session.add(clinica)
+    db_session.flush()
+
+    vet = Veterinario(
+        clinica_id=clinica.id,
+        nombre="Dr. Roy",
+        email="roy@royvet.com",
+        rol="ADMIN",
+        is_verified=True
+    )
+    dueno = Cliente(
+        clinica_id=clinica.id,
+        dni="70566731",
+        nombre_completo="Roger Cabezudo",
+        email="roggerjjj@hotmail.com"
+    )
+    db_session.add_all([vet, dueno])
+    db_session.flush()
+
+    mascota = Mascota(clinica_id=clinica.id, cliente_id=dueno.id, nombre="Princesa", especie="Canino")
+    db_session.add(mascota)
+    db_session.flush()
+
+    hoy = get_lima_now().date()
+    cita_hoy = Cita(
+        clinica_id=clinica.id,
+        cliente_id=dueno.id,
+        mascota_id=mascota.id,
+        fecha=hoy,
+        hora=time(8, 30),
+        motivo="Control general hoy",
+        estado="PENDIENTE"
+    )
+    db_session.add(cita_hoy)
+    db_session.commit()
+
+    # 1. El veterinario confirma la cita desde su panel (/api/clinic/citas/{id}/confirmar)
+    vet_token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", vet_token)
+    resp_vet = client.put(f"/api/clinic/citas/{cita_hoy.id}/confirmar", json={})
+    assert resp_vet.status_code == 200
+    assert resp_vet.json()["estado"] == "Confirmada"
+
+    # 2. El dueño consulta su portal (/portal/dashboard) y el endpoint de tiempo real (/api/portal/citas/estado)
+    client.cookies.clear()
+    client_token = create_access_token(data={"sub": str(dueno.id), "role": "client"})
+    client.cookies.set("client_token", client_token)
+
+    resp_estado = client.get("/api/portal/citas/estado")
+    assert resp_estado.status_code == 200
+    citas_rt = resp_estado.json()["citas"]
+    assert len(citas_rt) == 1
+    assert citas_rt[0]["id"] == cita_hoy.id
+    assert citas_rt[0]["estado"] == "CONFIRMADA"
+    assert citas_rt[0]["es_hoy"] is True
+
+    resp_dash = client.get("/portal/dashboard")
+    assert resp_dash.status_code == 200
+    html = resp_dash.text
+
+    # Header neutral en la barra superior
+    assert "SherekePet &bull; Portal de Mascotas" in html
+    # Banner y tarjeta de cita confirmada por el veterinario
+    assert "Cita Confirmada por Veterinario" in html
+    assert "aceptó la cita de" in html
+    assert "El veterinario aceptó y confirmó tu cita." in html
+
+
+

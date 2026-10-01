@@ -80,19 +80,17 @@
                     </a>
                 </div>
 
-                <!-- Centro: Nombre de la Veterinaria Centrado con Marco Elegante -->
+                <!-- Centro: Marca Neutral del Portal de Mascotas (independiente de la veterinaria) -->
                 <div class="flex-1 flex items-center justify-center min-w-0 px-2 text-center">
-                    <a href="/portal/dashboard" class="inline-flex items-center justify-center space-x-2 max-w-full truncate px-3 py-1.5 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/20 transition-all group" title="{{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'Portal de Mascotas' }}">
-                        {% if clinica and (clinica.logo_url or clinica.logo_b64) %}
+                    <a href="/portal/dashboard" class="inline-flex items-center justify-center space-x-2 max-w-full truncate px-3.5 py-1.5 rounded-2xl bg-white/10 border border-white/15 hover:bg-white/20 transition-all group" title="SherekePet · Portal de Mascotas">
                         <img 
-                            src="{{ clinica.logo_url or clinica.logo_b64 }}" 
-                            alt="{{ clinica.nombre_comercial or clinica.nombre }}" 
-                            class="w-6 h-6 sm:w-7 sm:h-7 rounded-xl object-cover bg-white border border-white/40 shrink-0"
+                            src="/static/img/icon-sherekepet.png" 
+                            alt="SherekePet" 
+                            class="w-6 h-6 sm:w-6 sm:h-6 rounded-xl object-contain bg-white/95 p-0.5 border border-white/40 shrink-0"
                             onerror="this.style.display='none';"
                         >
-                        {% endif %}
                         <span class="text-xs sm:text-sm font-black tracking-tight text-white truncate">
-                            {{ (clinica.nombre_comercial or clinica.nombre) if clinica else 'Portal de Mascotas' }}
+                            SherekePet &bull; Portal de Mascotas
                         </span>
                     </a>
                 </div>

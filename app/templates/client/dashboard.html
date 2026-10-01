@@ -38,6 +38,21 @@
                             </span>
                         </span>
                     </div>
+                    {% if clinicas_cliente %}
+                    <div class="flex items-center flex-wrap gap-1.5 mt-2.5 pt-2 border-t border-slate-100">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Mis Veterinarias:</span>
+                        {% for vet_cli in clinicas_cliente %}
+                        <span class="inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold border border-slate-200">
+                            {% if vet_cli.logo_url or vet_cli.logo_b64 %}
+                            <img src="{{ vet_cli.logo_url or vet_cli.logo_b64 }}" alt="{{ vet_cli.nombre_comercial or vet_cli.nombre }}" class="w-3.5 h-3.5 rounded-full object-cover" onerror="this.style.display='none';">
+                            {% else %}
+                            <i data-lucide="hospital" class="w-3 h-3 text-indigo-500" aria-hidden="true"></i>
+                            {% endif %}
+                            <span>{{ vet_cli.nombre_comercial or vet_cli.nombre }}</span>
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -154,32 +169,110 @@
     </div>
     {% endif %}
 
+    <!-- Contenedor Dinámico de Alerta en Tiempo Real cuando el Veterinario acepta una cita -->
+    <div id="alertaCitaRecienConfirmada" class="hidden bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-3xl p-4 sm:p-5 shadow-lg border-2 border-emerald-300 animate-in fade-in slide-in-from-top-4 duration-300">
+        <div class="flex items-start space-x-3.5">
+            <div class="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                <i data-lucide="calendar-check-2" class="w-6 h-6 text-white" aria-hidden="true"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <span class="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-md">
+                    Notificación en Tiempo Real
+                </span>
+                <h3 id="tituloCitaRecienConfirmada" class="text-sm sm:text-base font-black mt-1">
+                    ¡El veterinario acaba de aceptar tu cita!
+                </h3>
+                <p id="detalleCitaRecienConfirmada" class="text-xs text-emerald-50 font-medium mt-0.5"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Banner de Citas Aceptadas por el Veterinario -->
+    {% if citas_confirmadas %}
+    <div class="bg-gradient-to-br from-emerald-50 via-teal-50/80 to-white rounded-3xl p-4 sm:p-5 border-2 border-emerald-400 shadow-sm space-y-2.5">
+        {% for cc in citas_confirmadas %}
+        <div class="flex items-start space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <i data-lucide="check-check" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+            <div class="min-w-0 flex-1 text-xs">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-600 text-white">
+                        ✅ Cita Confirmada por Veterinario
+                    </span>
+                    {% if hoy_lima and cc.fecha == hoy_lima %}
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                        📅 ¡ES HOY!
+                    </span>
+                    {% endif %}
+                </div>
+                <p class="text-sm font-black text-slate-900 mt-1">
+                    {{ cc.clinica.nombre_comercial or cc.clinica.nombre }} aceptó la cita de <span class="text-emerald-700 underline decoration-emerald-300 decoration-2">{{ cc.mascota.nombre }}</span>
+                </p>
+                <p class="text-[11px] font-semibold text-slate-600 mt-0.5">
+                    📆 {{ cc.fecha.strftime('%d/%m/%Y') }} a las <strong>{{ cc.hora.strftime('%I:%M %p') }}</strong> &bull; {{ cc.motivo }}
+                </p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Sección: Mis Próximas Citas (si existen) -->
     {% if citas_cliente %}
-    <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
-        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+    <div id="seccionProximasCitas" class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2.5 flex-wrap gap-2">
             <h2 class="text-sm font-black text-slate-900 flex items-center space-x-1.5 tracking-tight">
                 <i data-lucide="calendar-days" class="w-4 h-4 text-teal-600" aria-hidden="true"></i>
                 <span>Mis Próximas Citas</span>
             </h2>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                {{ citas_cliente|length }} agendada{{ 's' if citas_cliente|length != 1 else '' }}
-            </span>
+            <div class="flex items-center gap-2">
+                <button 
+                    type="button" 
+                    onclick="activarNotificacionesCelular()"
+                    class="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 inline-flex items-center space-x-1 transition-all"
+                    title="Recibir alerta en mi celular cuando el veterinario confirme"
+                >
+                    <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                    <span class="txtEstadoNotifCitas">Avisarme en celular</span>
+                </button>
+                <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    {{ citas_cliente|length }} agendada{{ 's' if citas_cliente|length != 1 else '' }}
+                </span>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {% for c in citas_cliente %}
-            <div class="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60 flex items-start space-x-3">
-                <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex flex-col items-center justify-center text-teal-800 font-mono shrink-0 shadow-2xs">
+            {% set es_confirmada = (c.estado or '')|upper == 'CONFIRMADA' %}
+            {% set es_hoy = hoy_lima and c.fecha == hoy_lima %}
+            <div 
+                id="cita-card-{{ c.id }}"
+                data-cita-id="{{ c.id }}"
+                data-cita-estado="{{ (c.estado or 'PENDIENTE')|upper }}"
+                class="p-3.5 rounded-2xl border-2 {% if es_confirmada %}border-emerald-400 bg-emerald-50/50{% else %}border-amber-200 bg-amber-50/30{% endif %} flex items-start space-x-3 transition-all"
+            >
+                <div class="w-12 h-12 rounded-xl bg-white border {% if es_confirmada %}border-emerald-300 text-emerald-800{% else %}border-amber-200 text-amber-800{% endif %} flex flex-col items-center justify-center font-mono shrink-0 shadow-2xs">
                     <span class="text-xs font-black">{{ c.hora.strftime('%I:%M') }}</span>
                     <span class="text-[9px] font-bold uppercase text-slate-400">{{ c.hora.strftime('%p') }}</span>
                 </div>
                 <div class="min-w-0 flex-1 text-xs">
-                    <div class="flex items-center justify-between">
-                        <p class="font-black text-slate-900 truncate">{{ c.mascota.nombre }}</p>
-                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full {% if c.estado == 'CONFIRMADA' %}bg-emerald-100 text-emerald-800{% else %}bg-amber-100 text-amber-800{% endif %}">
-                            {{ c.estado }}
+                    <div class="flex items-center justify-between gap-1 flex-wrap">
+                        <div class="flex items-center gap-1.5">
+                            <p class="font-black text-slate-900 truncate">{{ c.mascota.nombre }}</p>
+                            {% if es_hoy %}
+                            <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">HOY</span>
+                            {% endif %}
+                        </div>
+                        {% if es_confirmada %}
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white inline-flex items-center space-x-1">
+                            <span>✓ Confirmada</span>
                         </span>
+                        {% else %}
+                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                            ⏳ Por confirmar
+                        </span>
+                        {% endif %}
                     </div>
                     <p class="text-[11px] font-semibold text-teal-700 truncate mt-0.5 flex items-center space-x-1">
                         <i data-lucide="hospital" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
@@ -189,6 +282,15 @@
                         <i data-lucide="calendar-days" class="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true"></i>
                         <span class="truncate">{{ c.fecha.strftime('%d/%m/%Y') }} &bull; {{ c.motivo }}</span>
                     </p>
+                    {% if es_confirmada %}
+                    <p class="text-[10px] font-bold text-emerald-700 mt-1">
+                        ✅ El veterinario aceptó y confirmó tu cita.
+                    </p>
+                    {% else %}
+                    <p class="text-[10px] font-medium text-amber-700 mt-1">
+                        🔔 Te notificaremos aquí y por correo apenas el veterinario confirme.
+                    </p>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
@@ -1221,15 +1323,101 @@ async function descartarCitaSugerida(citaId) {
     }
 }
 
-// Notificaciones Móviles PWA para Recordatorios de Pastillas
+// Notificaciones Móviles PWA para Recordatorios de Pastillas y Confirmación de Citas
 function actualizarEstadoBotonAlarma() {
-    const txt = document.getElementById('txtActivarAlarmaPwa');
-    const btn = document.getElementById('btnActivarAlarmaPwa');
-    if (!txt || !btn || !('Notification' in window)) return;
+    if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-        txt.textContent = 'Alertas activadas en celular';
-        btn.classList.remove('bg-white', 'text-amber-900', 'border-amber-300');
-        btn.classList.add('bg-emerald-100', 'text-emerald-900', 'border-emerald-300');
+        const txt = document.getElementById('txtActivarAlarmaPwa');
+        const btn = document.getElementById('btnActivarAlarmaPwa');
+        if (txt && btn) {
+            txt.textContent = 'Alertas activadas en celular';
+            btn.classList.remove('bg-white', 'text-amber-900', 'border-amber-300');
+            btn.classList.add('bg-emerald-100', 'text-emerald-900', 'border-emerald-300');
+        }
+        document.querySelectorAll('.txtEstadoNotifCitas').forEach(el => {
+            el.textContent = 'Alertas activadas';
+        });
+    }
+}
+
+async function lanzarNotificacionNativaCitaConfirmada(cita) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sw = reg?.active || navigator.serviceWorker?.controller;
+        const title = `✅ ¡El veterinario aceptó tu cita!`;
+        const body = `${cita.clinica} confirmó la cita de ${cita.mascota} para el ${cita.fecha} a las ${cita.hora} (${cita.motivo}).`;
+        if (sw) {
+            sw.postMessage({
+                type: 'SHOW_DOSE_NOTIFICATION',
+                title: title,
+                body: body,
+                tag: `cita-confirmada-${cita.id}`,
+                url: '/portal/dashboard#seccionProximasCitas'
+            });
+        } else {
+            new Notification(title, { body: body, icon: '/static/img/icon-192.png' });
+        }
+    } catch (err) {
+        console.warn('No se pudo lanzar notificación nativa de cita:', err);
+    }
+}
+
+async function verificarEstadoCitasEnTiempoReal() {
+    try {
+        const resp = await fetch('/api/portal/citas/estado', { cache: 'no-store' });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const citas = data.citas || [];
+
+        let estadoPrevioMap = {};
+        let notificadasMap = {};
+        try {
+            estadoPrevioMap = JSON.parse(localStorage.getItem('sherekepet_citas_estado_map') || '{}');
+            notificadasMap = JSON.parse(localStorage.getItem('sherekepet_citas_notificadas') || '{}');
+        } catch (_) {}
+
+        let huboCambioEnPantalla = false;
+
+        for (const c of citas) {
+            const estadoAnterior = estadoPrevioMap[c.id];
+            const cardEl = document.getElementById(`cita-card-${c.id}`);
+            const estadoEnDom = cardEl?.getAttribute('data-cita-estado');
+
+            // Si la cita está CONFIRMADA y antes estaba PENDIENTE (o aún no se ha notificado al dueño)
+            if (c.estado === 'CONFIRMADA' && (!notificadasMap[c.id] || estadoAnterior === 'PENDIENTE' || estadoEnDom === 'PENDIENTE')) {
+                notificadasMap[c.id] = true;
+
+                // Mostrar alerta visual destacada en la Web App
+                const banner = document.getElementById('alertaCitaRecienConfirmada');
+                const titulo = document.getElementById('tituloCitaRecienConfirmada');
+                const detalle = document.getElementById('detalleCitaRecienConfirmada');
+                if (banner && titulo && detalle) {
+                    titulo.textContent = `🎉 ¡${c.clinica} aceptó la cita de ${c.mascota}!`;
+                    detalle.textContent = `Confirmada para el ${c.fecha} a las ${c.hora} (${c.motivo}).`;
+                    banner.classList.remove('hidden');
+                }
+
+                mostrarToast(`✅ ¡${c.clinica} confirmó tu cita para ${c.mascota} (${c.hora})!`);
+                await lanzarNotificacionNativaCitaConfirmada(c);
+
+                if (estadoEnDom === 'PENDIENTE' || !cardEl) {
+                    huboCambioEnPantalla = true;
+                }
+            }
+            estadoPrevioMap[c.id] = c.estado;
+        }
+
+        try {
+            localStorage.setItem('sherekepet_citas_estado_map', JSON.stringify(estadoPrevioMap));
+            localStorage.setItem('sherekepet_citas_notificadas', JSON.stringify(notificadasMap));
+        } catch (_) {}
+
+        if (huboCambioEnPantalla) {
+            setTimeout(() => window.location.reload(), 2200);
+        }
+    } catch (e) {
+        // Silencioso en caso de pérdida momentánea de red
     }
 }
 
@@ -1267,8 +1455,8 @@ async function programarAlarmasDosisPendientes(forzarNotificacionPrueba = false)
     if (forzarNotificacionPrueba) {
         sw.postMessage({
             type: 'SHOW_DOSE_NOTIFICATION',
-            title: '🔔 ¡Recordatorios de pastillas activados!',
-            body: 'Tu celular te avisará cuando le toque la medicina a tu mascota.',
+            title: '🔔 ¡Alertas de Citas y Pastillas activadas!',
+            body: 'Tu celular te avisará cuando el veterinario confirme tu cita o le toque medicina a tu mascota.',
             tag: 'sherekepet-test-alarm',
             url: '/portal/dashboard'
         });
@@ -1284,21 +1472,28 @@ async function activarNotificacionesCelular() {
     if (perm === 'granted') {
         actualizarEstadoBotonAlarma();
         await programarAlarmasDosisPendientes(true);
-        mostrarToast('¡Notificaciones en celular activadas!');
+        mostrarToast('¡Notificaciones de citas y pastillas activadas!');
     } else {
         alert('Permiso de notificaciones denegado. Puedes activarlo en la configuración del navegador o agregar tu correo en "Mi Perfil".');
     }
 }
 
-// Service Worker PWA
+// Service Worker PWA y Monitoreo en Tiempo Real de Confirmación de Citas
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('/service-worker.js')
             .then(() => {
                 actualizarEstadoBotonAlarma();
                 programarAlarmasDosisPendientes(false);
+                verificarEstadoCitasEnTiempoReal();
+                setInterval(verificarEstadoCitasEnTiempoReal, 12000);
             })
             .catch(err => console.log('SW error:', err));
+    });
+} else {
+    window.addEventListener('load', () => {
+        verificarEstadoCitasEnTiempoReal();
+        setInterval(verificarEstadoCitasEnTiempoReal, 12000);
     });
 }
 </script>

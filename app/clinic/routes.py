@@ -2463,6 +2463,15 @@ def confirmar_cita_veterinario(
         destinatario_email = request.query_params.get("destinatario_email") or request.query_params.get("email")
     if not destinatario_email and cita.cliente:
         destinatario_email = getattr(cita.cliente, "email", None)
+        if not destinatario_email and cita.cliente.dni:
+            otro_cli = db.query(Cliente).filter(
+                Cliente.dni == cita.cliente.dni,
+                Cliente.email.isnot(None),
+                Cliente.email != "",
+                Cliente.is_deleted == False
+            ).first()
+            if otro_cli:
+                destinatario_email = otro_cli.email
 
     if destinatario_email:
         background_tasks.add_task(enviar_alerta_paciente, cita.id, destinatario_email)

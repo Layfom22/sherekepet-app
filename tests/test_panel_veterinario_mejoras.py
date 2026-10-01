@@ -356,3 +356,82 @@ def test_deduplicacion_mascotas_mismo_nombre_y_multi_clinica(client, db_session,
     assert resp_ficha.status_code == 200
     assert "Mulato" in resp_ficha.text
 
+
+def test_modulo_mis_productos_crud_y_privacidad_multitenant(client, db_session, vet_setup):
+    """
+    Verifica:
+    1. Acceso al módulo GET /productos y presencia en el menú lateral.
+    2. Creación de productos propios (Vacuna, Medicina) mediante POST /api/clinic/productos.
+    3. Aislamiento Multi-Tenant: los productos de otra clínica nunca aparecen en la lista de este veterinario.
+    4. Edición (PUT) y eliminación lógica (DELETE) de productos propios.
+    """
+    clinica = vet_setup["clinica"]
+
+    # 1. Crear otra clínica con su propio producto privado
+    otra_clinica = Clinica(
+        nombre="Veterinaria Ajena",
+        nombre_comercial="Vet Ajena",
+        zona_horaria="America/Lima",
+        plan_activo="solo"
+    )
+    db_session.add(otra_clinica)
+    db_session.flush()
+
+    prod_ajeno = Producto(
+        clinica_id=otra_clinica.id,
+        nombre="Vacuna Secreta Otra Vet",
+        tipo="Vacuna",
+        stock_actual=50.0,
+        unidad_medida="dosis",
+        stock_minimo=5.0
+    )
+    db_session.add(prod_ajeno)
+    db_session.commit()
+
+    # 2. Verificar que la vista GET /productos carga correctamente
+    resp_vista = client.get("/productos")
+    assert resp_vista.status_code == 200
+    assert "Mis Productos" in resp_vista.text
+    assert 'href="/productos"' in resp_vista.text
+
+    # 3. Crear una Vacuna propia del veterinario
+    resp_crear = client.post("/api/clinic/productos", json={
+        "nombre": "Séxtuple Vanguard Plus",
+        "tipo": "Vacuna",
+        "codigo": "LOTE-Z99",
+        "stock_actual": 15,
+        "unidad_medida": "dosis",
+        "stock_minimo": 5,
+        "precio_venta": 65.0
+    })
+    assert resp_crear.status_code == 201
+    mi_vacuna = resp_crear.json()
+    assert mi_vacuna["nombre"] == "Séxtuple Vanguard Plus"
+    assert mi_vacuna["tipo"] == "Vacuna"
+    assert mi_vacuna["codigo"] == "LOTE-Z99"
+    assert mi_vacuna["clinica_id"] == clinica.id
+
+    # 4. Listar productos del veterinario y comprobar que NO aparece el de otra clínica
+    resp_lista = client.get("/api/clinic/productos")
+    assert resp_lista.status_code == 200
+    nombres = [p["nombre"] for p in resp_lista.json()]
+    assert "Séxtuple Vanguard Plus" in nombres
+    assert "Vacuna Secreta Otra Vet" not in nombres
+
+    # 5. Intentar editar o borrar el producto ajeno debe dar 404
+    resp_del_ajeno = client.delete(f"/api/clinic/productos/{prod_ajeno.id}")
+    assert resp_del_ajeno.status_code == 404
+
+    # 6. Editar y eliminar el producto propio
+    resp_edit = client.put(f"/api/clinic/productos/{mi_vacuna['id']}", json={
+        "nombre": "Séxtuple Vanguard Plus 5",
+        "stock_actual": 20
+    })
+    assert resp_edit.status_code == 200
+    assert resp_edit.json()["nombre"] == "Séxtuple Vanguard Plus 5"
+    assert resp_edit.json()["stock_actual"] == 20.0
+
+    resp_del = client.delete(f"/api/clinic/productos/{mi_vacuna['id']}")
+    assert resp_del.status_code == 200
+
+

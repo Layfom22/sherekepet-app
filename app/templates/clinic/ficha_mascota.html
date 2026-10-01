@@ -352,20 +352,29 @@
 
             <!-- Campos Condicionales de Vacuna -->
             <div id="seccionVacuna" class="hidden p-4 rounded-xl bg-teal-50/70 border border-teal-200 space-y-3">
-                <p class="text-xs font-bold text-teal-900 uppercase">Detalles de la Vacuna</p>
+                <div class="flex items-center justify-between">
+                    <p class="text-xs font-bold text-teal-900 uppercase">Detalles de la Vacuna</p>
+                    <a href="/productos" class="text-[11px] font-bold text-teal-700 hover:underline inline-flex items-center gap-1">
+                        <i data-lucide="package" class="w-3 h-3"></i>
+                        <span>Gestionar mis vacunas</span>
+                    </a>
+                </div>
                 <div>
                     <label for="tipo_vacuna_select" class="block text-xs font-semibold text-slate-700 mb-1">Nombre / Tipo de Vacuna *</label>
                     <select id="tipo_vacuna_select" onchange="seleccionarTipoVacuna(this.value)" class="w-full px-3 py-2 text-sm bg-white border border-teal-300 rounded-lg mb-2">
-                        <option value="">-- Selecciona una vacuna común o escribe otra --</option>
-                        <option value="Séxtuple Canina">Séxtuple Canina (Perros)</option>
-                        <option value="Quíntuple Canina">Quíntuple Canina (Perros)</option>
-                        <option value="Puppy DP">Puppy DP (Cachorros)</option>
-                        <option value="Antirrábica">Antirrábica (Perros / Gatos)</option>
-                        <option value="Triple Felina">Triple Felina (Gatos)</option>
-                        <option value="Leucemia Felina">Leucemia Felina (Gatos)</option>
-                        <option value="Giardia">Giardia (Perros)</option>
-                        <option value="KC / Tos de las Perreras">KC / Tos de las Perreras</option>
-                        <option value="OTRA">Otra (Escribir nombre personalizado)</option>
+                        <option value="">-- Selecciona una vacuna de tu inventario o común --</option>
+                        <optgroup id="optgroupMisVacunas" label="📦 Mis Vacunas en Inventario" class="hidden"></optgroup>
+                        <optgroup label="📋 Catálogo General">
+                            <option value="Séxtuple Canina">Séxtuple Canina (Perros)</option>
+                            <option value="Quíntuple Canina">Quíntuple Canina (Perros)</option>
+                            <option value="Puppy DP">Puppy DP (Cachorros)</option>
+                            <option value="Antirrábica">Antirrábica (Perros / Gatos)</option>
+                            <option value="Triple Felina">Triple Felina (Gatos)</option>
+                            <option value="Leucemia Felina">Leucemia Felina (Gatos)</option>
+                            <option value="Giardia">Giardia (Perros)</option>
+                            <option value="KC / Tos de las Perreras">KC / Tos de las Perreras</option>
+                            <option value="OTRA">Otra (Escribir nombre personalizado)</option>
+                        </optgroup>
                     </select>
                     <input type="text" id="tipo_vacuna" placeholder="Ej: Séxtuple Canina, Rabia..." class="w-full px-3 py-2 text-sm bg-white border border-teal-300 rounded-lg">
                 </div>
@@ -423,10 +432,12 @@
                     <input 
                         type="text" 
                         id="receta_medicamento" 
+                        list="datalistMisMedicinas"
                         placeholder="Ej: Amoxicilina 500mg, Meloxicam, Prednisona..." 
                         oninput="validarRecetaInputs()"
                         class="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-500 font-medium"
                     >
+                    <datalist id="datalistMisMedicinas"></datalist>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
@@ -569,11 +580,46 @@ function abrirModalAtencion() {
     const scrollContainer = modal.querySelector('.overflow-y-auto');
     if (scrollContainer) scrollContainer.scrollTop = 0;
     cargarOpcionesServiciosBano();
+    cargarMisProductosAtencion();
     if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function cerrarModalAtencion() {
     document.getElementById('modalAtencion').classList.add('hidden');
+}
+
+let misProductosAtencion = [];
+let misProductosCargados = false;
+async function cargarMisProductosAtencion() {
+    if (misProductosCargados) return;
+    try {
+        const resp = await fetch('/api/clinic/productos');
+        if (resp.ok) {
+            misProductosAtencion = await resp.json();
+            misProductosCargados = true;
+
+            // 1. Poblar Mis Vacunas en el select de Vacunación
+            const optgroupVacunas = document.getElementById('optgroupMisVacunas');
+            const misVacunas = misProductosAtencion.filter(p => (p.tipo || '').toLowerCase() === 'vacuna');
+            if (optgroupVacunas && misVacunas.length > 0) {
+                optgroupVacunas.classList.remove('hidden');
+                optgroupVacunas.innerHTML = misVacunas.map(v => 
+                    `<option value="${v.nombre}">💉 ${v.nombre} (Stock: ${v.stock_actual} ${v.unidad_medida})</option>`
+                ).join('');
+            }
+
+            // 2. Poblar Mis Medicinas / Desparasitantes en el datalist de Receta
+            const datalistMed = document.getElementById('datalistMisMedicinas');
+            const misMedicinas = misProductosAtencion.filter(p => ['medicina', 'desparasitante'].includes((p.tipo || '').toLowerCase()));
+            if (datalistMed && misMedicinas.length > 0) {
+                datalistMed.innerHTML = misMedicinas.map(m => 
+                    `<option value="${m.nombre}">Stock: ${m.stock_actual} ${m.unidad_medida}</option>`
+                ).join('');
+            }
+        }
+    } catch (e) {
+        console.warn("No se pudieron cargar los productos del veterinario", e);
+    }
 }
 
 let serviciosBanoCargados = false;
@@ -602,6 +648,7 @@ function toggleCamposVacuna() {
 
     if (tipo === 'VACUNACION') {
         seccionVacuna.classList.remove('hidden');
+        cargarMisProductosAtencion();
     } else {
         seccionVacuna.classList.add('hidden');
     }
@@ -649,8 +696,14 @@ function validarRecetaInputs() {
 
 function seleccionarTipoVacuna(nombre) {
     const inputTexto = document.getElementById('tipo_vacuna');
+    const inputLote = document.getElementById('marca_lote');
     if (nombre && nombre !== "OTRA") {
         inputTexto.value = nombre;
+        // Si corresponde a una vacuna del inventario del veterinario con lote registrado, autocompletar
+        const prodVac = misProductosAtencion.find(p => (p.nombre || '').toLowerCase() === nombre.toLowerCase());
+        if (prodVac && prodVac.codigo && inputLote) {
+            inputLote.value = prodVac.codigo;
+        }
         cargarEnfermedades(nombre);
     } else if (nombre === "OTRA") {
         inputTexto.value = "";
@@ -665,7 +718,19 @@ function cargarEnfermedades(nombreVacuna) {
     const contenedor = document.getElementById('contenedorEnfermedades');
     contenedor.innerHTML = "";
 
-    const enfermedades = (nombreVacuna && CATALOGO_VACUNAS[nombreVacuna]) ? CATALOGO_VACUNAS[nombreVacuna] : [];
+    let enfermedades = [];
+    if (nombreVacuna) {
+        if (CATALOGO_VACUNAS[nombreVacuna]) {
+            enfermedades = CATALOGO_VACUNAS[nombreVacuna];
+        } else {
+            const claveCoincidente = Object.keys(CATALOGO_VACUNAS).find(k =>
+                nombreVacuna.toLowerCase().includes(k.toLowerCase())
+            );
+            if (claveCoincidente) {
+                enfermedades = CATALOGO_VACUNAS[claveCoincidente];
+            }
+        }
+    }
 
     if (enfermedades.length === 0) {
         contenedor.innerHTML = '<p class="text-slate-400 text-[11px] italic col-span-2">Puedes añadir enfermedades manualmente con el botón "+ Añadir otra".</p>';

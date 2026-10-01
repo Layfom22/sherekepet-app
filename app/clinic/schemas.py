@@ -215,9 +215,35 @@ class ProductoItem(BaseModel):
     id: int
     clinica_id: int
     nombre: str
+    tipo: str = "Champú"
+    codigo: Optional[str] = None
     stock_actual: float
     unidad_medida: str
     stock_minimo: float
+    precio_costo: Optional[float] = None
+    precio_venta: Optional[float] = None
+
+
+class ProductoCreateRequest(BaseModel):
+    nombre: str = Field(..., min_length=2, max_length=150)
+    tipo: str = Field(default="Medicina", max_length=50)
+    codigo: Optional[str] = Field(default=None, max_length=50)
+    stock_actual: float = Field(default=0.0, ge=0)
+    unidad_medida: str = Field(default="unidades", max_length=30)
+    stock_minimo: float = Field(default=5.0, ge=0)
+    precio_costo: Optional[float] = Field(default=None, ge=0)
+    precio_venta: Optional[float] = Field(default=None, ge=0)
+
+
+class ProductoUpdateRequest(BaseModel):
+    nombre: Optional[str] = Field(default=None, min_length=2, max_length=150)
+    tipo: Optional[str] = Field(default=None, max_length=50)
+    codigo: Optional[str] = Field(default=None, max_length=50)
+    stock_actual: Optional[float] = Field(default=None, ge=0)
+    unidad_medida: Optional[str] = Field(default=None, max_length=30)
+    stock_minimo: Optional[float] = Field(default=None, ge=0)
+    precio_costo: Optional[float] = Field(default=None, ge=0)
+    precio_venta: Optional[float] = Field(default=None, ge=0)
 
 
 class ServicioBanoItem(BaseModel):

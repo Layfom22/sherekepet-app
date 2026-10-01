@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block title %}Mis Productos e Inventario | SherekePet{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Cabecera Principal del Módulo Mis Productos -->
+    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center space-x-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100 text-teal-600 flex items-center justify-center shrink-0 shadow-2xs">
+                <i data-lucide="package" class="w-6 h-6" aria-hidden="true"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <h1 class="text-2xl font-black text-slate-900">Mis Productos</h1>
+                    <span class="px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-teal-50 text-teal-700 border border-teal-200 rounded-full">
+                        Inventario Privado
+                    </span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Gestiona tus propias vacunas, medicinas, champús e insumos. Visibles únicamente para tu veterinaria.
+                </p>
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <!-- Buscador Instantáneo -->
+            <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                    <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
+                </span>
+                <input 
+                    type="text" 
+                    id="inputBuscarProducto" 
+                    oninput="filtrarProductosUI()"
+                    placeholder="Buscar vacuna, medicina, lote..." 
+                    class="w-full sm:w-64 pl-9 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-medium"
+                >
+            </div>
+
+            <!-- Botón Nuevo Producto -->
+            <button 
+                type="button" 
+                onclick="abrirModalProducto()"
+                class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+            >
+                <i data-lucide="plus" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Agregar Producto</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Alerta Dinámica de Operación -->
+    <div id="alertaProductos" class="hidden p-4 rounded-2xl border text-xs font-bold flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+            <span id="alertaProductosTexto"></span>
+        </div>
+        <button type="button" onclick="document.getElementById('alertaProductos').classList.add('hidden')" class="opacity-70 hover:opacity-100">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+    </div>
+
+    <!-- Tarjetas de Resumen Rápido (KPIs) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Productos</span>
+                <span id="kpiTotalProductos" class="text-2xl font-black text-slate-900 font-mono">0</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                <i data-lucide="boxes" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-teal-600 block">Mis Vacunas</span>
+                <span id="kpiTotalVacunas" class="text-2xl font-black text-teal-700 font-mono">0</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                <i data-lucide="syringe" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 block">Medicinas / Pastillas</span>
+                <span id="kpiTotalMedicinas" class="text-2xl font-black text-indigo-700 font-mono">0</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <i data-lucide="pill" class="w-5 h-5"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+            <div>
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 block">Stock Bajo / Alerta</span>
+                <span id="kpiTotalBajoStock" class="text-2xl font-black text-rose-600 font-mono">0</span>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <i data-lucide="triangle-alert" class="w-5 h-5"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros por Categoría -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-1.5 bg-slate-200/70 p-1.5 rounded-2xl flex-wrap">
+            <button type="button" onclick="seleccionarCategoriaFiltro('TODOS')" id="btnFiltro_TODOS" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs">
+                Todos
+            </button>
+            <button type="button" onclick="seleccionarCategoriaFiltro('Vacuna')" id="btnFiltro_Vacuna" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                <i data-lucide="syringe" class="w-3.5 h-3.5"></i>
+                <span>Vacunas</span>
+            </button>
+            <button type="button" onclick="seleccionarCategoriaFiltro('Medicina')" id="btnFiltro_Medicina" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                <i data-lucide="pill" class="w-3.5 h-3.5"></i>
+                <span>Medicinas</span>
+            </button>
+            <button type="button" onclick="seleccionarCategoriaFiltro('Desparasitante')" id="btnFiltro_Desparasitante" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                <i data-lucide="shield-plus" class="w-3.5 h-3.5"></i>
+                <span>Desparasitantes</span>
+            </button>
+            <button type="button" onclick="seleccionarCategoriaFiltro('Champú')" id="btnFiltro_Champú" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                <i data-lucide="droplets" class="w-3.5 h-3.5"></i>
+                <span>Champús / Baño</span>
+            </button>
+        </div>
+
+        <span class="text-[11px] text-slate-400 font-medium">
+            💡 Tus vacunas y medicinas registradas aquí aparecerán al registrar una atención médica.
+        </span>
+    </div>
+
+    <!-- Grid de Productos -->
+    <div id="contenedorProductosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="col-span-full bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400 text-xs">
+            <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600"></i>
+            Cargando tu catálogo de productos...
+        </div>
+    </div>
+
+</div>
+
+<!-- ========================================================== -->
+<!-- MODAL: CREAR / EDITAR PRODUCTO                             -->
+<!-- ========================================================== -->
+<div id="modalProducto" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+    <div class="bg-white max-w-lg w-full rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+        <!-- Header Fijo -->
+        <div class="shrink-0 px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 id="modalProductoTitulo" class="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="package-plus" class="w-5 h-5 text-teal-600"></i>
+                <span>Agregar Nuevo Producto</span>
+            </h3>
+            <button type="button" onclick="cerrarModalProducto()" class="text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 p-1.5 rounded-lg transition-colors" aria-label="Cerrar modal">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form id="formProducto" onsubmit="guardarProducto(event)" class="flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div class="p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain text-xs">
+                <input type="hidden" id="prodId">
+
+                <!-- Categoría / Tipo -->
+                <div>
+                    <label for="prodTipo" class="block font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        Categoría del Producto *
+                    </label>
+                    <select 
+                        id="prodTipo" 
+                        onchange="sugerirUnidadPorTipo(this.value)"
+                        required 
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-bold text-slate-800 text-xs"
+                    >
+                        <option value="Vacuna">💉 Vacuna (Aparecerá en opciones de Vacunación)</option>
+                        <option value="Medicina">💊 Medicina / Pastilla (Aparecerá en Recetas)</option>
+                        <option value="Desparasitante">🛡️ Desparasitante / Antipulgas</option>
+                        <option value="Champú">🧴 Champú / Insumo de Baño</option>
+                        <option value="Insumo">📦 Otro Insumo Clínico</option>
+                    </select>
+                </div>
+
+                <!-- Nombre del Producto -->
+                <div>
+                    <label for="prodNombre" class="block font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                        Nombre del Producto *
+                    </label>
+                    <input 
+                        type="text" 
+                        id="prodNombre" 
+                        required 
+                        placeholder="Ej: Séxtuple Canina Vanguard, Amoxicilina 500mg, Bravecto..." 
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-bold text-slate-900 text-sm"
+                    >
+                </div>
+
+                <!-- Marca / Lote / Código -->
+                <div>
+                    <label for="prodCodigo" class="block font-semibold text-slate-700 mb-1">
+                        Marca / Lote / Referencia <span class="text-slate-400 font-normal">(Opcional)</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="prodCodigo" 
+                        placeholder="Ej: Zoetis Lote 45B, Lab. Bayer..." 
+                        class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white"
+                    >
+                    <p class="text-[11px] text-slate-400 mt-1">Si es una vacuna, el lote se autocompletará al seleccionarla en una atención.</p>
+                </div>
+
+                <!-- Stock Actual y Unidad de Medida -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="prodStockActual" class="block font-semibold text-slate-700 mb-1">
+                            Stock Disponible *
+                        </label>
+                        <input 
+                            type="number" 
+                            step="any" 
+                            min="0" 
+                            id="prodStockActual" 
+                            value="10" 
+                            required 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono font-bold text-sm"
+                        >
+                    </div>
+                    <div>
+                        <label for="prodUnidad" class="block font-semibold text-slate-700 mb-1">
+                            Unidad de Medida *
+                        </label>
+                        <select 
+                            id="prodUnidad" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-semibold"
+                        >
+                            <option value="dosis">dosis</option>
+                            <option value="tabletas">tabletas / pastillas</option>
+                            <option value="unidades">unidades</option>
+                            <option value="ampollas">ampollas</option>
+                            <option value="frascos">frascos</option>
+                            <option value="ml">ml (mililitros)</option>
+                            <option value="pipetas">pipetas</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Stock Mínimo y Precio de Venta -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="prodStockMinimo" class="block font-semibold text-slate-700 mb-1">
+                            Alerta de Stock Mínimo
+                        </label>
+                        <input 
+                            type="number" 
+                            step="any" 
+                            min="0" 
+                            id="prodStockMinimo" 
+                            value="5" 
+                            required 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                        >
+                    </div>
+                    <div>
+                        <label for="prodPrecioVenta" class="block font-semibold text-slate-700 mb-1">
+                            Precio Referencial (S/.) <span class="text-slate-400 font-normal">(Opcional)</span>
+                        </label>
+                        <input 
+                            type="number" 
+                            step="0.10" 
+                            min="0" 
+                            id="prodPrecioVenta" 
+                            placeholder="Ej: 45.00" 
+                            class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white font-mono"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pie Fijo -->
+            <div class="shrink-0 px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5">
+                <button type="button" onclick="cerrarModalProducto()" class="btn-touch px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors">
+                    Cancelar
+                </button>
+                <button type="submit" id="btnGuardarProducto" class="btn-touch px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-colors flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Guardar Producto</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let listaProductosGlobal = [];
+let categoriaFiltroActual = "TODOS";
+
+document.addEventListener("DOMContentLoaded", () => {
+    cargarProductosCatalogo();
+});
+
+async function cargarProductosCatalogo() {
+    try {
+        const resp = await fetch("/api/clinic/productos");
+        if (resp.ok) {
+            listaProductosGlobal = await resp.json();
+            actualizarKPIsProductos();
+            filtrarProductosUI();
+        }
+    } catch (e) {
+        console.error("Error al cargar productos:", e);
+    }
+}
+
+function actualizarKPIsProductos() {
+    const total = listaProductosGlobal.length;
+    const vacunas = listaProductosGlobal.filter(p => (p.tipo || "").toLowerCase() === "vacuna").length;
+    const medicinas = listaProductosGlobal.filter(p => ["medicina", "desparasitante"].includes((p.tipo || "").toLowerCase())).length;
+    const bajoStock = listaProductosGlobal.filter(p => p.stock_actual <= p.stock_minimo).length;
+
+    document.getElementById("kpiTotalProductos").textContent = total;
+    document.getElementById("kpiTotalVacunas").textContent = vacunas;
+    document.getElementById("kpiTotalMedicinas").textContent = medicinas;
+    document.getElementById("kpiTotalBajoStock").textContent = bajoStock;
+}
+
+function seleccionarCategoriaFiltro(cat) {
+    categoriaFiltroActual = cat;
+    const categorias = ["TODOS", "Vacuna", "Medicina", "Desparasitante", "Champú"];
+    const inactiveClass = "btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5";
+    const activeClass = "btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs inline-flex items-center gap-1.5";
+
+    categorias.forEach(c => {
+        const btn = document.getElementById(`btnFiltro_${c}`);
+        if (btn) {
+            btn.className = (c === cat) ? activeClass : inactiveClass;
+        }
+    });
+    filtrarProductosUI();
+}
+
+function obtenerBadgeTipo(tipo) {
+    const t = (tipo || "").toLowerCase();
+    if (t === "vacuna") {
+        return {
+            bg: "bg-teal-50 text-teal-800 border-teal-200",
+            icon: "syringe",
+            label: "Vacuna"
+        };
+    } else if (t === "medicina") {
+        return {
+            bg: "bg-indigo-50 text-indigo-800 border-indigo-200",
+            icon: "pill",
+            label: "Medicina"
+        };
+    } else if (t === "desparasitante") {
+        return {
+            bg: "bg-amber-50 text-amber-800 border-amber-200",
+            icon: "shield-plus",
+            label: "Desparasitante"
+        };
+    } else if (t === "champú" || t === "champu") {
+        return {
+            bg: "bg-sky-50 text-sky-800 border-sky-200",
+            icon: "droplets",
+            label: "Champú / Baño"
+        };
+    }
+    return {
+        bg: "bg-slate-100 text-slate-700 border-slate-200",
+        icon: "package",
+        label: tipo || "Insumo"
+    };
+}
+
+function filtrarProductosUI() {
+    const grid = document.getElementById("contenedorProductosGrid");
+    const q = (document.getElementById("inputBuscarProducto")?.value || "").trim().toLowerCase();
+
+    const filtrados = listaProductosGlobal.filter(p => {
+        const coincideCat = categoriaFiltroActual === "TODOS" || (p.tipo || "").toLowerCase() === categoriaFiltroActual.toLowerCase();
+        const coincideTexto = !q || 
+            (p.nombre || "").toLowerCase().includes(q) || 
+            (p.codigo || "").toLowerCase().includes(q) ||
+            (p.tipo || "").toLowerCase().includes(q);
+        return coincideCat && coincideTexto;
+    });
+
+    if (filtrados.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full bg-white p-10 rounded-3xl border border-slate-200 text-center space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                    <i data-lucide="package-open" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800">No hay productos en esta vista</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Agrega tus propias vacunas, pastillas o insumos con el botón superior.</p>
+                </div>
+                <button type="button" onclick="abrirModalProducto()" class="btn-touch px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl inline-flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Agregar Mi Primer Producto</span>
+                </button>
+            </div>
+        `;
+        window.initLucideIcons?.();
+        return;
+    }
+
+    grid.innerHTML = filtrados.map(p => {
+        const badge = obtenerBadgeTipo(p.tipo);
+        const esBajo = p.stock_actual <= p.stock_minimo;
+        const pasoStock = (p.unidad_medida === "ml") ? 50 : 1;
+
+        return `
+            <div class="bg-white rounded-3xl border ${esBajo ? 'border-rose-200 ring-1 ring-rose-100' : 'border-slate-200 hover:border-teal-300'} p-5 shadow-2xs transition-all flex flex-col justify-between gap-4">
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border inline-flex items-center gap-1 ${badge.bg}">
+                            <i data-lucide="${badge.icon}" class="w-3 h-3"></i>
+                            <span>${badge.label}</span>
+                        </span>
+                        <div class="flex items-center gap-1">
+                            <button type="button" onclick="editarProducto(${p.id})" class="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-slate-100 rounded-lg transition-colors" title="Editar producto">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button type="button" onclick="eliminarProducto(${p.id})" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar producto">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-sm font-black text-slate-900 leading-snug">${p.nombre}</h3>
+                        ${p.codigo ? `<p class="text-[11px] text-slate-500 mt-0.5 font-mono">Lote / Ref: <strong>${p.codigo}</strong></p>` : ''}
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-end justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Stock Disponible</span>
+                        <div class="flex items-baseline gap-1.5 mt-0.5">
+                            <span class="text-2xl font-black font-mono ${esBajo ? 'text-rose-600' : 'text-slate-900'}">${Number(p.stock_actual.toFixed(2))}</span>
+                            <span class="text-xs font-bold text-slate-500">${p.unidad_medida}</span>
+                            ${esBajo ? '<span class="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">Bajo Stock</span>' : ''}
+                        </div>
+                        ${p.precio_venta ? `<span class="text-[11px] font-bold text-emerald-700 mt-1 block">Precio: S/ ${ parseFloat(p.precio_venta).toFixed(2) }</span>` : `<span class="text-[10px] text-slate-400 mt-1 block">Mínimo: ${p.stock_minimo} ${p.unidad_medida}</span>`}
+                    </div>
+
+                    <!-- Controles Rápidos de Stock -->
+                    <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button 
+                            type="button" 
+                            onclick="ajustarStockRapido(${p.id}, -${pasoStock})"
+                            class="w-7 h-7 rounded-lg bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-600 font-black text-xs shadow-2xs flex items-center justify-center transition-colors"
+                            title="Restar ${pasoStock} ${p.unidad_medida}"
+                        >
+                            -${pasoStock}
+                        </button>
+                        <button 
+                            type="button" 
+                            onclick="ajustarStockRapido(${p.id}, ${pasoStock})"
+                            class="w-7 h-7 rounded-lg bg-white hover:bg-teal-50 text-slate-700 hover:text-teal-700 font-black text-xs shadow-2xs flex items-center justify-center transition-colors"
+                            title="Sumar ${pasoStock} ${p.unidad_medida}"
+                        >
+                            +${pasoStock}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+
+    window.initLucideIcons?.();
+}
+
+function sugerirUnidadPorTipo(tipo) {
+    const prodId = document.getElementById("prodId").value;
+    if (prodId) return; // No sobreescribir si está editando un producto existente
+    const selectUnidad = document.getElementById("prodUnidad");
+    const inputMinimo = document.getElementById("prodStockMinimo");
+    const inputActual = document.getElementById("prodStockActual");
+
+    if (tipo === "Vacuna") {
+        selectUnidad.value = "dosis";
+        inputMinimo.value = 5;
+        inputActual.value = 10;
+    } else if (tipo === "Medicina") {
+        selectUnidad.value = "tabletas";
+        inputMinimo.value = 10;
+        inputActual.value = 30;
+    } else if (tipo === "Desparasitante") {
+        selectUnidad.value = "unidades";
+        inputMinimo.value = 5;
+        inputActual.value = 12;
+    } else if (tipo === "Champú") {
+        selectUnidad.value = "ml";
+        inputMinimo.value = 300;
+        inputActual.value = 1000;
+    } else {
+        selectUnidad.value = "unidades";
+        inputMinimo.value = 5;
+        inputActual.value = 10;
+    }
+}
+
+function abrirModalProducto() {
+    document.getElementById("formProducto").reset();
+    document.getElementById("prodId").value = "";
+    document.getElementById("modalProductoTitulo").innerHTML = `<i data-lucide="package-plus" class="w-5 h-5 text-teal-600"></i><span>Agregar Nuevo Producto</span>`;
+    if (categoriaFiltroActual !== "TODOS") {
+        document.getElementById("prodTipo").value = categoriaFiltroActual;
+    } else {
+        document.getElementById("prodTipo").value = "Vacuna";
+    }
+    sugerirUnidadPorTipo(document.getElementById("prodTipo").value);
+    document.getElementById("modalProducto").classList.remove("hidden");
+    window.initLucideIcons?.();
+}
+
+function editarProducto(id) {
+    const p = listaProductosGlobal.find(item => item.id === id);
+    if (!p) return;
+
+    document.getElementById("prodId").value = p.id;
+    document.getElementById("prodTipo").value = p.tipo || "Medicina";
+    document.getElementById("prodNombre").value = p.nombre || "";
+    document.getElementById("prodCodigo").value = p.codigo || "";
+    document.getElementById("prodStockActual").value = p.stock_actual;
+    document.getElementById("prodUnidad").value = p.unidad_medida || "unidades";
+    document.getElementById("prodStockMinimo").value = p.stock_minimo;
+    document.getElementById("prodPrecioVenta").value = p.precio_venta || "";
+
+    document.getElementById("modalProductoTitulo").innerHTML = `<i data-lucide="pencil" class="w-5 h-5 text-teal-600"></i><span>Editar Producto</span>`;
+    document.getElementById("modalProducto").classList.remove("hidden");
+    window.initLucideIcons?.();
+}
+
+function cerrarModalProducto() {
+    document.getElementById("modalProducto").classList.add("hidden");
+}
+
+function mostrarMensajeProductos(texto, exito = true) {
+    const div = document.getElementById("alertaProductos");
+    const span = document.getElementById("alertaProductosTexto");
+    div.className = exito
+        ? "p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between"
+        : "p-4 rounded-2xl border bg-rose-50 border-rose-200 text-rose-800 text-xs font-bold flex items-center justify-between";
+    span.textContent = texto;
+    div.classList.remove("hidden");
+    window.initLucideIcons?.();
+    setTimeout(() => div.classList.add("hidden"), 4500);
+}
+
+async function guardarProducto(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnGuardarProducto");
+    const prodId = document.getElementById("prodId").value;
+    btn.disabled = true;
+
+    const precioRaw = document.getElementById("prodPrecioVenta").value;
+    const payload = {
+        nombre: document.getElementById("prodNombre").value.trim(),
+        tipo: document.getElementById("prodTipo").value,
+        codigo: document.getElementById("prodCodigo").value.trim() || null,
+        stock_actual: parseFloat(document.getElementById("prodStockActual").value) || 0,
+        unidad_medida: document.getElementById("prodUnidad").value,
+        stock_minimo: parseFloat(document.getElementById("prodStockMinimo").value) || 0,
+        precio_venta: precioRaw !== "" ? parseFloat(precioRaw) : null
+    };
+
+    try {
+        const url = prodId ? `/api/clinic/productos/${prodId}` : "/api/clinic/productos";
+        const method = prodId ? "PUT" : "POST";
+
+        const resp = await fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            cerrarModalProducto();
+            mostrarMensajeProductos(prodId ? "Producto actualizado correctamente." : "¡Producto agregado a tu inventario!");
+            await cargarProductosCatalogo();
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error: " + (err.detail || "No se pudo guardar el producto."));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al guardar el producto.");
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function ajustarStockRapido(id, delta) {
+    const p = listaProductosGlobal.find(item => item.id === id);
+    if (!p) return;
+    const nuevoStock = Math.max(0, Number((p.stock_actual + delta).toFixed(2)));
+
+    try {
+        const resp = await fetch(`/api/clinic/productos/${id}/stock`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stock_actual: nuevoStock })
+        });
+        if (resp.ok) {
+            p.stock_actual = nuevoStock;
+            actualizarKPIsProductos();
+            filtrarProductosUI();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+
+async function eliminarProducto(id) {
+    const p = listaProductosGlobal.find(item => item.id === id);
+    if (!p) return;
+    if (!confirm(`¿Seguro que deseas eliminar "${p.nombre}" de tus productos?`)) return;
+
+    try {
+        const resp = await fetch(`/api/clinic/productos/${id}`, { method: "DELETE" });
+        if (resp.ok) {
+            mostrarMensajeProductos(`"${p.nombre}" fue eliminado de tu inventario.`);
+            await cargarProductosCatalogo();
+        }
+    } catch (e) {
+        console.error(e);
+    }
+}
+</script>
+{% endblock %}

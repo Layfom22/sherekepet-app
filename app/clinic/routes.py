@@ -47,6 +47,8 @@ from app.clinic.schemas import (
     AtencionCreateRequest,
     AtencionResponse,
     ProductoItem,
+    ProductoCreateRequest,
+    ProductoUpdateRequest,
     ServicioBanoItem,
     ServicioBanoCreateRequest,
     ProductoStockUpdateRequest,
@@ -607,6 +609,47 @@ def create_servicio_bano(
     )
 
 
+@router.get("/productos", response_class=HTMLResponse, summary="Módulo Mis Productos e Inventario de la Clínica")
+def vista_mis_productos(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    target_clinica_id = current_user.clinica_id
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
+
+    # Asegurar que se inicialicen los insumos base si la clínica es nueva
+    obtener_o_inicializar_servicios_bano(target_clinica_id, db)
+
+    productos = db.query(Producto).filter(
+        Producto.clinica_id == target_clinica_id,
+        Producto.is_deleted == False
+    ).order_by(Producto.tipo.asc(), Producto.nombre.asc()).all()
+
+    hoy = get_lima_now().date()
+    total_citas_pendientes = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.is_deleted == False,
+        func.upper(Cita.estado) == "PENDIENTE",
+        Cita.fecha >= hoy
+    ).count()
+
+    return templates.TemplateResponse(
+        request=request,
+        name="clinic/productos.html",
+        context={
+            "clinica": clinica,
+            "current_user": current_user,
+            "productos": productos,
+            "citas_pendientes_count": total_citas_pendientes
+        }
+    )
+
+
 @router.get(
     "/api/clinic/productos",
     response_model=List[ProductoItem],
@@ -615,6 +658,7 @@ def create_servicio_bano(
 )
 def get_productos_inventario(
     request: Request,
+    tipo: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
@@ -623,12 +667,134 @@ def get_productos_inventario(
     # Asegurar que se inicialicen los insumos por defecto si la clínica es nueva
     obtener_o_inicializar_servicios_bano(target_clinica_id, db)
 
-    productos = db.query(Producto).filter(
+    query = db.query(Producto).filter(
         Producto.clinica_id == target_clinica_id,
         Producto.is_deleted == False
-    ).order_by(Producto.nombre.asc()).all()
+    )
+    if tipo and tipo.strip():
+        query = query.filter(func.lower(Producto.tipo) == tipo.strip().lower())
+
+    productos = query.order_by(Producto.nombre.asc()).all()
 
     return [ProductoItem.model_validate(p) for p in productos]
+
+
+@router.post(
+    "/api/clinic/productos",
+    response_model=ProductoItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear Nuevo Producto en el Inventario del Veterinario",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def crear_producto_inventario(
+    payload: ProductoCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    nombre_limpio = payload.nombre.strip()
+    if not nombre_limpio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El nombre del producto es obligatorio."
+        )
+
+    nuevo_prod = Producto(
+        clinica_id=target_clinica_id,
+        nombre=nombre_limpio,
+        tipo=(payload.tipo or "Medicina").strip(),
+        codigo=payload.codigo.strip() if payload.codigo else None,
+        stock_actual=payload.stock_actual,
+        unidad_medida=(payload.unidad_medida or "unidades").strip(),
+        stock_minimo=payload.stock_minimo,
+        precio_costo=payload.precio_costo,
+        precio_venta=payload.precio_venta
+    )
+    db.add(nuevo_prod)
+    db.commit()
+    db.refresh(nuevo_prod)
+    return ProductoItem.model_validate(nuevo_prod)
+
+
+@router.put(
+    "/api/clinic/productos/{producto_id}",
+    response_model=ProductoItem,
+    summary="Actualizar Datos de un Producto del Veterinario",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def actualizar_producto_inventario(
+    producto_id: int,
+    payload: ProductoUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    prod = db.query(Producto).filter(
+        Producto.id == producto_id,
+        Producto.clinica_id == target_clinica_id,
+        Producto.is_deleted == False
+    ).first()
+
+    if not prod:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Producto no encontrado en esta clínica."
+        )
+
+    if payload.nombre is not None and payload.nombre.strip():
+        prod.nombre = payload.nombre.strip()
+    if payload.tipo is not None and payload.tipo.strip():
+        prod.tipo = payload.tipo.strip()
+    if payload.codigo is not None:
+        prod.codigo = payload.codigo.strip() or None
+    if payload.stock_actual is not None:
+        prod.stock_actual = payload.stock_actual
+    if payload.unidad_medida is not None and payload.unidad_medida.strip():
+        prod.unidad_medida = payload.unidad_medida.strip()
+    if payload.stock_minimo is not None:
+        prod.stock_minimo = payload.stock_minimo
+    if payload.precio_costo is not None:
+        prod.precio_costo = payload.precio_costo
+    if payload.precio_venta is not None:
+        prod.precio_venta = payload.precio_venta
+
+    db.commit()
+    db.refresh(prod)
+    return ProductoItem.model_validate(prod)
+
+
+@router.delete(
+    "/api/clinic/productos/{producto_id}",
+    summary="Eliminar Producto del Inventario del Veterinario",
+    dependencies=[Depends(verificar_acceso_veterinario)]
+)
+def eliminar_producto_inventario(
+    producto_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    current_user = obtener_veterinario_actual(request, db)
+    target_clinica_id = current_user.clinica_id if current_user else 1
+
+    prod = db.query(Producto).filter(
+        Producto.id == producto_id,
+        Producto.clinica_id == target_clinica_id,
+        Producto.is_deleted == False
+    ).first()
+
+    if not prod:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Producto no encontrado en esta clínica."
+        )
+
+    prod.is_deleted = True
+    db.commit()
+    return {"mensaje": "Producto eliminado correctamente.", "id": producto_id}
 
 
 @router.put(
@@ -1329,6 +1495,33 @@ def registrar_atencion(
                 insumo_nombre = producto.nombre
                 stock_restante = producto.stock_actual
                 db.flush()
+
+    elif payload.tipo_atencion == "VACUNACION" and payload.tipo_vacuna:
+        prod_vacuna = db.query(Producto).filter(
+            Producto.clinica_id == payload.clinica_id,
+            func.lower(Producto.nombre) == payload.tipo_vacuna.strip().lower(),
+            Producto.is_deleted == False
+        ).first()
+        if prod_vacuna and prod_vacuna.stock_actual > 0:
+            prod_vacuna.stock_actual = max(0.0, round(float(prod_vacuna.stock_actual) - 1.0, 2))
+            stock_descontado = 1.0
+            insumo_nombre = prod_vacuna.nombre
+            stock_restante = prod_vacuna.stock_actual
+            db.flush()
+
+    if payload.receta_medicamento and payload.receta_medicamento.strip():
+        prod_med = db.query(Producto).filter(
+            Producto.clinica_id == payload.clinica_id,
+            func.lower(Producto.nombre) == payload.receta_medicamento.strip().lower(),
+            Producto.is_deleted == False
+        ).first()
+        if prod_med and prod_med.stock_actual > 0:
+            prod_med.stock_actual = max(0.0, round(float(prod_med.stock_actual) - 1.0, 2))
+            if stock_descontado is None:
+                stock_descontado = 1.0
+                insumo_nombre = prod_med.nombre
+                stock_restante = prod_med.stock_actual
+            db.flush()
 
     db.commit()
 

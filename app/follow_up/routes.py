@@ -1169,6 +1169,21 @@ def get_disponibilidad_clinica(
     if not clinica:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
 
+    # Si la clínica tiene su licencia vencida, pausar la agenda en línea sin bloquear el carnet del dueño
+    if not clinica.tiene_suscripcion_activa:
+        return {
+            "clinica_id": clinica.id,
+            "clinica_nombre": clinica.nombre_comercial or clinica.nombre,
+            "fecha": fecha,
+            "horas_ocupadas": [],
+            "horas_disponibles": [],
+            "hay_disponibilidad": False,
+            "licencia_expirada": True,
+            "mensaje": "La agenda en línea de esta clínica no está disponible temporalmente. Contáctalos directamente.",
+            "contacto_emergencia": clinica.telefono,
+            "telefono_urgencia": clinica.telefono
+        }
+
     try:
         fecha_obj = date.fromisoformat(fecha.strip())
     except Exception:
@@ -1269,6 +1284,13 @@ def agendar_cita_portal(
     clinica = db.query(Clinica).filter(Clinica.id == payload.clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    if not clinica.tiene_suscripcion_activa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La agenda en línea de esta clínica no está disponible temporalmente. Por favor, contáctalos directamente."
+        )
+
 
     # Parsear hora
     try:

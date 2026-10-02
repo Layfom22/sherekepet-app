@@ -142,6 +142,92 @@
     </div>
 
     <!-- ========================================================== -->
+    <!-- BANDEJA DE COMPROBANTES DE PAGO POR REVISAR (YAPE / PLIN)  -->
+    <!-- ========================================================== -->
+    {% if pagos_pendientes %}
+    <div id="seccionPagosPendientesAdmin" class="bg-purple-50/70 rounded-3xl border-2 border-purple-300 shadow-xs overflow-hidden">
+        <div class="p-5 sm:p-6 border-b border-purple-200 flex items-center justify-between gap-4 bg-purple-100/50">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-purple-700 text-white flex items-center justify-center font-black text-sm shrink-0">
+                    {{ pagos_pendientes|length }}
+                </div>
+                <div>
+                    <h2 class="text-base sm:text-lg font-black text-purple-950 flex items-center gap-2">
+                        <span>Comprobantes de Pago por Revisar (Yape / Plin)</span>
+                    </h2>
+                    <p class="text-xs text-purple-800">
+                        Valida el N° de operación o captura subida por la clínica y aprueba en 1 clic para otorgar +30 días.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto bg-white">
+            <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                    <tr class="bg-purple-50/60 border-b border-purple-100 text-[11px] font-extrabold uppercase tracking-wider text-purple-900">
+                        <th class="py-3 px-4">Fecha</th>
+                        <th class="py-3 px-4">Clínica</th>
+                        <th class="py-3 px-4">Método / Monto</th>
+                        <th class="py-3 px-4">N° Operación</th>
+                        <th class="py-3 px-4">Comprobante / Notas</th>
+                        <th class="py-3 px-4 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for pago in pagos_pendientes %}
+                    <tr id="filaPagoPendiente-{{ pago.id }}" class="hover:bg-purple-50/30">
+                        <td class="py-3.5 px-4 text-slate-600 whitespace-nowrap">
+                            {{ pago.created_at.strftime('%d/%m/%Y %H:%M') if pago.created_at else '-' }}
+                        </td>
+                        <td class="py-3.5 px-4 font-bold text-slate-900">
+                            #{{ pago.clinica_id }} &bull; {{ pago.clinica.nombre_mostrado if pago.clinica else 'Clínica' }}
+                        </td>
+                        <td class="py-3.5 px-4 whitespace-nowrap">
+                            <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-900 font-black text-[10px] uppercase">{{ pago.metodo_pago }}</span>
+                            <span class="ml-1 font-black text-slate-900">S/ {{ pago.monto }}</span>
+                        </td>
+                        <td class="py-3.5 px-4 font-mono font-bold text-indigo-950">
+                            {{ pago.referencia_operacion }}
+                        </td>
+                        <td class="py-3.5 px-4">
+                            {% if pago.comprobante_url %}
+                            <a href="{{ pago.comprobante_url }}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 font-bold hover:bg-teal-100">
+                                <i data-lucide="image" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                <span>Ver Captura</span>
+                            </a>
+                            {% else %}
+                            <span class="text-slate-400">Sin imagen adjunta</span>
+                            {% endif %}
+                            {% if pago.notas %}
+                            <p class="text-[11px] text-slate-500 mt-1">{{ pago.notas }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="py-3.5 px-4 text-right whitespace-nowrap space-x-1.5">
+                            <button 
+                                type="button"
+                                onclick="aprobarPagoAdmin({{ pago.id }}, '{{ (pago.clinica.nombre_mostrado if pago.clinica else 'Clínica') | e }}')"
+                                class="btn-touch px-3 py-1.5 text-xs font-black text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs cursor-pointer"
+                            >
+                                ✅ Aprobar (+30d)
+                            </button>
+                            <button 
+                                type="button"
+                                onclick="rechazarPagoAdmin({{ pago.id }}, '{{ (pago.clinica.nombre_mostrado if pago.clinica else 'Clínica') | e }}')"
+                                class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl cursor-pointer"
+                            >
+                                Rechazar
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ========================================================== -->
     <!-- TABLA DE CLÍNICAS CON BARRA DE BÚSQUEDA Y FILTROS          -->
     <!-- ========================================================== -->
     <div class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
@@ -717,5 +803,49 @@
             mostrarFeedbackAdmin('error', error.message);
         }
     }
+
+    async function aprobarPagoAdmin(pagoId, clinicaNombre) {
+        if (!confirm(`¿Aprobar el comprobante #${pagoId} y activar +30 días para "${clinicaNombre}"?`)) {
+            return;
+        }
+        try {
+            const resp = await fetch(`/admin/pagos/${pagoId}/aprobar`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || 'No se pudo aprobar el pago.');
+            }
+            const fila = document.getElementById(`filaPagoPendiente-${pagoId}`);
+            if (fila) fila.remove();
+            mostrarFeedbackAdmin('success', data.mensaje || 'Pago aprobado y +30 días activados.');
+            await cargarClinicas();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        }
+    }
+
+    async function rechazarPagoAdmin(pagoId, clinicaNombre) {
+        if (!confirm(`¿Marcar como rechazado el comprobante #${pagoId} de "${clinicaNombre}"?`)) {
+            return;
+        }
+        try {
+            const resp = await fetch(`/admin/pagos/${pagoId}/rechazar`, {
+                method: 'POST',
+                headers: { 'Accept': 'application/json' }
+            });
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || 'No se pudo rechazar el comprobante.');
+            }
+            const fila = document.getElementById(`filaPagoPendiente-${pagoId}`);
+            if (fila) fila.remove();
+            mostrarFeedbackAdmin('success', data.mensaje || 'Comprobante rechazado.');
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        }
+    }
 </script>
 {% endblock %}
+

@@ -21,7 +21,9 @@ from app.auth.schemas import (
     AsistenteCreateRequest,
     ClinicaConfiguracionUpdate
 )
-from app.core.models import Clinica
+import uuid
+from app.core.config import settings
+from app.core.models import Clinica, PagoSuscripcion
 from app.clinic.models import (
     Especie,
     Raza,
@@ -2664,7 +2666,8 @@ def vista_facturacion_clinica(
 ):
     """
     Vista de Facturación y Planes SaaS: Muestra Plan Emprendedor (S/ 49.00 / mes),
-    días restantes del Trial de 14 días o alerta roja de Suscripción Expirada.
+    días restantes del Trial de 14 días, Periodo de Gracia (3 días), alerta roja de Suscripción Expirada,
+    pasarela Mercado Pago, modal de Yape/Plin con subida de comprobante e historial de pagos.
     """
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
@@ -2683,6 +2686,18 @@ def vista_facturacion_clinica(
     expirado = not clinica.tiene_suscripcion_activa
     dias_restantes = clinica.dias_restantes_trial
     en_trial = (clinica.estado_suscripcion or "").upper() == "TRIAL"
+    en_gracia = clinica.en_periodo_gracia
+    dias_gracia = clinica.dias_gracia_restantes
+    dias_suscripcion = clinica.dias_restantes_suscripcion
+
+    historial_pagos = db.query(PagoSuscripcion).filter(
+        PagoSuscripcion.clinica_id == clinica.id
+    ).order_by(PagoSuscripcion.created_at.desc()).limit(20).all()
+
+    pago_pendiente = next(
+        (p for p in historial_pagos if (p.estado or "").upper() == "PENDIENTE_REVISION"),
+        None
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -2693,10 +2708,60 @@ def vista_facturacion_clinica(
             "expirado": expirado,
             "dias_restantes": dias_restantes,
             "en_trial": en_trial,
+            "en_gracia": en_gracia,
+            "dias_gracia": dias_gracia,
+            "dias_suscripcion": dias_suscripcion,
+            "historial_pagos": historial_pagos,
+            "pago_pendiente": pago_pendiente,
+            "yape_titular": settings.YAPE_PLIN_TITULAR,
+            "yape_numero": settings.YAPE_PLIN_NUMERO,
+            "yape_qr_url": settings.YAPE_PLIN_QR_URL,
+            "mp_configured": bool(settings.MP_ACCESS_TOKEN),
             "alerta": alerta,
             "mensaje": mensaje
         }
     )
+
+
+def _aplicar_activacion_30_dias(
+    db: Session,
+    clinica: Clinica,
+    metodo_pago: str = "MERCADOPAGO",
+    referencia_operacion: Optional[str] = None,
+    notas: Optional[str] = None
+) -> PagoSuscripcion:
+    """Activa o extiende por 30 días la suscripción del Plan Emprendedor y registra el pago aprobado."""
+    ahora = get_lima_now()
+    base_inicio = ahora
+    if clinica.subscription_ends_at:
+        s_end = clinica.subscription_ends_at
+        if s_end.tzinfo is None:
+            s_end = s_end.replace(tzinfo=ahora.tzinfo)
+        if s_end > ahora:
+            base_inicio = s_end
+
+    nuevo_fin = base_inicio + timedelta(days=30)
+    clinica.estado_suscripcion = "ACTIVO"
+    clinica.plan_activo = "emprendedor"
+    clinica.subscription_ends_at = nuevo_fin
+
+    ref_final = referencia_operacion or f"MP-{uuid.uuid4().hex[:8].upper()}"
+    pago = PagoSuscripcion(
+        clinica_id=clinica.id,
+        monto="49.00",
+        moneda="PEN",
+        metodo_pago=metodo_pago,
+        referencia_operacion=ref_final,
+        estado="APROBADO",
+        notas=notas or "Suscripción mensual Plan Emprendedor (30 días)",
+        periodo_inicio=ahora,
+        periodo_fin=nuevo_fin
+    )
+    db.add(pago)
+    db.commit()
+    db.refresh(clinica)
+    db.refresh(pago)
+    return pago
 
 
 @router.post("/configuracion/facturacion/activar", response_class=HTMLResponse, summary="Activar Suscripción Plan Emprendedor")
@@ -2705,8 +2770,9 @@ def activar_plan_emprendedor(
     db: Session = Depends(get_db)
 ):
     """
-    Activa la suscripción del Plan Emprendedor (S/ 49.00/mes) pasando el estado a ACTIVO
+    Activa la suscripción del Plan Emprendedor (S/ 49.00/mes) por 30 días pasando el estado a ACTIVO
     y desbloqueando inmediatamente todas las operaciones de la clínica.
+    Si MP_ACCESS_TOKEN está configurado en producción, redirige al Checkout Pro de Mercado Pago.
     """
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
@@ -2718,16 +2784,268 @@ def activar_plan_emprendedor(
         Clinica.is_deleted == False
     ).first()
 
-    if clinica:
-        clinica.estado_suscripcion = "ACTIVO"
-        clinica.plan_activo = "emprendedor"
-        db.commit()
-        db.refresh(clinica)
+    if not clinica:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    # Si hay token de Mercado Pago configurado, intentar crear preferencia Checkout Pro real
+    if settings.MP_ACCESS_TOKEN and settings.MP_ACCESS_TOKEN.strip():
+        try:
+            import httpx
+            base_url = str(request.base_url).rstrip("/")
+            mp_payload = {
+                "items": [
+                    {
+                        "id": f"plan-emprendedor-{clinica.id}",
+                        "title": f"SherekePet - Plan Emprendedor Mensual ({clinica.nombre_mostrado})",
+                        "description": "Suscripción SaaS Veterinario por 30 días",
+                        "quantity": 1,
+                        "currency_id": "PEN",
+                        "unit_price": 49.00
+                    }
+                ],
+                "payer": {
+                    "email": current_user.email or "cliente@sherekepet.com"
+                },
+                "external_reference": str(clinica.id),
+                "back_urls": {
+                    "success": f"{base_url}/configuracion/facturacion/retorno-mp",
+                    "failure": f"{base_url}/configuracion/facturacion?alerta=pago_fallido",
+                    "pending": f"{base_url}/configuracion/facturacion?mensaje=Tu+pago+está+en+proceso+de+validación."
+                },
+                "auto_return": "approved",
+                "notification_url": f"{base_url}/api/billing/webhook/mercadopago"
+            }
+            resp = httpx.post(
+                "https://api.mercadopago.com/checkout/preferences",
+                headers={
+                    "Authorization": f"Bearer {settings.MP_ACCESS_TOKEN.strip()}",
+                    "Content-Type": "application/json"
+                },
+                json=mp_payload,
+                timeout=10.0
+            )
+            if resp.status_code in (200, 201):
+                init_point = resp.json().get("init_point")
+                if init_point:
+                    return RedirectResponse(url=init_point, status_code=status.HTTP_303_SEE_OTHER)
+        except Exception:
+            pass
+
+    # Modo directo / sandbox cuando aún no se configura MP_ACCESS_TOKEN
+    _aplicar_activacion_30_dias(
+        db=db,
+        clinica=clinica,
+        metodo_pago="MERCADOPAGO",
+        notas="Activación Plan Emprendedor (30 días)"
+    )
 
     return RedirectResponse(
-        url="/configuracion/facturacion?mensaje=¡Plan+Emprendedor+(S/+49.00/mes)+activado+con+éxito!+Tu+clínica+cuenta+con+acceso+total.",
+        url="/configuracion/facturacion?mensaje=¡Plan+Emprendedor+(S/+49.00/mes)+activado+con+éxito!+Tu+clínica+cuenta+con+acceso+total+por+30+días.",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+
+@router.get("/configuracion/facturacion/retorno-mp", response_class=HTMLResponse, summary="Retorno desde Mercado Pago Checkout Pro")
+def retorno_mercadopago(
+    request: Request,
+    status_mp: Optional[str] = None,
+    collection_status: Optional[str] = None,
+    payment_id: Optional[str] = None,
+    external_reference: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Procesa el retorno exitoso de Mercado Pago Checkout Pro y activa los 30 días de suscripción."""
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
+
+    estado_pago = (status_mp or collection_status or request.query_params.get("status") or "").lower()
+    if estado_pago == "approved":
+        clinica = db.query(Clinica).filter(
+            Clinica.id == current_user.clinica_id,
+            Clinica.is_deleted == False
+        ).first()
+        if clinica:
+            # Evitar duplicar si el webhook ya registró este payment_id
+            existente = None
+            if payment_id:
+                existente = db.query(PagoSuscripcion).filter(
+                    PagoSuscripcion.referencia_operacion == str(payment_id),
+                    PagoSuscripcion.estado == "APROBADO"
+                ).first()
+            if not existente:
+                _aplicar_activacion_30_dias(
+                    db=db,
+                    clinica=clinica,
+                    metodo_pago="MERCADOPAGO",
+                    referencia_operacion=str(payment_id) if payment_id else None,
+                    notas="Pago automático confirmado vía Mercado Pago"
+                )
+            return RedirectResponse(
+                url="/configuracion/facturacion?mensaje=¡Pago+confirmado+vía+Mercado+Pago!+Tu+Plan+Emprendedor+está+activo+por+30+días.",
+                status_code=status.HTTP_303_SEE_OTHER
+            )
+
+    return RedirectResponse(
+        url="/configuracion/facturacion?alerta=El+pago+no+pudo+ser+completado+o+sigue+pendiente.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
+
+@router.post("/api/billing/webhook/mercadopago", summary="Webhook Automático de Mercado Pago")
+async def webhook_mercadopago(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Recibe notificaciones IPN/Webhook de Mercado Pago.
+    Cuando un pago es aprobado, renueva automáticamente la clínica por +30 días.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    topic = body.get("type") or body.get("topic") or request.query_params.get("type") or request.query_params.get("topic")
+    data_obj = body.get("data") or {}
+    payment_id = data_obj.get("id") or request.query_params.get("data.id") or body.get("id")
+    external_ref = body.get("external_reference") or data_obj.get("external_reference")
+    payment_status = body.get("status") or data_obj.get("status")
+
+    # Si tenemos MP_ACCESS_TOKEN y solo llegó el payment_id, consultar la API de Mercado Pago
+    if payment_id and settings.MP_ACCESS_TOKEN and not external_ref:
+        try:
+            import httpx
+            resp = httpx.get(
+                f"https://api.mercadopago.com/v1/payments/{payment_id}",
+                headers={"Authorization": f"Bearer {settings.MP_ACCESS_TOKEN.strip()}"},
+                timeout=8.0
+            )
+            if resp.status_code == 200:
+                info = resp.json()
+                external_ref = info.get("external_reference")
+                payment_status = info.get("status")
+        except Exception:
+            pass
+
+    if external_ref and str(payment_status or "approved").lower() == "approved":
+        try:
+            clinica_id = int(external_ref)
+        except (ValueError, TypeError):
+            clinica_id = None
+
+        if clinica_id:
+            clinica = db.query(Clinica).filter(Clinica.id == clinica_id, Clinica.is_deleted == False).first()
+            if clinica:
+                ref_str = str(payment_id) if payment_id else f"MP-WH-{uuid.uuid4().hex[:8].upper()}"
+                ya_procesado = db.query(PagoSuscripcion).filter(
+                    PagoSuscripcion.referencia_operacion == ref_str,
+                    PagoSuscripcion.estado == "APROBADO"
+                ).first()
+                if not ya_procesado:
+                    _aplicar_activacion_30_dias(
+                        db=db,
+                        clinica=clinica,
+                        metodo_pago="MERCADOPAGO",
+                        referencia_operacion=ref_str,
+                        notas="Renovación automática vía Webhook Mercado Pago"
+                    )
+                return {"status": "ok", "clinica_id": clinica.id, "estado_suscripcion": clinica.estado_suscripcion}
+
+    return {"status": "ignored", "topic": topic}
+
+
+@router.post("/api/billing/reportar-pago", summary="Reportar Pago Yape/Plin con Comprobante en Plataforma")
+async def reportar_pago_yape_plin(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    metodo_pago: str = Form("YAPE_PLIN"),
+    referencia_operacion: str = Form(...),
+    notas: Optional[str] = Form(None),
+    comprobante: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Permite a la clínica informar su pago por Yape, Plin o Transferencia directamente en la plataforma
+    (sin depender de WhatsApp), adjuntando el N° de operación y opcionalmente la captura de pantalla.
+    Notifica por correo al SuperAdmin y queda listo para aprobación en 1 clic desde /admin.
+    """
+    verificar_acceso_veterinario(request)
+    current_user = obtener_veterinario_actual(request, db)
+    if not current_user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    clinica = db.query(Clinica).filter(
+        Clinica.id == current_user.clinica_id,
+        Clinica.is_deleted == False
+    ).first()
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
+
+    ref_limpia = (referencia_operacion or "").strip()
+    if not ref_limpia:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El número de operación es obligatorio.")
+
+    comprobante_url = None
+    if comprobante and comprobante.filename:
+        contenido = await comprobante.read()
+        if len(contenido) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La imagen excede los 10MB.")
+        if len(contenido) > 0:
+            comprobante_url = await upload_image_to_r2(
+                file_bytes=contenido,
+                filename=comprobante.filename or f"voucher_{clinica.id}_{uuid.uuid4().hex[:6]}.webp",
+                folder="comprobantes",
+                content_type=comprobante.content_type or "image/webp"
+            )
+
+    metodo_norm = (metodo_pago or "YAPE_PLIN").strip().upper()
+    nuevo_pago = PagoSuscripcion(
+        clinica_id=clinica.id,
+        monto="49.00",
+        moneda="PEN",
+        metodo_pago=metodo_norm,
+        referencia_operacion=ref_limpia,
+        comprobante_url=comprobante_url,
+        estado="PENDIENTE_REVISION",
+        notas=(notas or "").strip() or f"Pago reportado por {current_user.nombre or current_user.email}"
+    )
+    db.add(nuevo_pago)
+    db.commit()
+    db.refresh(nuevo_pago)
+
+    # Notificar por correo electrónico al SuperAdmin en segundo plano
+    try:
+        from app.core.email import send_payment_report_notification_email
+        background_tasks.add_task(
+            send_payment_report_notification_email,
+            clinica.nombre_mostrado,
+            clinica.id,
+            current_user.email or "sin-correo@sherekepet.com",
+            metodo_norm,
+            ref_limpia,
+            "49.00",
+            comprobante_url or ""
+        )
+    except Exception:
+        pass
+
+    accept = request.headers.get("accept", "")
+    if "application/json" in accept:
+        return {
+            "status": "ok",
+            "mensaje": "Comprobante enviado con éxito. Validaremos tu operación en breve.",
+            "pago_id": nuevo_pago.id,
+            "estado": nuevo_pago.estado,
+            "comprobante_url": nuevo_pago.comprobante_url
+        }
+
+    return RedirectResponse(
+        url="/configuracion/facturacion?mensaje=¡Comprobante+recibido+con+éxito!+Nuestro+equipo+validará+tu+operación+y+activará+tus+30+días+en+breve.",
+        status_code=status.HTTP_303_SEE_OTHER
+    )
+
 
 
 # ==========================================

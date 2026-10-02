@@ -188,3 +188,133 @@ def test_portal_duenos_legal_y_cookies(client):
     assert "Cloudflare R2" in resp_priv.text
     assert "veterinarias" in resp_priv.text
 
+
+def test_ciclo_pagos_yape_gracia_y_modo_solo_lectura(client, db_session):
+    """
+    Verifica el flujo completo de:
+    1. Modo Solo Lectura cuando expira la licencia (GET permitido con bannerModoSoloLectura, carnet del dueño intacto, citas online pausadas).
+    2. Reporte de pago Yape/Plin sin WhatsApp (/api/billing/reportar-pago).
+    3. Aprobación en 1 clic desde el Panel SuperAdmin (/admin/pagos/{id}/aprobar) otorgando +30 días.
+    4. Periodo de Gracia de 3 días (bannerPeriodoGracia y acceso operativo activo).
+    """
+    from app.clinic.models import Cliente, Mascota
+
+    ahora = get_lima_now()
+    clinica = Clinica(
+        nombre="Veterinaria Los Olivos Test",
+        zona_horaria="America/Lima",
+        plan_activo="solo",
+        estado_suscripcion="TRIAL",
+        trial_ends_at=ahora - timedelta(days=2)  # Expirado
+    )
+    db_session.add(clinica)
+    db_session.flush()
+
+    vet = Veterinario(
+        clinica_id=clinica.id,
+        email="roggerjjj@gmail.com",  # SuperAdmin + Titular
+        nombre="Dr. Rogger SuperAdmin",
+        password_hash="fakehash",
+        rol="SUPER_ADMIN",
+        is_superadmin=True,
+        is_active=True,
+        is_verified=True
+    )
+    db_session.add(vet)
+
+    cliente_dueno = Cliente(
+        clinica_id=clinica.id,
+        dni="76543210",
+        nombre_completo="María Dueña",
+        telefono="999111222"
+    )
+    db_session.add(cliente_dueno)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente_dueno.id,
+        nombre="Firulais",
+        especie="Canino"
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    # 1. Verificar Modo Solo Lectura (GET /dashboard funciona y muestra bannerModoSoloLectura)
+    assert clinica.modo_solo_lectura is True
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "SUPER_ADMIN",
+        "is_superadmin": True,
+        "is_verified": True
+    })
+    client.cookies.set("vet_token", token)
+
+    resp_dash = client.get("/dashboard")
+    assert resp_dash.status_code == 200
+    assert 'id="bannerModoSoloLectura"' in resp_dash.text
+
+    # 2. Verificar que el Carnet del Dueño NUNCA se bloquea aunque la clínica esté vencida
+    resp_carnet = client.get(f"/portal/carnet/{mascota.id}")
+    assert resp_carnet.status_code == 200
+    assert "Firulais" in resp_carnet.text
+
+    # Pero la agenda online del portal sí se pausa para la clínica vencida
+    hoy_str = ahora.date().isoformat()
+    resp_disp = client.get(f"/api/portal/clinica/{clinica.id}/disponibilidad?fecha={hoy_str}")
+    assert resp_disp.status_code == 200
+    assert resp_disp.json()["hay_disponibilidad"] is False
+    assert resp_disp.json()["licencia_expirada"] is True
+
+    # 3. Reportar pago por Yape directamente en la plataforma (sin WhatsApp)
+    resp_reporte = client.post(
+        "/api/billing/reportar-pago",
+        data={
+            "metodo_pago": "YAPE",
+            "referencia_operacion": "98765432",
+            "notas": "Pago mensual Veterinaria Los Olivos"
+        },
+        headers={"Accept": "application/json"}
+    )
+    assert resp_reporte.status_code == 200
+    datos_rep = resp_reporte.json()
+    assert datos_rep["estado"] == "PENDIENTE_REVISION"
+    pago_id = datos_rep["pago_id"]
+
+    # 4. SuperAdmin aprueba el pago en 1 clic (/admin/pagos/{pago_id}/aprobar)
+    resp_aprob = client.post(
+        f"/admin/pagos/{pago_id}/aprobar",
+        headers={"Accept": "application/json"}
+    )
+    assert resp_aprob.status_code == 200
+    assert resp_aprob.json()["estado_pago"] == "APROBADO"
+
+    db_session.refresh(clinica)
+    assert clinica.tiene_suscripcion_activa is True
+    assert clinica.dias_restantes_suscripcion >= 29
+
+    # 5. Simular vencimiento hace 1 día (entra en Periodo de Gracia de 3 días)
+    clinica.subscription_ends_at = ahora - timedelta(days=1)
+    db_session.commit()
+    db_session.refresh(clinica)
+
+    assert clinica.en_periodo_gracia is True
+    assert clinica.tiene_suscripcion_activa is True
+    assert clinica.dias_gracia_restantes >= 2
+
+    resp_dash_gracia = client.get("/dashboard")
+    assert resp_dash_gracia.status_code == 200
+    assert 'id="bannerPeriodoGracia"' in resp_dash_gracia.text
+
+    # 6. Simular vencimiento hace 5 días (superó los 3 días de gracia -> pasa a Modo Solo Lectura)
+    clinica.subscription_ends_at = ahora - timedelta(days=5)
+    db_session.commit()
+    db_session.refresh(clinica)
+
+    assert clinica.en_periodo_gracia is False
+    assert clinica.tiene_suscripcion_activa is False
+    assert clinica.modo_solo_lectura is True
+
+

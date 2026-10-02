@@ -1,11 +1,11 @@
 from datetime import timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from app.core.models import Clinica
+from app.core.models import Clinica, PagoSuscripcion
 from app.core.security import decode_access_token
 from app.core.timezone import get_lima_now
 from app.clinic.models import Veterinario, Mascota
@@ -189,11 +189,16 @@ def vista_admin_dashboard(
         Veterinario.is_deleted == False
     ).order_by(Veterinario.id.asc()).all()
 
+    pagos_pendientes_db = db.query(PagoSuscripcion).filter(
+        PagoSuscripcion.estado == "PENDIENTE_REVISION"
+    ).order_by(PagoSuscripcion.created_at.desc()).all()
+
     kpis = {
         "total_clinicas": len(clinicas_data),
         "activas": sum(1 for c in clinicas_data if c["estado_suscripcion"] == "ACTIVE"),
         "en_trial": sum(1 for c in clinicas_data if c["estado_suscripcion"] == "TRIAL"),
         "expiradas": sum(1 for c in clinicas_data if c["estado_suscripcion"] == "EXPIRED"),
+        "pagos_pendientes": len(pagos_pendientes_db),
         "total_superadmins": sum(
             1 for u in usuarios_db if u.rol == "SUPER_ADMIN" or getattr(u, "is_superadmin", False)
         )
@@ -206,6 +211,7 @@ def vista_admin_dashboard(
             "current_user": current_user,
             "clinicas": clinicas_data,
             "usuarios": usuarios_db,
+            "pagos_pendientes": pagos_pendientes_db,
             "kpis": kpis
         }
     )
@@ -332,9 +338,12 @@ def cambiar_estado_suscripcion_clinica(
     if nuevo_estado in ("ACTIVE", "ACTIVO"):
         clinica.estado_suscripcion = "ACTIVE"
         clinica.plan_activo = "emprendedor"
+        if not clinica.subscription_ends_at or clinica.subscription_ends_at <= ahora:
+            clinica.subscription_ends_at = ahora + timedelta(days=30)
     elif nuevo_estado in ("EXPIRED", "EXPIRADO"):
         clinica.estado_suscripcion = "EXPIRED"
         clinica.trial_ends_at = ahora - timedelta(days=1)
+        clinica.subscription_ends_at = ahora - timedelta(days=5)
     else:
         clinica.estado_suscripcion = "TRIAL"
         if not clinica.trial_ends_at or clinica.trial_ends_at <= ahora:
@@ -347,6 +356,100 @@ def cambiar_estado_suscripcion_clinica(
     return {
         "mensaje": f"Estado de '{clinica.nombre_mostrado}' actualizado a {datos_actualizados['estado_suscripcion']}.",
         "clinica": datos_actualizados
+    }
+
+
+@router.post(
+    "/pagos/{pago_id}/aprobar",
+    summary="Aprobar Comprobante de Pago Yape/Plin y Activar +30 días"
+)
+def aprobar_pago_suscripcion(
+    pago_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_superadmin)
+):
+    """
+    Aprueba un pago reportado en estado PENDIENTE_REVISION, activa la clínica por +30 días
+    en el Plan Emprendedor y envía correo de confirmación al veterinario titular.
+    """
+    pago = db.query(PagoSuscripcion).filter(PagoSuscripcion.id == pago_id).first()
+    if not pago:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de pago no encontrado.")
+
+    clinica = db.query(Clinica).filter(Clinica.id == pago.clinica_id, Clinica.is_deleted == False).first()
+    if not clinica:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica asociada no encontrada.")
+
+    ahora = get_lima_now()
+    base_inicio = ahora
+    if clinica.subscription_ends_at:
+        s_end = clinica.subscription_ends_at
+        if s_end.tzinfo is None:
+            s_end = s_end.replace(tzinfo=ahora.tzinfo)
+        if s_end > ahora:
+            base_inicio = s_end
+
+    nuevo_fin = base_inicio + timedelta(days=30)
+    clinica.estado_suscripcion = "ACTIVE"
+    clinica.plan_activo = "emprendedor"
+    clinica.subscription_ends_at = nuevo_fin
+
+    pago.estado = "APROBADO"
+    pago.periodo_inicio = ahora
+    pago.periodo_fin = nuevo_fin
+    db.commit()
+    db.refresh(clinica)
+    db.refresh(pago)
+
+    # Notificar por correo al veterinario titular
+    try:
+        from app.core.email import send_payment_approved_email
+        titular = next((v for v in clinica.veterinarios if not v.is_deleted and v.email), None)
+        if titular and titular.email:
+            background_tasks.add_task(
+                send_payment_approved_email,
+                titular.email,
+                clinica.nombre_mostrado,
+                nuevo_fin.strftime("%d/%m/%Y"),
+                pago.monto or "49.00"
+            )
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "mensaje": f"Pago #{pago.id} aprobado. '{clinica.nombre_mostrado}' ahora tiene 30 días activos (hasta {nuevo_fin.strftime('%d/%m/%Y')}).",
+        "pago_id": pago.id,
+        "estado_pago": pago.estado,
+        "clinica_id": clinica.id,
+        "estado_suscripcion": clinica.estado_suscripcion_normalizado
+    }
+
+
+@router.post(
+    "/pagos/{pago_id}/rechazar",
+    summary="Rechazar Comprobante de Pago Inválido"
+)
+def rechazar_pago_suscripcion(
+    pago_id: int,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_superadmin)
+):
+    """Marca un comprobante de pago como RECHAZADO sin activar días adicionales."""
+    pago = db.query(PagoSuscripcion).filter(PagoSuscripcion.id == pago_id).first()
+    if not pago:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de pago no encontrado.")
+
+    pago.estado = "RECHAZADO"
+    db.commit()
+    db.refresh(pago)
+
+    return {
+        "status": "ok",
+        "mensaje": f"Comprobante #{pago.id} marcado como rechazado.",
+        "pago_id": pago.id,
+        "estado_pago": pago.estado
     }
 
 
@@ -391,3 +494,4 @@ def promover_usuario_superadmin(
             "clinica_id": usuario.clinica_id
         }
     }
+

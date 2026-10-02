@@ -127,6 +127,18 @@
                         </div>
                     </div>
                     {% endif %}
+
+                    <div class="pt-2 border-t border-slate-100">
+                        <button
+                            type="button"
+                            id="btnResetPin"
+                            onclick="resetearPinCliente({{ cliente.id }})"
+                            class="btn-touch w-full px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-amber-800 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-200 rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                        >
+                            <i data-lucide="key-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                            <span>Restablecer PIN</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -464,6 +464,47 @@
     <!-- 4. CONTENIDO PRINCIPAL (Desktop: con margen md:pl-64 sólo si hay sidebar) -->
     <!-- ========================================================== -->
     <div class="{% if show_sidebar %}md:pl-64{% endif %} flex flex-col min-h-screen">
+        {% set active_clinica = clinica or (current_user.clinica if current_user else None) %}
+        {% if show_sidebar and active_clinica %}
+            {% if active_clinica.modo_solo_lectura %}
+            <!-- Banner Global Persistente: Modo Solo Lectura (Licencia Vencida) -->
+            <div id="bannerModoSoloLectura" class="bg-rose-600 text-white px-4 py-2.5 shadow-sm border-b border-rose-700">
+                <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-full bg-white text-rose-700 font-black uppercase tracking-wider text-[10px] shrink-0">
+                            Modo Solo Lectura
+                        </span>
+                        <span class="font-semibold">
+                            Tu licencia ha expirado. Puedes consultar el historial de tus pacientes, pero el registro de nuevas atenciones y citas está pausado.
+                        </span>
+                    </div>
+                    <a href="/configuracion/facturacion" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-rose-700 hover:bg-rose-50 font-black uppercase tracking-wider text-[11px] shrink-0 self-start sm:self-auto shadow-2xs transition-all">
+                        <i data-lucide="credit-card" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                        <span>Renovar por S/ 49.00</span>
+                    </a>
+                </div>
+            </div>
+            {% elif active_clinica.en_periodo_gracia %}
+            <!-- Banner Global Persistente: Periodo de Gracia (3 días) -->
+            <div id="bannerPeriodoGracia" class="bg-amber-500 text-slate-950 px-4 py-2.5 shadow-sm border-b border-amber-600">
+                <div class="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-full bg-slate-950 text-amber-300 font-black uppercase tracking-wider text-[10px] shrink-0">
+                            Periodo de Gracia ({{ active_clinica.dias_gracia_restantes }}d)
+                        </span>
+                        <span class="font-bold">
+                            Tu ciclo mensual venció. Mantienes acceso completo por {{ active_clinica.dias_gracia_restantes }} día(s) adicional(es) para que renueves sin interrumpir tu clínica.
+                        </span>
+                    </div>
+                    <a href="/configuracion/facturacion" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950 text-white hover:bg-slate-800 font-black uppercase tracking-wider text-[11px] shrink-0 self-start sm:self-auto shadow-2xs transition-all">
+                        <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400" aria-hidden="true"></i>
+                        <span>Renovar Ahora (S/ 49.00)</span>
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+        {% endif %}
+
         <!-- Main Content Area -->
         <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {% block content %}{% endblock %}

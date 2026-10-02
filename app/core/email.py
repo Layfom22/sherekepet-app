@@ -637,3 +637,128 @@ def send_bath_suggestion_email(
         return False
 
 
+def send_payment_report_notification_email(
+    clinica_nombre: str,
+    clinica_id: int,
+    veterinario_email: str,
+    metodo_pago: str,
+    referencia_operacion: str,
+    monto: str = "49.00",
+    comprobante_url: str = ""
+) -> bool:
+    """Envía una alerta al SuperAdmin cuando una clínica reporta un pago por Yape/Plin para revisión."""
+    destinatario = (settings.SOPORTE_EMAIL or "roggerjjj@gmail.com").strip().lower()
+    remitente = settings.SMTP_FROM or "SherekePet Billing <soporte@sherekepet.com>"
+    asunto = f"💳 Nuevo Pago Reportado ({metodo_pago}): {clinica_nombre} - S/ {monto}"
+
+    texto_plano = (
+        f"Nuevo comprobante de pago recibido en SherekePet:\n\n"
+        f"- Clínica: {clinica_nombre} (ID #{clinica_id})\n"
+        f"- Contacto: {veterinario_email}\n"
+        f"- Método: {metodo_pago}\n"
+        f"- Monto: S/ {monto}\n"
+        f"- N° Operación / Referencia: {referencia_operacion}\n"
+        f"- Comprobante: {comprobante_url or 'Sin adjunto'}\n\n"
+        f"Ingresa al Panel SuperAdmin (/admin) para aprobar y activar los +30 días.\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Nuevo Pago Reportado</title></head>
+<body style="margin:0;padding:24px;background-color:#f8fafc;font-family:sans-serif;color:#0f172a;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;">
+    <span style="display:inline-block;padding:4px 12px;background:#eef2ff;color:#4338ca;border-radius:999px;font-size:11px;font-weight:bold;">
+      REVISIÓN DE PAGO SAAS
+    </span>
+    <h2 style="margin:12px 0 8px 0;font-size:18px;">Nuevo pago reportado por {clinica_nombre}</h2>
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;font-size:13px;line-height:1.6;">
+      <p style="margin:4px 0;"><strong>Clínica:</strong> {clinica_nombre} (#{clinica_id})</p>
+      <p style="margin:4px 0;"><strong>Email Titular:</strong> {veterinario_email}</p>
+      <p style="margin:4px 0;"><strong>Método:</strong> {metodo_pago}</p>
+      <p style="margin:4px 0;"><strong>Monto:</strong> S/ {monto} PEN</p>
+      <p style="margin:4px 0;"><strong>N° de Operación:</strong> <code style="background:#e2e8f0;padding:2px 6px;border-radius:4px;">{referencia_operacion}</code></p>
+    </div>
+    <div style="text-align:center;margin-top:20px;">
+      <a href="https://sherekepet.com/admin" style="display:inline-block;padding:12px 24px;background:#4f46e5;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:bold;font-size:13px;">
+        Revisar y Aprobar en Panel SuperAdmin
+      </a>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando alerta de pago al SuperAdmin vía Resend: {e}")
+
+    return False
+
+
+def send_payment_approved_email(
+    destinatario: str,
+    clinica_nombre: str,
+    fecha_vencimiento_str: str,
+    monto: str = "49.00"
+) -> bool:
+    """Notifica al veterinario titular que su suscripción Plan Emprendedor fue activada/renovada por 30 días."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
+    asunto = f"✅ Suscripción Activa: Plan Emprendedor ({clinica_nombre})"
+
+    texto_plano = (
+        f"¡Hola!\n\n"
+        f"Confirmamos la activación del Plan Emprendedor (S/ {monto} / mes) para {clinica_nombre}.\n"
+        f"Tu licencia operativa está activa hasta el {fecha_vencimiento_str}.\n\n"
+        f"Ingresa a tu panel en: https://sherekepet.com/dashboard\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Suscripción Activa</title></head>
+<body style="margin:0;padding:24px;background-color:#f8fafc;font-family:sans-serif;color:#0f172a;">
+  <div style="max-width:500px;margin:0 auto;background:#ffffff;border:1px solid #a7f3d0;border-radius:16px;padding:24px;">
+    <span style="display:inline-block;padding:4px 12px;background:#ecfdf5;color:#065f46;border-radius:999px;font-size:11px;font-weight:bold;">
+      PLAN EMPRENDEDOR ACTIVO
+    </span>
+    <h2 style="margin:12px 0 8px 0;font-size:18px;">¡Gracias por confiar en SherekePet!</h2>
+    <p style="font-size:13px;color:#475569;line-height:1.5;">
+      El pago de <strong>S/ {monto} PEN</strong> para <strong>{clinica_nombre}</strong> ha sido procesado con éxito.
+      Tu clínica cuenta con acceso total ilimitado hasta el <strong>{fecha_vencimiento_str}</strong>.
+    </p>
+  </div>
+</body>
+</html>"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando confirmación de pago con Resend: {e}")
+
+    return False
+
+
+

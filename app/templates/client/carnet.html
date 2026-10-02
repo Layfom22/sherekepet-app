@@ -237,14 +237,14 @@
                             </span>
                         </div>
 
-                        {% if at.diagnostico %}
+                        {% if at.diagnostico and at.tipo != 'GROOMING' %}
                         <div class="text-slate-600 pt-1 border-t border-slate-200/60">
                             <strong class="text-slate-800">Diagnóstico:</strong> {{ at.diagnostico }}
                         </div>
                         {% endif %}
 
                         <!-- Receta Médica Estructurada y Resaltada -->
-                        {% if at.receta_info %}
+                        {% if at.receta_info and at.tipo != 'GROOMING' %}
                         <div class="mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 space-y-2 shadow-2xs">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-1.5 text-teal-900 font-black text-xs">
@@ -272,7 +272,7 @@
                         </div>
                         {% elif at.tratamiento %}
                         <div class="text-slate-600 pt-1 border-t border-slate-200/60">
-                            <strong class="text-slate-800">Tratamiento Indicado:</strong> {{ at.tratamiento }}
+                            <strong class="text-slate-800">{% if at.tipo == 'GROOMING' %}Observación:{% else %}Tratamiento Indicado:{% endif %}</strong> {{ at.tratamiento }}
                         </div>
                         {% endif %}
                     </div>

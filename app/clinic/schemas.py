@@ -105,6 +105,7 @@ class AtencionCreateRequest(BaseModel):
     motivo: str = Field(..., max_length=255, description="Motivo de la atención")
     diagnostico: Optional[str] = Field(None, description="Diagnóstico médico")
     tratamiento: Optional[str] = Field(None, description="Tratamiento o indicaciones")
+    observacion: Optional[str] = Field(None, description="Observaciones del servicio (ej: baño / grooming)")
     peso_actual_kg: Optional[float] = Field(None, ge=0, description="Peso registrado durante la atención")
 
     # Campos requeridos si tipo_atencion == 'VACUNACION'
@@ -136,6 +137,15 @@ class AtencionCreateRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_receta_estricta(self):
+        if self.tipo_atencion == "GROOMING":
+            self.diagnostico = None
+            self.receta_medicamento = None
+            self.receta_frecuencia = None
+            self.receta_dosis = None
+            if self.observacion and not self.tratamiento:
+                self.tratamiento = self.observacion.strip()
+            return self
+
         med = (self.receta_medicamento or "").strip()
         frec = (self.receta_frecuencia or "").strip()
         dosis = (self.receta_dosis or "").strip()

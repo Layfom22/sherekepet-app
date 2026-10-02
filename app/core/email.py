@@ -506,3 +506,134 @@ def send_medication_reminder_email(
 
     return False
 
+
+def send_bath_suggestion_email(
+    destinatario: str,
+    cliente_nombre: str,
+    mascota_nombre: str,
+    fecha_sugerida_str: str,
+    hora_sugerida_str: str,
+    clinica_nombre: str
+) -> bool:
+    """Envía un correo al dueño sugiriendo la próxima fecha de baño para que confirme o agende su cita."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
+    asunto = f"🛁 Próximo baño sugerido para {mascota_nombre} ({fecha_sugerida_str}) - {clinica_nombre}"
+
+    texto_plano = (
+        f"Hola {cliente_nombre},\n\n"
+        f"¡Gracias por traer hoy a {mascota_nombre} a su baño en {clinica_nombre}!\n"
+        f"Para mantener su pelaje y piel saludables, tu veterinario sugiere agendar su próximo baño para:\n\n"
+        f"- Mascota: {mascota_nombre}\n"
+        f"- Fecha sugerida: {fecha_sugerida_str}\n"
+        f"- Hora sugerida: {hora_sugerida_str}\n"
+        f"- Veterinaria: {clinica_nombre}\n\n"
+        f"Ingresa a tu Portal del Dueño desde tu celular para confirmar o elegir tu hora preferida con un clic:\n"
+        f"https://sherekepet.com/portal/dashboard\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Sugerencia de Próximo Baño</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid #99f6e4; padding: 28px;">
+          <tr>
+            <td align="center" style="padding-bottom: 12px;">
+              <span style="display: inline-block; padding: 4px 12px; background-color: #f0fdfa; border: 1px solid #99f6e4; color: #0f766e; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                ✨ Próximo Baño Sugerido
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <h2 style="margin: 0; color: #0f172a; font-size: 18px;">¡Hola {cliente_nombre}!</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: #64748b; line-height: 1.5; padding-bottom: 16px; text-align: center;">
+              Para mantener a <strong>{mascota_nombre}</strong> limpio y saludable, <strong>{clinica_nombre}</strong> te sugiere la siguiente fecha para su próximo baño:
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f0fdfa; border: 1px solid #99f6e4; border-radius: 12px; padding: 16px;">
+              <p style="margin: 4px 0; font-size: 13px; color: #0f172a;"><strong>🐾 Mascota:</strong> {mascota_nombre}</p>
+              <p style="margin: 6px 0; font-size: 15px; font-weight: 800; color: #0f766e;">📅 Fecha sugerida: {fecha_sugerida_str}</p>
+              <p style="margin: 4px 0; font-size: 13px; color: #0f172a;"><strong>⏰ Hora tentativa:</strong> {hora_sugerida_str} (puedes ajustarla en el portal)</p>
+              <p style="margin: 4px 0; font-size: 13px; color: #0f172a;"><strong>🏥 Veterinaria:</strong> {clinica_nombre}</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 20px;">
+              <a href="https://sherekepet.com/portal/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #0d9488; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
+                Confirmar o Elegir Hora de Cita
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            try:
+                resend.Emails.send({
+                    "from": remitente,
+                    "to": [destinatario],
+                    "reply_to": "soporte@sherekepet.com",
+                    "subject": asunto,
+                    "html": html_contenido,
+                    "text": texto_plano,
+                    "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
+                })
+                return True
+            except Exception:
+                resend.Emails.send({
+                    "from": f"{clinica_nombre} <onboarding@resend.dev>",
+                    "to": [destinatario],
+                    "subject": asunto,
+                    "html": html_contenido,
+                    "text": texto_plano
+                })
+                return True
+        except Exception as e:
+            logger.warning(f"Error enviando correo de sugerencia de baño con Resend: {e}")
+
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[SUGERENCIA BAÑO EMAIL SIMULADO] Para: {destinatario} | Mascota: {mascota_nombre} | Fecha: {fecha_sugerida_str}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = remitente if "<" in remitente else f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        if settings.SMTP_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.sendmail(remitente, [destinatario], msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        logger.warning(f"Error enviando correo de sugerencia de baño por SMTP: {e}")
+        return False
+
+

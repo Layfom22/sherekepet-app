@@ -122,8 +122,10 @@ class AtencionCreateRequest(BaseModel):
     receta_frecuencia_horas: Optional[int] = Field(None, ge=1, le=72, description="Frecuencia en horas para plan automatizado")
     receta_total_dosis: Optional[int] = Field(None, ge=1, le=100, description="Total de dosis programadas")
 
-    # Mini-ERP: Selección de Tipo de Baño para descuento de stock
+    # Mini-ERP: Selección de Tipo de Baño para descuento de stock y recurrencia de baño
     servicio_bano_id: Optional[int] = Field(None, description="ID del servicio de baño para descontar insumo")
+    fecha_proximo_bano: Optional[date] = Field(None, description="Fecha sugerida para el próximo baño (ej. cada 15 o 30 días)")
+    hora_proximo_bano: Optional[str] = Field("10:00", description="Hora tentativa sugerida para el próximo baño (HH:MM)")
     cita_id: Optional[int] = Field(None, description="ID de la cita asociada para marcarla como ATENDIDA automáticamente")
 
     @field_validator("tipo_atencion")
@@ -164,6 +166,7 @@ class AtencionResponse(BaseModel):
     mascota_id: int
     vacuna_id: Optional[int] = None
     seguimiento_id: Optional[int] = None
+    cita_sugerida_id: Optional[int] = None
     enfermedades_cubiertas: Optional[List[str]] = None
     plan_medicacion_id: Optional[int] = None
     stock_descontado: Optional[float] = None

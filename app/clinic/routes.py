@@ -1371,6 +1371,62 @@ def registrar_paciente_rapido(
     )
 
 
+def _notificar_sugerencia_bano_dueno(
+    db: Session,
+    background_tasks: Optional[BackgroundTasks],
+    mascota: Mascota,
+    clinica_id: int,
+    fecha_sugerida: date,
+    hora_obj: time
+) -> None:
+    """Envía notificación por correo y Web Push al dueño cuando el veterinario sugiere un próximo baño."""
+    cliente = mascota.cliente
+    if not cliente:
+        return
+
+    clinica = db.query(Clinica).filter(Clinica.id == clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+    cliente_nombre = cliente.nombre_completo or f"DNI {cliente.dni}"
+    fecha_str = fecha_sugerida.strftime("%d/%m/%Y")
+    hora_str = hora_obj.strftime("%I:%M %p")
+
+    email_destino = (cliente.email or "").strip()
+    if not email_destino and cliente.dni:
+        otro_cli = db.query(Cliente).filter(
+            Cliente.dni == cliente.dni,
+            Cliente.email.isnot(None),
+            Cliente.email != "",
+            Cliente.is_deleted == False
+        ).first()
+        if otro_cli and otro_cli.email:
+            email_destino = otro_cli.email.strip()
+
+    if email_destino:
+        from app.core.email import send_bath_suggestion_email
+        if background_tasks:
+            background_tasks.add_task(
+                send_bath_suggestion_email,
+                email_destino,
+                cliente_nombre,
+                mascota.nombre,
+                fecha_str,
+                hora_str,
+                clinica_nombre
+            )
+        else:
+            try:
+                send_bath_suggestion_email(
+                    email_destino,
+                    cliente_nombre,
+                    mascota.nombre,
+                    fecha_str,
+                    hora_str,
+                    clinica_nombre
+                )
+            except Exception:
+                pass
+
+
 @router.post(
     "/api/clinic/atenciones",
     response_model=AtencionResponse,
@@ -1381,6 +1437,7 @@ def registrar_paciente_rapido(
 )
 def registrar_atencion(
     payload: AtencionCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     mascota = db.query(Mascota).filter(
@@ -1414,6 +1471,7 @@ def registrar_atencion(
 
     vacuna_id = None
     seguimiento_id = None
+    cita_sugerida_id = None
     enfermedades_lista = payload.enfermedades_cubiertas
 
     # Lógica para VACUNACION
@@ -1493,7 +1551,7 @@ def registrar_atencion(
         except Exception as e:
             logger.warning(f"No se pudo crear el plan de medicación automático: {e}")
 
-    # Lógica para Descuento de Inventario en Grooming / Baños (Mini-ERP)
+    # Lógica para Descuento de Inventario y Sugerencia de Próximo Baño en Grooming / Baños (Mini-ERP)
     stock_descontado = None
     insumo_nombre = None
     stock_restante = None
@@ -1528,6 +1586,49 @@ def registrar_atencion(
                 insumo_nombre = producto.nombre
                 stock_restante = producto.stock_actual
                 db.flush()
+
+        # Si el veterinario sugirió una próxima fecha de baño directamente en el formulario
+        if payload.fecha_proximo_bano:
+            hora_sug_obj = time(10, 0)
+            if payload.hora_proximo_bano and ":" in payload.hora_proximo_bano:
+                try:
+                    partes_h = payload.hora_proximo_bano.strip().split(":")
+                    hora_sug_obj = time(int(partes_h[0]), int(partes_h[1]))
+                except Exception:
+                    hora_sug_obj = time(10, 0)
+
+            cita_sugerida = Cita(
+                clinica_id=payload.clinica_id,
+                cliente_id=mascota.cliente_id,
+                mascota_id=mascota.id,
+                fecha=payload.fecha_proximo_bano,
+                hora=hora_sug_obj,
+                motivo="Próximo Baño y Grooming (Sugerido)",
+                estado="SUGERIDA"
+            )
+            db.add(cita_sugerida)
+            db.flush()
+            cita_sugerida_id = cita_sugerida.id
+
+            dueno_nom = (mascota.cliente.nombre_completo if mascota.cliente else None) or "Estimado(a) cliente"
+            fecha_bano_str = payload.fecha_proximo_bano.strftime("%d/%m/%Y")
+            msg_bano = (
+                f"Hola {dueno_nom}, te saludamos de tu veterinaria. "
+                f"Te sugerimos programar el próximo baño de {mascota.nombre} para el día {fecha_bano_str}. "
+                f"Puedes confirmar tu hora en tu Portal SherekePet o respondiendo a este mensaje."
+            )
+            seg_bano = SeguimientoNotificacion(
+                clinica_id=payload.clinica_id,
+                cliente_id=mascota.cliente_id,
+                mascota_id=mascota.id,
+                tipo="PROXIMO_BANO",
+                fecha_programada=payload.fecha_proximo_bano,
+                mensaje_plantilla=msg_bano,
+                estado="PENDIENTE"
+            )
+            db.add(seg_bano)
+            db.flush()
+            seguimiento_id = seg_bano.id
 
     elif payload.tipo_atencion == "VACUNACION" and payload.tipo_vacuna:
         prod_vacuna = db.query(Producto).filter(
@@ -1589,6 +1690,23 @@ def registrar_atencion(
 
     db.commit()
 
+    if payload.tipo_atencion == "GROOMING" and payload.fecha_proximo_bano and cita_sugerida_id:
+        hora_notif = time(10, 0)
+        if payload.hora_proximo_bano and ":" in payload.hora_proximo_bano:
+            try:
+                ph = payload.hora_proximo_bano.strip().split(":")
+                hora_notif = time(int(ph[0]), int(ph[1]))
+            except Exception:
+                pass
+        _notificar_sugerencia_bano_dueno(
+            db=db,
+            background_tasks=background_tasks,
+            mascota=mascota,
+            clinica_id=payload.clinica_id,
+            fecha_sugerida=payload.fecha_proximo_bano,
+            hora_obj=hora_notif
+        )
+
     return AtencionResponse(
         id=atencion.id,
         tipo_atencion=atencion.tipo_atencion,
@@ -1596,6 +1714,7 @@ def registrar_atencion(
         mascota_id=atencion.mascota_id,
         vacuna_id=vacuna_id,
         seguimiento_id=seguimiento_id,
+        cita_sugerida_id=cita_sugerida_id,
         enfermedades_cubiertas=enfermedades_lista,
         plan_medicacion_id=plan_medicacion_id,
         stock_descontado=stock_descontado,
@@ -2905,6 +3024,7 @@ class CitaCreateVetRequest(BaseModel):
 def crear_cita_veterinario(
     payload: CitaCreateVetRequest,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
@@ -2937,8 +3057,38 @@ def crear_cita_veterinario(
         estado=payload.estado
     )
     db.add(cita)
+
+    if (payload.estado or "").upper() == "SUGERIDA":
+        dueno_nom = (mascota.cliente.nombre_completo if mascota.cliente else None) or "Estimado(a) cliente"
+        fecha_bano_str = payload.fecha.strftime("%d/%m/%Y")
+        msg_bano = (
+            f"Hola {dueno_nom}, te saludamos de tu veterinaria. "
+            f"Te sugerimos programar el próximo baño de {mascota.nombre} para el día {fecha_bano_str}. "
+            f"Puedes confirmar tu hora en tu Portal SherekePet o respondiendo a este mensaje."
+        )
+        seg_bano = SeguimientoNotificacion(
+            clinica_id=target_clinica_id,
+            cliente_id=resolved_cliente_id,
+            mascota_id=mascota.id,
+            tipo="PROXIMO_BANO",
+            fecha_programada=payload.fecha,
+            mensaje_plantilla=msg_bano,
+            estado="PENDIENTE"
+        )
+        db.add(seg_bano)
+
     db.commit()
     db.refresh(cita)
+
+    if (payload.estado or "").upper() == "SUGERIDA":
+        _notificar_sugerencia_bano_dueno(
+            db=db,
+            background_tasks=background_tasks,
+            mascota=mascota,
+            clinica_id=target_clinica_id,
+            fecha_sugerida=payload.fecha,
+            hora_obj=hora_obj
+        )
 
     return {
         "mensaje": "Cita agendada exitosamente.",
@@ -2947,5 +3097,6 @@ def crear_cita_veterinario(
         "hora": cita.hora.strftime("%H:%M"),
         "estado": cita.estado
     }
+
 
 

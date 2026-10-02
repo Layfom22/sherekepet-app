@@ -683,7 +683,7 @@ def api_estado_citas_portal(request: Request, db: Session = Depends(get_db)):
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "SUGERIDA"]),
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 

@@ -1436,6 +1436,29 @@ async function lanzarNotificacionNativaCitaConfirmada(cita) {
     }
 }
 
+async function lanzarNotificacionNativaCitaSugerida(cita) {
+    if (!sonAlertasGlobalesActivas()) return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sw = reg?.active || navigator.serviceWorker?.controller;
+        const title = `🛁 Próximo baño sugerido para ${cita.mascota}`;
+        const body = `${cita.clinica} sugiere su próximo baño para el ${cita.fecha}. Toca aquí para confirmar o elegir tu hora.`;
+        if (sw) {
+            sw.postMessage({
+                type: 'SHOW_DOSE_NOTIFICATION',
+                title: title,
+                body: body,
+                tag: `cita-sugerida-${cita.id}`,
+                url: '/portal/dashboard#contenedorSugerenciasCitas'
+            });
+        } else {
+            new Notification(title, { body: body, icon: '/static/img/icon-192.png' });
+        }
+    } catch (err) {
+        console.warn('No se pudo lanzar notificación nativa de sugerencia de baño:', err);
+    }
+}
+
 async function verificarEstadoCitasEnTiempoReal() {
     try {
         const resp = await fetch('/api/portal/citas/estado', { cache: 'no-store' });
@@ -1445,9 +1468,11 @@ async function verificarEstadoCitasEnTiempoReal() {
 
         let estadoPrevioMap = {};
         let notificadasMap = {};
+        let sugeridasNotificadasMap = {};
         try {
             estadoPrevioMap = JSON.parse(localStorage.getItem('sherekepet_citas_estado_map') || '{}');
             notificadasMap = JSON.parse(localStorage.getItem('sherekepet_citas_notificadas') || '{}');
+            sugeridasNotificadasMap = JSON.parse(localStorage.getItem('sherekepet_citas_sugeridas_notificadas') || '{}');
         } catch (_) {}
 
         let huboCambioEnPantalla = false;
@@ -1455,7 +1480,19 @@ async function verificarEstadoCitasEnTiempoReal() {
         for (const c of citas) {
             const estadoAnterior = estadoPrevioMap[c.id];
             const cardEl = document.getElementById(`cita-card-${c.id}`);
+            const sugerenciaEl = document.getElementById(`card-sugerencia-${c.id}`);
             const estadoEnDom = cardEl?.getAttribute('data-cita-estado');
+
+            // Si la cita es SUGERIDA (ej. próximo baño sugerido por el veterinario) y aún no se ha notificado en el celular
+            if (c.estado === 'SUGERIDA' && !sugeridasNotificadasMap[c.id]) {
+                sugeridasNotificadasMap[c.id] = true;
+                mostrarToast(`🛁 ¡${c.clinica} te sugiere agendar el próximo baño de ${c.mascota} para el ${c.fecha}!`);
+                await lanzarNotificacionNativaCitaSugerida(c);
+
+                if (!sugerenciaEl) {
+                    huboCambioEnPantalla = true;
+                }
+            }
 
             // Si la cita está CONFIRMADA y antes estaba PENDIENTE (o aún no se ha notificado al dueño)
             if (c.estado === 'CONFIRMADA' && (!notificadasMap[c.id] || estadoAnterior === 'PENDIENTE' || estadoEnDom === 'PENDIENTE')) {
@@ -1473,6 +1510,7 @@ async function verificarEstadoCitasEnTiempoReal() {
         try {
             localStorage.setItem('sherekepet_citas_estado_map', JSON.stringify(estadoPrevioMap));
             localStorage.setItem('sherekepet_citas_notificadas', JSON.stringify(notificadasMap));
+            localStorage.setItem('sherekepet_citas_sugeridas_notificadas', JSON.stringify(sugeridasNotificadasMap));
         } catch (_) {}
 
         if (huboCambioEnPantalla) {

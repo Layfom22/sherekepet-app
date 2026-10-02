@@ -531,4 +531,107 @@ def test_flujo_cita_portal_auto_vinculacion_y_estado_atendida(client, db_session
     assert "Atendido" in resp_agenda.text
 
 
+def test_sugerir_proximo_bano_desde_atencion_grooming_con_notificacion(client, db_session, vet_setup, monkeypatch):
+    """
+    Verifica que al registrar un Baño (GROOMING) indicando 'fecha_proximo_bano' (ej. +15 o +30 días):
+    - Se crea automáticamente una Cita con estado 'SUGERIDA' para el portal del dueño.
+    - Se crea un SeguimientoNotificacion con tipo 'PROXIMO_BANO'.
+    - Se dispara la notificación por correo al dueño.
+    - La API de estado del portal móvil devuelve la cita SUGERIDA para lanzar la alerta en celular.
+    """
+    from datetime import timedelta
+    from app.clinic.models import Cita, SeguimientoNotificacion
+    from app.core.timezone import get_lima_now
+    from app.core.security import create_access_token
+
+    clinica = vet_setup["clinica"]
+    cliente_dueno = Cliente(
+        clinica_id=clinica.id,
+        dni="77889900",
+        nombres="Carlos",
+        apellido_paterno="Ríos",
+        nombre_completo="Carlos Ríos",
+        telefono="999111222",
+        email="dueno.bano@sherekepet.com"
+    )
+    db_session.add(cliente_dueno)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente_dueno.id,
+        nombre="Boby",
+        especie="Canino",
+        raza="Poodle",
+        peso=6.5
+    )
+    db_session.add(mascota)
+    db_session.commit()
+    db_session.refresh(mascota)
+
+    correos_enviados = []
+
+    def mock_send_bath_email(destinatario, cliente_nombre, mascota_nombre, fecha_sugerida_str, hora_sugerida_str, clinica_nombre):
+        correos_enviados.append({
+            "destinatario": destinatario,
+            "mascota": mascota_nombre,
+            "fecha": fecha_sugerida_str,
+            "hora": hora_sugerida_str,
+            "clinica": clinica_nombre
+        })
+        return True
+
+    import app.core.email as email_mod
+    monkeypatch.setattr(email_mod, "send_bath_suggestion_email", mock_send_bath_email)
+
+    # Verificar que la ficha contiene los controles de sugerencia de próximo baño en #seccionGrooming
+    resp_ficha = client.get(f"/pacientes/{mascota.id}")
+    assert resp_ficha.status_code == 200
+    assert 'id="fecha_proximo_bano"' in resp_ficha.text
+    assert 'seleccionarFechaProximoBanoInline(15)' in resp_ficha.text
+    assert 'seleccionarFechaProximoBanoInline(30)' in resp_ficha.text
+
+    fecha_sugerida = get_lima_now().date() + timedelta(days=15)
+
+    resp_at = client.post("/api/clinic/atenciones", json={
+        "clinica_id": clinica.id,
+        "mascota_id": mascota.id,
+        "tipo_atencion": "GROOMING",
+        "motivo": "Baño medicado quincenal",
+        "tratamiento": "Piel mejorando notablemente",
+        "fecha_proximo_bano": fecha_sugerida.isoformat(),
+        "hora_proximo_bano": "11:00"
+    })
+    assert resp_at.status_code == 201
+    data_at = resp_at.json()
+    assert data_at["cita_sugerida_id"] is not None
+    assert data_at["seguimiento_id"] is not None
+
+    # Verificar Cita SUGERIDA creada
+    cita_sug = db_session.query(Cita).filter(Cita.id == data_at["cita_sugerida_id"]).first()
+    assert cita_sug is not None
+    assert cita_sug.estado == "SUGERIDA"
+    assert cita_sug.fecha == fecha_sugerida
+
+    # Verificar SeguimientoNotificacion creado
+    seg = db_session.query(SeguimientoNotificacion).filter(SeguimientoNotificacion.id == data_at["seguimiento_id"]).first()
+    assert seg is not None
+    assert seg.tipo == "PROXIMO_BANO"
+    assert seg.fecha_programada == fecha_sugerida
+
+    # Verificar que el correo fue enviado al dueño
+    assert len(correos_enviados) == 1
+    assert correos_enviados[0]["destinatario"] == "dueno.bano@sherekepet.com"
+    assert correos_enviados[0]["mascota"] == mascota.nombre
+
+    # Verificar que el endpoint de alertas móviles del Portal Dueño incluye la cita SUGERIDA
+    client_token = create_access_token({"sub": str(cliente_dueno.id), "role": "client"})
+    client.cookies.set("client_token", client_token)
+    resp_estado = client.get("/api/portal/citas/estado")
+    assert resp_estado.status_code == 200
+    citas_portal = resp_estado.json()["citas"]
+    assert any(c["id"] == cita_sug.id and c["estado"] == "SUGERIDA" for c in citas_portal)
+
+
+
 

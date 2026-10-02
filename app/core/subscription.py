@@ -84,6 +84,8 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         "/terminos-y-condiciones",
         "/politica-privacidad",
         "/politica-reembolsos",
+        "/planes",
+        "/precios",
     )
 
     async def dispatch(self, request: Request, call_next):

@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-50 scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Planes y Qué Ofrecemos - SherekePet SaaS Veterinario</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pet: {
+                            50: '#f0fdf9',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    },
+                    minHeight: {
+                        'touch': '44px'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .btn-touch {
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+    <!-- Favicon & Brand Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="/static/img/favicon.png">
+    <link rel="apple-touch-icon" href="/static/img/icon-192.png">
+
+    <!-- Lucide Icons -->
+    <script src="/static/js/lucide.min.js"></script>
+    <script>
+        if (!window.lucide) {
+            document.write('<script src="https://unpkg.com/lucide@latest"><\/script>');
+        }
+    </script>
+
+    <!-- Marca de Agua Ambiental Global -->
+    <link rel="stylesheet" href="/static/css/watermark.css">
+</head>
+<body class="min-h-full font-sans text-slate-800 antialiased selection:bg-teal-500 selection:text-white bg-slate-50 app-watermark-bg flex flex-col justify-between">
+
+    <!-- Navbar Público Superior -->
+    <header class="w-full bg-white/85 backdrop-blur border-b border-slate-200/80 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand -->
+            <a href="/" class="flex items-center space-x-2.5 group">
+                <img 
+                    src="/static/img/icon-sherekepet.png" 
+                    alt="SherekePet" 
+                    class="w-9 h-9 object-contain drop-shadow-sm group-hover:scale-105 transition-transform"
+                >
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                        SherekePet
+                    </span>
+                    <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 rounded-full border border-teal-200">
+                        SaaS Veterinario
+                    </span>
+                </div>
+            </a>
+
+            <!-- Enlaces de Navegación -->
+            <div class="flex items-center space-x-1.5 sm:space-x-3">
+                <a 
+                    href="/planes" 
+                    class="btn-touch px-3 py-1.5 text-xs font-extrabold text-teal-700 bg-teal-50 border border-teal-200 rounded-xl transition-all"
+                >
+                    💎 <span>Planes y Qué Ofrecemos</span>
+                </a>
+                <a 
+                    href="/portal/login" 
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-all"
+                    title="Acceso para propietarios de mascotas"
+                >
+                    🐾 <span class="hidden md:inline ml-1">Portal Dueños</span>
+                </a>
+                {% if current_user %}
+                <a 
+                    href="/dashboard" 
+                    class="btn-touch px-4 py-2 text-xs font-extrabold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-all shadow-xs"
+                >
+                    Ir a mi Clínica →
+                </a>
+                {% else %}
+                <a 
+                    href="/login" 
+                    class="btn-touch px-3 py-1.5 text-xs font-bold text-slate-700 hover:text-teal-700 hover:bg-slate-100 rounded-xl transition-all hidden sm:inline-flex"
+                >
+                    Iniciar Sesión
+                </a>
+                <a 
+                    href="/registro" 
+                    class="btn-touch px-4 py-2 text-xs font-extrabold text-teal-800 bg-teal-100/80 hover:bg-teal-100 border border-teal-300 rounded-xl transition-all shadow-xs"
+                >
+                    ✨ Prueba 14 Días
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 w-full space-y-16">
+
+        <!-- ============================================== -->
+        <!-- 1. HERO: ENCABEZADO DEL PLAN Y PROPUESTA       -->
+        <!-- ============================================== -->
+        <section class="text-center max-w-3xl mx-auto space-y-4">
+            <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold shadow-2xs">
+                <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Tarifa Plana Transparente • Sin Comisiones por Paciente</span>
+            </div>
+
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+                Todo lo que ofrecemos para hacer crecer tu 
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-teal-700 to-emerald-600">
+                    clínica veterinaria
+                </span>
+            </h1>
+
+            <p class="text-sm sm:text-base text-slate-600 leading-relaxed">
+                Un solo plan integral con todas las funciones desbloqueadas desde el primer día. Prueba el sistema gratis durante <strong>14 días</strong> y luego continúa con nuestra tarifa plana mensual pensada para veterinarias del Perú.
+            </p>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 2. TARJETAS DE PLANES (TRIAL 14 DÍAS + PLAN)   -->
+        <!-- ============================================== -->
+        <section id="precios" class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch max-w-5xl mx-auto">
+
+            <!-- Tarjeta 1: Prueba Gratuita 14 Días -->
+            <div class="lg:col-span-5 bg-white/90 backdrop-blur rounded-3xl border border-slate-200/90 p-7 sm:p-8 shadow-sm flex flex-col justify-between space-y-6">
+                <div class="space-y-5">
+                    <div class="flex items-center justify-between">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-extrabold uppercase tracking-wider">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-teal-600"></i>
+                            <span>Paso 1: Prueba Gratis</span>
+                        </span>
+                        <span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            14 Días Libres
+                        </span>
+                    </div>
+
+                    <div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-4xl font-black text-slate-900 tracking-tight">S/ 0.00</span>
+                            <span class="text-sm font-bold text-slate-400">/ por 14 días</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+                            Explora y utiliza todo el sistema en el día a día de tu consultorio sin ingresar tarjeta ni asumir compromisos.
+                        </p>
+                    </div>
+
+                    <div class="border-t border-slate-100 pt-4 space-y-2.5">
+                        <p class="text-xs font-extrabold uppercase tracking-wider text-slate-700">¿Qué incluye tu prueba?</p>
+                        <ul class="space-y-2.5 text-xs text-slate-600">
+                            <li class="flex items-start gap-2.5">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+                                <span><strong>100% de los módulos activos</strong> desde el primer minuto</span>
+                            </li>
+                            <li class="flex items-start gap-2.5">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+                                <span><strong>Registro ilimitado</strong> de dueños (con DNI RENIEC) y mascotas</span>
+                            </li>
+                            <li class="flex items-start gap-2.5">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+                                <span><strong>Configuración de tu Marca Blanca</strong> (tu logo y nombre comercial)</span>
+                            </li>
+                            <li class="flex items-start gap-2.5">
+                                <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+                                <span><strong>Cero pérdida de datos:</strong> todo lo que registres se conserva al activar tu plan</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 space-y-2">
+                    <a 
+                        href="/registro" 
+                        class="btn-touch w-full py-3.5 px-4 text-xs sm:text-sm font-black text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-300 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-2xs"
+                    >
+                        <i data-lucide="rocket" class="w-4 h-4 text-teal-700"></i>
+                        <span>Crear Clínica y Probar 14 Días Gratis</span>
+                    </a>
+                    <p class="text-[11px] text-center text-slate-400">
+                        Activación inmediata en menos de 1 minuto
+                    </p>
+                </div>
+            </div>
+
+            <!-- Tarjeta 2: Plan Emprendedor (Principal Destacado + Mercado Pago Ready) -->
+            <div class="lg:col-span-7 bg-white rounded-3xl border-2 border-teal-500 p-7 sm:p-8 shadow-xl shadow-teal-900/5 flex flex-col justify-between space-y-6 relative overflow-hidden">
+                <!-- Cinta Destacada -->
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-teal-600 text-white text-xs font-black uppercase tracking-wider shadow-xs">
+                        <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                        <span>Plan Emprendedor Veterinario</span>
+                    </span>
+                    <span class="inline-flex items-center gap-1 text-[11px] font-extrabold text-teal-800 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                        ⭐ Todo Incluido • Sin Límites
+                    </span>
+                </div>
+
+                <!-- Precio Principal -->
+                <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-slate-100">
+                    <div>
+                        <div class="flex items-baseline gap-2">
+                            <span class="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">S/ 49.00</span>
+                            <span class="text-base font-bold text-slate-400">/ mes</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1.5">
+                            Precio único mensual en Soles Peruanos (PEN). Cancela cuando quieras sin penalidades.
+                        </p>
+                    </div>
+                    <div class="bg-emerald-50/90 border border-emerald-200 rounded-2xl px-3.5 py-2 text-left sm:text-right shrink-0">
+                        <span class="block text-[10px] font-bold uppercase tracking-wider text-emerald-700">Equivale a solo</span>
+                        <span class="text-sm font-black text-emerald-900">S/ 1.60 al día</span>
+                    </div>
+                </div>
+
+                <!-- Lista de Todo lo que Incluye -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Pacientes e Historias Ilimitadas</strong> con consulta DNI RENIEC</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Agenda de Citas Inteligente</strong> y flujo de atención en 1 clic</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Portal Móvil PWA para Dueños</strong> con Carnet Digital de Vacunas</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Sugerencia de Próximo Baño</strong> (15/21/30 días) por correo y celular</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Módulo Mis Productos</strong> (vacunas, medicinas y champús propios)</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Motor de Medicación Dinámica</strong> con alertas en el celular del dueño</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Invitación al Portal y Reset de PIN</strong> directo desde Mis Pacientes</span>
+                    </div>
+                    <div class="flex items-start gap-2.5">
+                        <i data-lucide="check" class="w-4 h-4 text-teal-600 shrink-0 mt-0.5"></i>
+                        <span><strong>Multi-usuario:</strong> Cuenta titular + Asistentes y soporte WhatsApp</span>
+                    </div>
+                </div>
+
+                <!-- Bloque Preparado para Pasarela Mercado Pago -->
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200/90 space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <div class="w-7 h-7 rounded-lg bg-sky-500 text-white flex items-center justify-center font-black text-xs shadow-2xs">
+                                MP
+                            </div>
+                            <div>
+                                <p class="text-xs font-extrabold text-slate-800">Pagos Seguros con Mercado Pago Perú</p>
+                                <p class="text-[11px] text-slate-500">Activación automática con Yape, Plin, Tarjetas Visa, Mastercard y Débito</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="px-2 py-0.5 text-[10px] font-bold bg-sky-50 text-sky-800 border border-sky-200 rounded-md">Mercado Pago</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200 rounded-md">Yape / Plin</span>
+                            <span class="px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 rounded-md"> Tarjetas</span>
+                        </div>
+                    </div>
+
+                    {% if current_user %}
+                    <a 
+                        href="/configuracion/facturacion" 
+                        class="btn-touch w-full py-3.5 px-5 text-sm font-black text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                        <i data-lucide="credit-card" class="w-4 h-4"></i>
+                        <span>Ir a Facturación y Activar Plan (S/ 49.00/mes)</span>
+                        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </a>
+                    {% else %}
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <a 
+                            href="/registro" 
+                            class="btn-touch w-full py-3.5 px-4 text-xs sm:text-sm font-black text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                        >
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>Empezar con 14 Días Gratis</span>
+                        </a>
+                        <a 
+                            href="/login" 
+                            class="btn-touch w-full py-3.5 px-4 text-xs sm:text-sm font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                            <i data-lucide="log-in" class="w-4 h-4 text-teal-600"></i>
+                            <span>Ya tengo cuenta • Suscribirme</span>
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 3. DETALLE DE MÓDULOS: ¿QUÉ OFRECEMOS?         -->
+        <!-- ============================================== -->
+        <section id="modulos" class="space-y-8">
+            <div class="text-center max-w-2xl mx-auto space-y-2">
+                <span class="text-xs font-extrabold uppercase tracking-wider text-teal-700">Ecosistema Completo</span>
+                <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                    Conoce a detalle todo lo que incluye SherekePet
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-500">
+                    Diseñado específicamente para el flujo real de trabajo de médicos veterinarios, consultorios y spa/grooming.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <!-- Módulo 1 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center">
+                        <i data-lucide="clipboard-list" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">1. Historias Clínicas & RENIEC</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Registra dueños en segundos ingresando solo su DNI. Lleva el historial de consultas, cirugías, desparasitaciones, control de peso, alergias y fotos de la mascota con visor ampliado.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-teal-800">
+                        <li>✓ Autocompletado de nombres por DNI</li>
+                        <li>✓ Registro de vacunas y enfermedades cubiertas</li>
+                        <li>✓ Invitación por WhatsApp y reseteo de PIN en 1 clic</li>
+                    </ul>
+                </div>
+
+                <!-- Módulo 2 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+                        <i data-lucide="calendar-check-2" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">2. Agenda & Flujo de Atención</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Configura tus turnos de atención por día de la semana. Recibe citas agendadas por los dueños, confírmalas con un clic y pasa directo a <strong>"Atender Paciente"</strong>.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-emerald-800">
+                        <li>✓ Vinculación automática de mascotas nuevas de cita</li>
+                        <li>✓ Estado visual "Atendido" al finalizar la consulta</li>
+                        <li>✓ Confirmación por correo automática al propietario</li>
+                    </ul>
+                </div>
+
+                <!-- Módulo 3 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-sky-50 border border-sky-200 text-sky-700 flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">3. Grooming & Próximo Baño</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Al registrar un baño, sugiere la próxima fecha en <strong>+15, +21 o +30 días</strong>. El dueño recibe una notificación por correo y en su celular para confirmar su hora.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-sky-800">
+                        <li>✓ Fidelización para baños quincenales o mensuales</li>
+                        <li>✓ Alerta automática por correo y PWA móvil</li>
+                        <li>✓ Descuento opcional de insumo/champú por baño</li>
+                    </ul>
+                </div>
+
+                <!-- Módulo 4 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center">
+                        <i data-lucide="smartphone" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">4. Portal PWA para Dueños</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Tus clientes acceden desde cualquier celular con su DNI y PIN de 4 dígitos para revisar el carnet digital de sus mascotas, vacunas vigentes, recetas y agendar citas.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-indigo-800">
+                        <li>✓ Instalable en celular sin ocupar memoria</li>
+                        <li>✓ Notificaciones nativas de citas y medicinas</li>
+                        <li>✓ Personalizado con el logo de tu veterinaria</li>
+                    </ul>
+                </div>
+
+                <!-- Módulo 5 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center">
+                        <i data-lucide="package" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">5. Módulo Mis Productos</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Crea tu propio catálogo privado de vacunas, pastillas, desparasitantes y champús. Al registrar una atención o vacuna, tus productos aparecen listos para seleccionar.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-amber-800">
+                        <li>✓ Catálogo 100% privado para tu veterinaria</li>
+                        <li>✓ Control de stock opcional mediante interruptor</li>
+                        <li>✓ Autocompletado en vacunación y recetas médicas</li>
+                    </ul>
+                </div>
+
+                <!-- Módulo 6 -->
+                <div class="bg-white/90 backdrop-blur p-6 rounded-3xl border border-slate-200/90 shadow-xs hover:border-teal-400 transition-all space-y-3">
+                    <div class="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 flex items-center justify-center">
+                        <i data-lucide="pill" class="w-5 h-5"></i>
+                    </div>
+                    <h3 class="text-base font-black text-slate-900">6. Recetas & Seguimiento</h3>
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Cuando recetas un medicamento, el sistema genera el plan de tomas para el dueño, respetando el descanso nocturno y avisándole cuándo le toca cada dosis a su mascota.
+                    </p>
+                    <ul class="pt-1 space-y-1 text-[11px] font-semibold text-rose-800">
+                        <li>✓ Confirmación interactiva "Ya se la di" por el dueño</li>
+                        <li>✓ Recordatorios de refuerzos de vacunas</li>
+                        <li>✓ Enlaces directos de WhatsApp pre-redactados</li>
+                    </ul>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ============================================== -->
+        <!-- 4. PREGUNTAS FRECUENTES (FAQ)                  -->
+        <!-- ============================================== -->
+        <section class="max-w-4xl mx-auto bg-white/90 backdrop-blur rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6">
+            <div class="text-center space-y-1">
+                <h2 class="text-xl sm:text-2xl font-black text-slate-900">Preguntas Frecuentes sobre el Plan</h2>
+                <p class="text-xs text-slate-500">Todo claro antes de empezar tu prueba gratuita</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <h3 class="font-black text-slate-900 text-sm">¿Necesito tarjeta para los 14 días gratis?</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        No. Solo creas tu cuenta con tu correo o Google y tienes 14 días completos con todas las funciones activas sin ingresar ningún medio de pago.
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <h3 class="font-black text-slate-900 text-sm">¿Cómo realizo el pago de S/ 49.00 al mes?</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        Desde tu panel en <strong>Facturación</strong> podrás abonar de forma rápida y segura mediante <strong>Mercado Pago</strong> (con Yape, Plin o tarjeta de débito/crédito).
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <h3 class="font-black text-slate-900 text-sm">¿Los dueños de mascotas pagan algo por usar el Portal?</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        No, el Portal del Dueño y el Carnet Digital son totalmente gratuitos e ilimitados para todos los clientes de tu veterinaria.
+                    </p>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+                    <h3 class="font-black text-slate-900 text-sm">¿Mis productos y pacientes los ve otra clínica?</h3>
+                    <p class="text-slate-600 leading-relaxed">
+                        Tu catálogo de productos, precios, historial médico y agenda son estrictamente privados para tu clínica veterinaria.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer con Información Legal y Enlaces -->
+    <footer class="w-full border-t border-slate-200/90 bg-white/80 backdrop-blur py-6 text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
+                <div class="space-y-1">
+                    <div class="flex items-center justify-center md:justify-start space-x-2">
+                        <img src="/static/img/icon-sherekepet.png" alt="SherekePet SaaS" class="w-4 h-4 object-contain">
+                        <span class="font-bold text-slate-800">SherekePet SaaS Veterinario</span>
+                        <span class="text-slate-400">&bull;</span>
+                        <span class="text-slate-400">v0.3.0</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 font-medium">
+                        Razón Social: [TU EMPRESA] | RUC: [TU RUC] | Contacto: <a href="mailto:soporte@sherekepet.com" class="text-teal-700 hover:underline">soporte@sherekepet.com</a>
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
+                    <a href="/" class="hover:text-teal-700 transition-colors">Inicio</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/planes" class="text-teal-700 font-bold">Planes y Precios</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/terminos-y-condiciones" class="hover:text-teal-700 transition-colors">Términos y Condiciones</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/politica-privacidad" class="hover:text-teal-700 transition-colors">Política de Privacidad</a>
+                    <span class="text-slate-300">&bull;</span>
+                    <a href="/politica-reembolsos" class="hover:text-teal-700 transition-colors">Política de Reembolsos</a>
+                </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-400 text-center sm:text-left">
+                <span>© 2026 SherekePet. Todos los derechos reservados. Desarrollado para clínicas veterinarias del Perú.</span>
+                <span>Plataforma Cloud Multi-tenant</span>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Cookie Consent Banner Global -->
+    {% include "components/cookie_banner.html" %}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -158,14 +158,25 @@
                 </ul>
             </div>
 
-            <!-- Botón de Suscripción / Acción -->
-            <div class="pt-4">
+            <!-- Botón de Suscripción / Acción y Pasarela Mercado Pago -->
+            <div class="pt-4 space-y-3" id="mercadopago-checkout-box">
                 {% if clinica.estado_suscripcion == 'ACTIVO' %}
                 <div class="w-full py-4 px-4 bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-2xl font-black text-sm flex items-center justify-center space-x-2">
                     <i data-lucide="badge-check" class="w-5 h-5 text-emerald-600" aria-hidden="true"></i>
                     <span>Tu Plan Emprendedor está Activo</span>
                 </div>
                 {% else %}
+                <div class="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-200 flex items-center justify-between gap-2 flex-wrap">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-lg bg-sky-500 text-white font-black text-[11px] flex items-center justify-center">MP</span>
+                        <span class="text-xs font-bold text-slate-800">Medios de pago aceptados vía Mercado Pago:</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 text-[10px] font-bold">
+                        <span class="px-2 py-0.5 rounded bg-white text-purple-800 border border-purple-200">Yape / Plin</span>
+                        <span class="px-2 py-0.5 rounded bg-white text-sky-800 border border-sky-200">Visa / Mastercard</span>
+                    </div>
+                </div>
+
                 <form method="POST" action="/configuracion/facturacion/activar">
                     <button 
                         type="submit" 
@@ -190,7 +201,12 @@
         <p class="text-xs text-slate-500">
             Facturación electrónica compatible con normativa SUNAT. Para requerir factura con RUC o coordinar transferencias bancarias:
         </p>
-        <div class="flex items-center justify-center gap-4 text-xs font-bold text-teal-700">
+        <div class="flex flex-wrap items-center justify-center gap-4 text-xs font-bold text-teal-700">
+            <a href="/planes" class="hover:underline flex items-center gap-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>Ver Detalle Completo del Plan</span>
+            </a>
+            <span>&bull;</span>
             <a href="mailto:soporte@sherekepet.com" class="hover:underline flex items-center gap-1">
                 <i data-lucide="mail" class="w-3.5 h-3.5" aria-hidden="true"></i>
                 <span>soporte@sherekepet.com</span>

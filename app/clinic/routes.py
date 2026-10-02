@@ -1810,6 +1810,17 @@ def resetear_pin_cliente(
 # 2. VISTAS HTML PÚBLICAS Y DE SESIÓN (VETERINARIO)
 # ==========================================
 
+@router.get("/planes", response_class=HTMLResponse, summary="Vista Pública de Planes y Qué Ofrecemos")
+@router.get("/precios", response_class=HTMLResponse, summary="Alias de Vista Pública de Planes y Precios")
+def vista_planes_publica(request: Request, db: Session = Depends(get_db)):
+    current_user = obtener_veterinario_actual(request, db)
+    return templates.TemplateResponse(
+        request=request,
+        name="planes.html",
+        context={"current_user": current_user}
+    )
+
+
 @router.get("/login", response_class=HTMLResponse, summary="Vista Login Veterinario")
 def vista_login_veterinario(request: Request, error: Optional[str] = None, db: Session = Depends(get_db)):
     current_user = obtener_veterinario_actual(request, db)

@@ -633,5 +633,30 @@ def test_sugerir_proximo_bano_desde_atencion_grooming_con_notificacion(client, d
     assert any(c["id"] == cita_sug.id and c["estado"] == "SUGERIDA" for c in citas_portal)
 
 
+def test_pagina_publica_planes_y_que_ofrecemos(client):
+    """
+    Verifica que la landing page enlace a '/planes' y que la página de Planes y Qué Ofrecemos
+    muestre el Plan Emprendedor (S/ 49.00 / mes), la Prueba de 14 días gratis, los módulos y
+    la preparación para Mercado Pago.
+    """
+    client.cookies.clear()
+    resp_landing = client.get("/login")
+    assert resp_landing.status_code == 200
+    assert 'href="/planes"' in resp_landing.text
+    assert "Planes y Qué Ofrecemos" in resp_landing.text
+
+    resp_planes = client.get("/planes")
+    assert resp_planes.status_code == 200
+    assert "Plan Emprendedor Veterinario" in resp_planes.text
+    assert "S/ 49.00" in resp_planes.text
+    assert "14 Días" in resp_planes.text
+    assert "Mercado Pago" in resp_planes.text
+
+    resp_precios = client.get("/precios")
+    assert resp_precios.status_code == 200
+    assert "Plan Emprendedor Veterinario" in resp_precios.text
+
+
+
 
 

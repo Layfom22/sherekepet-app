@@ -1,0 +1,721 @@
+{% extends "base.html" %}
+
+{% block title %}Panel SuperAdmin - SherekePet SaaS{% endblock %}
+
+{% block extra_head %}
+<style>
+    dialog::backdrop {
+        background-color: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(4px);
+    }
+    dialog[open] {
+        animation: dialogFadeIn 0.18s ease-out;
+    }
+    @keyframes dialogFadeIn {
+        from {
+            opacity: 0;
+            transform: scale(0.96) translateY(6px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- ========================================================== -->
+    <!-- ENCABEZADO DEL PANEL SUPERADMIN                            -->
+    <!-- ========================================================== -->
+    <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-7 rounded-3xl shadow-md border border-indigo-500/30 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="space-y-1.5">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-extrabold uppercase tracking-wider">
+                <i data-lucide="shield-check" class="w-4 h-4 text-indigo-400" aria-hidden="true"></i>
+                <span>Control Maestro SaaS &bull; SuperAdmin</span>
+            </div>
+            <h1 class="text-2xl sm:text-3xl font-black tracking-tight">
+                Panel SuperAdmin de Clínicas y Suscripciones
+            </h1>
+            <p class="text-xs sm:text-sm text-slate-300 max-w-2xl">
+                Gestiona los periodos de prueba (<code class="text-indigo-300 font-mono">trial_ends_at</code>), estados de suscripción y privilegios de administración global sin perder tus funciones operativas como Veterinario.
+            </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a 
+                href="/dashboard" 
+                class="btn-touch px-4 py-2.5 text-xs font-bold text-slate-100 bg-white/10 hover:bg-white/20 border border-white/15 rounded-xl transition-all inline-flex items-center gap-2"
+            >
+                <i data-lucide="stethoscope" class="w-4 h-4 text-teal-300" aria-hidden="true"></i>
+                <span>Ir a Mi Clínica Veterinaria</span>
+            </a>
+            <button 
+                type="button" 
+                onclick="cargarClinicas()" 
+                class="btn-touch px-4 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl shadow-sm transition-all inline-flex items-center gap-2"
+            >
+                <i data-lucide="refresh-cw" id="iconRefresh" class="w-4 h-4" aria-hidden="true"></i>
+                <span>Actualizar Datos</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- BANNER DE FEEDBACK DINÁMICO                                -->
+    <!-- ========================================================== -->
+    <div id="adminAlertSuccess" class="hidden p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2.5">
+            <i data-lucide="circle-check" class="w-5 h-5 text-emerald-600 shrink-0" aria-hidden="true"></i>
+            <span id="adminAlertSuccessText">Operación realizada con éxito.</span>
+        </div>
+        <button type="button" onclick="document.getElementById('adminAlertSuccess').classList.add('hidden')" class="text-emerald-600 hover:text-emerald-900">
+            <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <div id="adminAlertError" class="hidden p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2.5">
+            <i data-lucide="triangle-alert" class="w-5 h-5 text-rose-600 shrink-0" aria-hidden="true"></i>
+            <span id="adminAlertErrorText">Ocurrió un error al procesar la solicitud.</span>
+        </div>
+        <button type="button" onclick="document.getElementById('adminAlertError').classList.add('hidden')" class="text-rose-600 hover:text-rose-900">
+            <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
+        </button>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- TARJETAS KPI DE SUSCRIPCIONES                              -->
+    <!-- ========================================================== -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Total Clínicas</p>
+                <p id="kpiTotalClinicas" class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{{ kpis.total_clinicas }}</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                <i data-lucide="building-2" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-emerald-200 bg-emerald-50/30 shadow-xs flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Activas (ACTIVE)</p>
+                <p id="kpiActivas" class="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">{{ kpis.activas }}</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <i data-lucide="badge-check" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-amber-200 bg-amber-50/30 shadow-xs flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-amber-700">En Prueba (TRIAL)</p>
+                <p id="kpiEnTrial" class="text-2xl sm:text-3xl font-black text-amber-600 mt-1">{{ kpis.en_trial }}</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <i data-lucide="clock-3" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-rose-200 bg-rose-50/30 shadow-xs flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-rose-700">Expiradas (EXPIRED)</p>
+                <p id="kpiExpiradas" class="text-2xl sm:text-3xl font-black text-rose-600 mt-1">{{ kpis.expiradas }}</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <i data-lucide="shield-alert" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+        </div>
+
+        <div class="col-span-2 lg:col-span-1 bg-white p-4 sm:p-5 rounded-2xl border border-indigo-200 bg-indigo-50/30 shadow-xs flex items-center justify-between">
+            <div>
+                <p class="text-[11px] font-bold uppercase tracking-wider text-indigo-700">SuperAdmins</p>
+                <p id="kpiSuperAdmins" class="text-2xl sm:text-3xl font-black text-indigo-600 mt-1">{{ kpis.total_superadmins }}</p>
+            </div>
+            <div class="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                <i data-lucide="crown" class="w-5 h-5" aria-hidden="true"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- TABLA DE CLÍNICAS CON BARRA DE BÚSQUEDA Y FILTROS          -->
+    <!-- ========================================================== -->
+    <div class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        <!-- Cabecera y Buscador -->
+        <div class="p-5 sm:p-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <i data-lucide="hospital" class="w-5 h-5 text-indigo-600" aria-hidden="true"></i>
+                    <span>Directorio de Clínicas Registradas</span>
+                </h2>
+                <p class="text-xs text-slate-500 mt-0.5">
+                    Filtra por nombre de clínica, correo del veterinario titular, teléfono o estado de suscripción.
+                </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                <!-- Filtro rápido de estado -->
+                <select 
+                    id="selectFiltroEstado" 
+                    onchange="filtrarTablaClinicas()"
+                    aria-label="Filtrar por estado de suscripción"
+                    class="px-3.5 py-2.5 text-xs font-bold text-slate-700 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                    <option value="ALL">Todos los estados</option>
+                    <option value="ACTIVE">🟢 Activo (ACTIVE)</option>
+                    <option value="TRIAL">🟡 En Prueba (TRIAL)</option>
+                    <option value="EXPIRED">🔴 Expirado (EXPIRED)</option>
+                </select>
+
+                <!-- Barra de Búsqueda -->
+                <div class="relative flex-1 sm:w-80">
+                    <input 
+                        type="search" 
+                        id="inputBuscarClinica" 
+                        oninput="filtrarTablaClinicas()"
+                        placeholder="Buscar clínica, email, contacto..." 
+                        class="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                    >
+                    <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                        <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabla Responsiva -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" id="tablaClinicasAdmin">
+                <thead>
+                    <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                        <th class="py-3.5 px-4 sm:px-6">Clínica</th>
+                        <th class="py-3.5 px-4">Contacto Titular</th>
+                        <th class="py-3.5 px-4">Registro</th>
+                        <th class="py-3.5 px-4">Estado Suscripción</th>
+                        <th class="py-3.5 px-4">Días Restantes / Fin Trial</th>
+                        <th class="py-3.5 px-4 sm:px-6 text-right">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyClinicasAdmin" class="divide-y divide-slate-200 text-xs sm:text-sm">
+                    {% for c in clinicas %}
+                    <tr 
+                        class="hover:bg-slate-50/80 transition-colors fila-clinica"
+                        data-search="{{ (c.nombre ~ ' ' ~ (c.nombre_comercial or '') ~ ' ' ~ (c.contacto_email or '') ~ ' ' ~ (c.contacto_nombre or '') ~ ' ' ~ (c.telefono or '')) | lower }}"
+                        data-estado="{{ c.estado_suscripcion }}"
+                    >
+                        <!-- Clínica -->
+                        <td class="py-4 px-4 sm:px-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0">
+                                    #{{ c.id }}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-slate-900">{{ c.nombre_mostrado }}</p>
+                                    <p class="text-[11px] text-slate-500">
+                                        Plan: <span class="font-semibold uppercase text-slate-700">{{ c.plan_activo }}</span>
+                                        &bull; {{ c.total_pacientes }} paciente(s)
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Contacto -->
+                        <td class="py-4 px-4">
+                            <div class="space-y-0.5">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-semibold text-slate-800">{{ c.contacto_nombre or 'Sin titular' }}</span>
+                                    {% if c.veterinario_is_superadmin %}
+                                    <span class="px-1.5 py-0.5 text-[9px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md">
+                                        SUPER_ADMIN
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <p class="text-xs text-slate-500 font-mono">{{ c.contacto_email or 'Sin correo' }}</p>
+                                {% if c.telefono %}
+                                <p class="text-[11px] text-slate-400">Tel: {{ c.telefono }}</p>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Fecha de Registro -->
+                        <td class="py-4 px-4 text-xs text-slate-600 whitespace-nowrap">
+                            {{ c.fecha_registro or 'N/A' }}
+                        </td>
+
+                        <!-- Badge de Estado (Verde: Activo, Amarillo: Trial, Rojo: Expirado) -->
+                        <td class="py-4 px-4 whitespace-nowrap">
+                            {% if c.estado_suscripcion == 'ACTIVE' %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>Activo (ACTIVE)</span>
+                            </span>
+                            {% elif c.estado_suscripcion == 'TRIAL' %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                <span>Trial (TRIAL)</span>
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                <span>Expirado (EXPIRED)</span>
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Días Restantes -->
+                        <td class="py-4 px-4 whitespace-nowrap">
+                            <div class="space-y-0.5">
+                                <span class="font-black text-sm {% if c.dias_restantes > 5 %}text-emerald-700{% elif c.dias_restantes > 0 %}text-amber-700{% else %}text-rose-600{% endif %}">
+                                    {{ c.dias_restantes }} día(s)
+                                </span>
+                                <p class="text-[11px] text-slate-400">
+                                    Vence: {{ c.trial_ends_at_formatted }}
+                                </p>
+                            </div>
+                        </td>
+
+                        <!-- Acciones -->
+                        <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-2">
+                                <button 
+                                    type="button"
+                                    onclick="abrirModalAjustarDias({{ c.id }}, {{ c.nombre_mostrado | tojson | forceescape }}, {{ c.dias_restantes }}, {{ (c.trial_ends_at_formatted or '') | tojson | forceescape }})"
+                                    class="btn-touch px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all inline-flex items-center gap-1.5"
+                                >
+                                    <i data-lucide="calendar-plus" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>Ajustar Días</span>
+                                </button>
+
+                                {% if c.veterinario_id and not c.veterinario_is_superadmin %}
+                                <button 
+                                    type="button"
+                                    onclick="promoverUsuarioSuperAdmin({{ c.veterinario_id }}, {{ (c.contacto_nombre or c.contacto_email or 'Usuario') | tojson | forceescape }})"
+                                    class="btn-touch px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all inline-flex items-center gap-1.5"
+                                    title="Otorgar rol SUPER_ADMIN a este veterinario"
+                                >
+                                    <i data-lucide="crown" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>Promover</span>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Estado vacío de búsqueda -->
+        <div id="emptyStateClinicas" class="{% if clinicas %}hidden{% endif %} p-10 text-center space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                <i data-lucide="search-x" class="w-6 h-6" aria-hidden="true"></i>
+            </div>
+            <p class="text-sm font-bold text-slate-700">No se encontraron clínicas que coincidan con el filtro</p>
+            <p class="text-xs text-slate-500">Intenta con otro término de búsqueda o restablece el filtro de estado.</p>
+        </div>
+    </div>
+
+</div>
+
+<!-- ========================================================== -->
+<!-- MODAL NATIVO <dialog>: AJUSTAR DÍAS DE PRUEBA (LIGHT-DISMISS) -->
+<!-- ========================================================== -->
+<dialog 
+    id="modalAjustarDias" 
+    closedby="any" 
+    aria-labelledby="dialogAjustarTitle"
+    class="w-full max-w-md rounded-3xl bg-white p-0 shadow-2xl border border-slate-200 text-slate-800 m-auto"
+>
+    <div class="p-6 space-y-5">
+        <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                    <i data-lucide="calendar-clock" class="w-5 h-5" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h3 id="dialogAjustarTitle" class="text-base font-black text-slate-900">
+                        Ajustar Días de Prueba
+                    </h3>
+                    <p id="modalClinicaNombre" class="text-xs font-semibold text-indigo-600 truncate max-w-[240px]">
+                        Clínica
+                    </p>
+                </div>
+            </div>
+            <button 
+                type="button" 
+                onclick="cerrarModalAjustarDias()" 
+                class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                aria-label="Cerrar modal"
+            >
+                <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <!-- Resumen actual -->
+        <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+            <div>
+                <span class="text-slate-500 block">Días restantes actuales:</span>
+                <strong id="modalDiasActuales" class="text-sm font-black text-slate-900">0 días</strong>
+            </div>
+            <div class="text-right">
+                <span class="text-slate-500 block">Vencimiento actual:</span>
+                <strong id="modalVencimientoActual" class="text-xs font-bold text-slate-700">--/--/----</strong>
+            </div>
+        </div>
+
+        <form id="formAjustarDias" onsubmit="ejecutarAjusteDias(event)" class="space-y-4">
+            <input type="hidden" id="inputAjustarClinicaId" value="">
+
+            <!-- Atajos rápidos -->
+            <div>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                    Atajos Rápidos (Días de Gracia)
+                </label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button type="button" onclick="setDiasRapido(7)" class="py-2 px-2 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors">+7 días</button>
+                    <button type="button" onclick="setDiasRapido(14)" class="py-2 px-2 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors">+14 días</button>
+                    <button type="button" onclick="setDiasRapido(30)" class="py-2 px-2 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors">+30 días</button>
+                    <button type="button" onclick="setDiasRapido(-7)" class="py-2 px-2 text-xs font-bold rounded-xl border border-rose-200 bg-rose-50 text-rose-800 hover:bg-rose-100 transition-colors">-7 días</button>
+                </div>
+            </div>
+
+            <!-- Input numérico exacto -->
+            <div>
+                <label for="inputDiasASumar" class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Días a Sumar o Restar (<code class="text-indigo-600">dias_a_sumar</code>) *
+                </label>
+                <input 
+                    type="number" 
+                    id="inputDiasASumar" 
+                    name="dias_a_sumar"
+                    value="7" 
+                    step="1"
+                    required 
+                    class="w-full px-4 py-3 text-base font-black text-slate-900 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                >
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Usa un número positivo (ej. <strong>15</strong>) para extender el trial o un número negativo (ej. <strong>-5</strong>) para recortarlo.
+                </p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalAjustarDias()" 
+                    class="btn-touch px-4 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnSubmitAjustarDias"
+                    class="btn-touch px-5 py-2.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all inline-flex items-center gap-2"
+                >
+                    <i data-lucide="check" class="w-4 h-4" aria-hidden="true"></i>
+                    <span>Aplicar Ajuste</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const modalAjustar = document.getElementById('modalAjustarDias');
+
+    // Fallback para navegadores sin soporte nativo para closedby="any" en <dialog>
+    if (modalAjustar && !('closedBy' in HTMLDialogElement.prototype)) {
+        modalAjustar.addEventListener('click', (event) => {
+            if (event.target !== modalAjustar) return;
+            const rect = modalAjustar.getBoundingClientRect();
+            const isDialogContent = (
+                rect.top <= event.clientY &&
+                event.clientY <= rect.top + rect.height &&
+                rect.left <= event.clientX &&
+                event.clientX <= rect.left + rect.width
+            );
+            if (isDialogContent) return;
+            modalAjustar.close();
+        });
+    }
+
+    function mostrarFeedbackAdmin(tipo, mensaje) {
+        const boxSuccess = document.getElementById('adminAlertSuccess');
+        const boxError = document.getElementById('adminAlertError');
+        boxSuccess.classList.add('hidden');
+        boxError.classList.add('hidden');
+
+        if (tipo === 'success') {
+            document.getElementById('adminAlertSuccessText').textContent = mensaje;
+            boxSuccess.classList.remove('hidden');
+        } else {
+            document.getElementById('adminAlertErrorText').textContent = mensaje;
+            boxError.classList.remove('hidden');
+        }
+        window.initLucideIcons?.();
+    }
+
+    function abrirModalAjustarDias(clinicaId, nombreClinica, diasActuales, vencimientoActual) {
+        document.getElementById('inputAjustarClinicaId').value = clinicaId;
+        document.getElementById('modalClinicaNombre').textContent = `${nombreClinica} (#${clinicaId})`;
+        document.getElementById('modalDiasActuales').textContent = `${diasActuales} día(s)`;
+        document.getElementById('modalVencimientoActual').textContent = vencimientoActual || 'Sin fecha';
+        document.getElementById('inputDiasASumar').value = 7;
+
+        if (typeof modalAjustar.showModal === 'function') {
+            modalAjustar.showModal();
+        } else {
+            modalAjustar.setAttribute('open', '');
+        }
+    }
+
+    function cerrarModalAjustarDias() {
+        if (typeof modalAjustar.close === 'function') {
+            modalAjustar.close();
+        } else {
+            modalAjustar.removeAttribute('open');
+        }
+    }
+
+    function setDiasRapido(dias) {
+        document.getElementById('inputDiasASumar').value = dias;
+    }
+
+    function renderBadgeEstado(estado) {
+        if (estado === 'ACTIVE') {
+            return `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Activo (ACTIVE)</span>
+                </span>
+            `;
+        }
+        if (estado === 'TRIAL') {
+            return `
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 border border-amber-200">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                    <span>Trial (TRIAL)</span>
+                </span>
+            `;
+        }
+        return `
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold bg-rose-100 text-rose-800 border border-rose-200">
+                <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                <span>Expirado (EXPIRED)</span>
+            </span>
+        `;
+    }
+
+    function escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    async function cargarClinicas() {
+        const iconRefresh = document.getElementById('iconRefresh');
+        iconRefresh?.classList.add('animate-spin');
+
+        try {
+            const resp = await fetch('/admin/clinicas', {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || 'Error al cargar la lista de clínicas.');
+            }
+            const data = await resp.json();
+            const clinicas = Array.isArray(data) ? data : (data.clinicas || []);
+
+            // Actualizar KPIs
+            document.getElementById('kpiTotalClinicas').textContent = clinicas.length;
+            document.getElementById('kpiActivas').textContent = clinicas.filter(c => c.estado_suscripcion === 'ACTIVE').length;
+            document.getElementById('kpiEnTrial').textContent = clinicas.filter(c => c.estado_suscripcion === 'TRIAL').length;
+            document.getElementById('kpiExpiradas').textContent = clinicas.filter(c => c.estado_suscripcion === 'EXPIRED').length;
+
+            const tbody = document.getElementById('tbodyClinicasAdmin');
+            tbody.innerHTML = clinicas.map(c => {
+                const searchData = `${c.nombre || ''} ${c.nombre_comercial || ''} ${c.contacto_email || ''} ${c.contacto_nombre || ''} ${c.telefono || ''}`.toLowerCase();
+                const diasColor = c.dias_restantes > 5 ? 'text-emerald-700' : (c.dias_restantes > 0 ? 'text-amber-700' : 'text-rose-600');
+                const nombreSafe = escapeHtml(c.nombre_mostrado || c.nombre);
+                const contactoSafe = escapeHtml(c.contacto_nombre || 'Sin titular');
+                const emailSafe = escapeHtml(c.contacto_email || 'Sin correo');
+                const vencimientoSafe = escapeHtml(c.trial_ends_at_formatted || 'Sin fecha');
+
+                return `
+                    <tr class="hover:bg-slate-50/80 transition-colors fila-clinica" data-search="${escapeHtml(searchData)}" data-estado="${escapeHtml(c.estado_suscripcion)}">
+                        <td class="py-4 px-4 sm:px-6">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0">
+                                    #${c.id}
+                                </div>
+                                <div>
+                                    <p class="font-bold text-slate-900">${nombreSafe}</p>
+                                    <p class="text-[11px] text-slate-500">
+                                        Plan: <span class="font-semibold uppercase text-slate-700">${escapeHtml(c.plan_activo)}</span>
+                                        &bull; ${c.total_pacientes || 0} paciente(s)
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4">
+                            <div class="space-y-0.5">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-semibold text-slate-800">${contactoSafe}</span>
+                                    ${c.veterinario_is_superadmin ? '<span class="px-1.5 py-0.5 text-[9px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md">SUPER_ADMIN</span>' : ''}
+                                </div>
+                                <p class="text-xs text-slate-500 font-mono">${emailSafe}</p>
+                                ${c.telefono ? `<p class="text-[11px] text-slate-400">Tel: ${escapeHtml(c.telefono)}</p>` : ''}
+                            </div>
+                        </td>
+                        <td class="py-4 px-4 text-xs text-slate-600 whitespace-nowrap">
+                            ${escapeHtml(c.fecha_registro || 'N/A')}
+                        </td>
+                        <td class="py-4 px-4 whitespace-nowrap">
+                            ${renderBadgeEstado(c.estado_suscripcion)}
+                        </td>
+                        <td class="py-4 px-4 whitespace-nowrap">
+                            <div class="space-y-0.5">
+                                <span class="font-black text-sm ${diasColor}">
+                                    ${c.dias_restantes} día(s)
+                                </span>
+                                <p class="text-[11px] text-slate-400">
+                                    Vence: ${vencimientoSafe}
+                                </p>
+                            </div>
+                        </td>
+                        <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
+                            <div class="inline-flex items-center justify-end gap-2">
+                                <button 
+                                    type="button"
+                                    onclick='abrirModalAjustarDias(${c.id}, ${JSON.stringify(c.nombre_mostrado || c.nombre)}, ${c.dias_restantes}, ${JSON.stringify(c.trial_ends_at_formatted || "")})'
+                                    class="btn-touch px-3 py-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-all inline-flex items-center gap-1.5"
+                                >
+                                    <i data-lucide="calendar-plus" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>Ajustar Días</span>
+                                </button>
+                                ${(c.veterinario_id && !c.veterinario_is_superadmin) ? `
+                                <button 
+                                    type="button"
+                                    onclick='promoverUsuarioSuperAdmin(${c.veterinario_id}, ${JSON.stringify(c.contacto_nombre || c.contacto_email || "Usuario")})'
+                                    class="btn-touch px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all inline-flex items-center gap-1.5"
+                                    title="Otorgar rol SUPER_ADMIN a este veterinario"
+                                >
+                                    <i data-lucide="crown" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>Promover</span>
+                                </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            filtrarTablaClinicas();
+            window.initLucideIcons?.();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        } finally {
+            iconRefresh?.classList.remove('animate-spin');
+        }
+    }
+
+    function filtrarTablaClinicas() {
+        const termino = (document.getElementById('inputBuscarClinica')?.value || '').trim().toLowerCase();
+        const estadoFiltro = document.getElementById('selectFiltroEstado')?.value || 'ALL';
+        const filas = document.querySelectorAll('#tbodyClinicasAdmin .fila-clinica');
+        let visibles = 0;
+
+        filas.forEach(fila => {
+            const texto = fila.getAttribute('data-search') || '';
+            const estado = fila.getAttribute('data-estado') || '';
+            const coincideTexto = !termino || texto.includes(termino);
+            const coincideEstado = (estadoFiltro === 'ALL') || (estado === estadoFiltro);
+
+            if (coincideTexto && coincideEstado) {
+                fila.classList.remove('hidden');
+                visibles++;
+            } else {
+                fila.classList.add('hidden');
+            }
+        });
+
+        const emptyState = document.getElementById('emptyStateClinicas');
+        if (emptyState) {
+            emptyState.classList.toggle('hidden', visibles > 0);
+        }
+    }
+
+    async function ejecutarAjusteDias(event) {
+        event.preventDefault();
+        const clinicaId = document.getElementById('inputAjustarClinicaId').value;
+        const diasASumar = parseInt(document.getElementById('inputDiasASumar').value, 10);
+        const btnSubmit = document.getElementById('btnSubmitAjustarDias');
+
+        if (!clinicaId || isNaN(diasASumar)) {
+            mostrarFeedbackAdmin('error', 'Ingresa un número entero válido de días.');
+            return;
+        }
+
+        btnSubmit.disabled = true;
+        try {
+            const resp = await fetch(`/admin/clinicas/${clinicaId}/ajustar-dias`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ dias_a_sumar: diasASumar })
+            });
+
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || 'No se pudo ajustar el periodo de prueba.');
+            }
+
+            cerrarModalAjustarDias();
+            mostrarFeedbackAdmin('success', data.mensaje || 'Periodo de prueba actualizado correctamente.');
+            await cargarClinicas();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        } finally {
+            btnSubmit.disabled = false;
+        }
+    }
+
+    async function promoverUsuarioSuperAdmin(usuarioId, nombreUsuario) {
+        if (!confirm(`¿Estás seguro de otorgar el rol SUPER_ADMIN a "${nombreUsuario}"?`)) {
+            return;
+        }
+
+        try {
+            const resp = await fetch(`/admin/usuarios/${usuarioId}/promover`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || 'No se pudo promover al usuario.');
+            }
+
+            mostrarFeedbackAdmin('success', data.mensaje || 'Usuario promovido a SUPER_ADMIN exitosamente.');
+            await cargarClinicas();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        }
+    }
+</script>
+{% endblock %}

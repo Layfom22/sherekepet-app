@@ -56,6 +56,7 @@ class VetInfo(BaseModel):
     email: Optional[str] = None
     username: Optional[str] = None
     rol: str
+    is_superadmin: bool = False
     clinica_id: int
     is_active: bool
     is_verified: bool = False

@@ -75,6 +75,8 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
         "/api/portal",
         "/configuracion/facturacion",
         "/api/billing",
+        "/admin",
+        "/api/admin",
         "/static",
         "/uploads",
         "/docs",
@@ -96,7 +98,7 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
 
-        # Omitir rutas de autenticación, portal cliente y facturación
+        # Omitir rutas de autenticación, portal cliente, facturación y administración
         for prefix in self.RUTAS_EXCLUIDAS_PREFIX:
             if path == prefix or path.startswith(prefix + "/") or path.startswith(prefix + "?"):
                 return await call_next(request)
@@ -113,6 +115,10 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
 
         payload = decode_access_token(token)
         if not payload or payload.get("role") == "client":
+            return await call_next(request)
+
+        # El SUPER_ADMIN nunca es bloqueado por expiración de trial
+        if payload.get("rol") == "SUPER_ADMIN" or payload.get("role") == "SUPER_ADMIN" or payload.get("is_superadmin"):
             return await call_next(request)
 
         clinica_id = payload.get("clinica_id")

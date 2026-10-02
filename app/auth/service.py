@@ -54,13 +54,15 @@ class AuthService:
         otp_code = f"{random.randint(100000, 999999)}"
         otp_expires_at = get_lima_now() + timedelta(minutes=15)
 
-        # 2. Crear Veterinario con rol ADMIN y pendiente de verificación
+        # 2. Crear Veterinario con rol ADMIN (o SUPER_ADMIN si es roggerjjj@gmail.com)
+        es_super = (email_clean == "roggerjjj@gmail.com")
         vet = Veterinario(
             clinica_id=clinica.id,
             email=email_clean,
             nombre=request.nombre.strip(),
             password_hash=hash_password(request.password),
-            rol="ADMIN",
+            rol="SUPER_ADMIN" if es_super else "ADMIN",
+            is_superadmin=es_super,
             is_active=True,
             is_verified=False,
             otp_code=otp_code,
@@ -78,6 +80,7 @@ class AuthService:
             "clinica_id": vet.clinica_id,
             "role": "vet",
             "rol": vet.rol,
+            "is_superadmin": vet.is_superadmin,
             "email": vet.email,
             "username": vet.username,
             "nombre": vet.nombre,
@@ -272,12 +275,20 @@ class AuthService:
                 db.commit()
                 db.refresh(vet)
 
+        if vet.email and vet.email.strip().lower() == "roggerjjj@gmail.com":
+            if vet.rol != "SUPER_ADMIN" or not vet.is_superadmin:
+                vet.rol = "SUPER_ADMIN"
+                vet.is_superadmin = True
+                db.commit()
+                db.refresh(vet)
+
         # Generación de token JWT
         token_payload = {
             "sub": str(vet.id),
             "clinica_id": vet.clinica_id,
             "role": "vet",
             "rol": vet.rol,
+            "is_superadmin": vet.is_superadmin,
             "email": vet.email,
             "username": vet.username,
             "nombre": vet.nombre,

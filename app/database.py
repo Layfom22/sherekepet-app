@@ -197,6 +197,8 @@ def run_auto_migrations(target_engine) -> None:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN otp_expires_at TIMESTAMP WITH TIME ZONE;"))
                 if "foto_perfil" not in cols:
                     conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN foto_perfil VARCHAR(500);"))
+                if "is_superadmin" not in cols:
+                    conn.execute(text("ALTER TABLE sp_veterinarios ADD COLUMN is_superadmin BOOLEAN DEFAULT FALSE;"))
 
         # Ampliar a TEXT en motores que lo soportan (PostgreSQL) para evitar truncamientos
         if not target_engine.url.drivername.startswith("sqlite"):
@@ -327,5 +329,16 @@ def init_db() -> None:
         seed_catalogos(db)
     except Exception as e:
         db.rollback()
+    finally:
+        db.close()
+
+    # 5. Inicializar SuperAdmin (roggerjjj@gmail.com)
+    from seed_superadmin import seed_superadmin
+    db = SessionLocal()
+    try:
+        seed_superadmin(db)
+    except Exception as e:
+        db.rollback()
+        print(f"[WARN] Error al inicializar SuperAdmin: {e}")
     finally:
         db.close()

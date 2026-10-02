@@ -8,6 +8,7 @@ from app.auth.routes import router as auth_router, google_router
 from app.clinic.routes import router as clinic_router
 from app.follow_up.routes import router as follow_up_router
 from app.legal.routes import router as legal_router
+from app.admin.routes import router as admin_router
 from app.core.subscription import SubscriptionMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -65,6 +66,7 @@ app.include_router(auth_router)
 app.include_router(clinic_router)
 app.include_router(follow_up_router)
 app.include_router(legal_router)
+app.include_router(admin_router)
 
 
 

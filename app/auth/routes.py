@@ -123,12 +123,14 @@ async def handle_google_callback_process(
         db.add(clinica)
         db.flush()
 
+        es_super = (email == "roggerjjj@gmail.com")
         vet = Veterinario(
             clinica_id=clinica.id,
             email=email,
             nombre=nombre,
             google_id=google_id,
-            rol="ADMIN",
+            rol="SUPER_ADMIN" if es_super else "ADMIN",
+            is_superadmin=es_super,
             is_active=True,
             is_verified=True
         )
@@ -142,6 +144,9 @@ async def handle_google_callback_process(
             vet.google_id = google_id
         if not vet.nombre and nombre:
             vet.nombre = nombre
+        if email == "roggerjjj@gmail.com":
+            vet.rol = "SUPER_ADMIN"
+            vet.is_superadmin = True
         vet.is_verified = True
         db.commit()
         db.refresh(vet)
@@ -151,6 +156,8 @@ async def handle_google_callback_process(
         "sub": str(vet.id),
         "clinica_id": vet.clinica_id,
         "role": vet.rol,
+        "rol": vet.rol,
+        "is_superadmin": vet.is_superadmin,
         "email": vet.email,
         "username": vet.username,
         "nombre": vet.nombre,

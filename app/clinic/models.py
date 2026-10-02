@@ -44,7 +44,7 @@ class Raza(Base, TimestampMixin):
 
 
 class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
-    """Modelo de Autenticación y Perfil de Veterinario."""
+    """Modelo de Autenticación y Perfil de Veterinario (User)."""
     __tablename__ = "sp_veterinarios"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -60,6 +60,7 @@ class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     rol: Mapped[str] = mapped_column(String(50), default="ADMIN", nullable=False)
+    is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     otp_code: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
@@ -71,7 +72,11 @@ class Veterinario(Base, SoftDeleteMixin, TimestampMixin):
     atenciones = relationship("AtencionClinica", back_populates="veterinario")
 
     def __repr__(self) -> str:
-        return f"<Veterinario(id={self.id}, email='{self.email}', clinica_id={self.clinica_id})>"
+        return f"<Veterinario(id={self.id}, email='{self.email}', rol='{self.rol}', is_superadmin={self.is_superadmin}, clinica_id={self.clinica_id})>"
+
+
+# Alias compatible con estándar User
+User = Veterinario
 
 
 class Cliente(Base, SoftDeleteMixin, TimestampMixin):

@@ -89,7 +89,7 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
     def tiene_suscripcion_activa(self) -> bool:
         """Determina si la clínica tiene acceso operativo activo (Plan ACTIVO o TRIAL vigente)."""
         estado = (self.estado_suscripcion or "").upper()
-        if estado in ["ACTIVO", "PAGADO"]:
+        if estado in ["ACTIVO", "ACTIVE", "PAGADO"]:
             return True
         if estado == "TRIAL":
             if not self.trial_ends_at:
@@ -100,6 +100,19 @@ class Clinica(Base, SoftDeleteMixin, TimestampMixin):
                 t_end = t_end.replace(tzinfo=ahora.tzinfo)
             return t_end >= ahora
         return False
+
+    @property
+    def estado_suscripcion_normalizado(self) -> str:
+        """Retorna el estado normalizado para el Panel SuperAdmin: ACTIVE, TRIAL o EXPIRED."""
+        estado = (self.estado_suscripcion or "TRIAL").upper()
+        if estado in ["ACTIVO", "ACTIVE", "PAGADO"]:
+            return "ACTIVE"
+        if estado in ["EXPIRED", "EXPIRADO", "VENCIDO", "CANCELADO"]:
+            return "EXPIRED"
+        # Si está en TRIAL, verificar si ya venció su trial_ends_at
+        if not self.tiene_suscripcion_activa:
+            return "EXPIRED"
+        return "TRIAL"
 
     # Relaciones operativas
     veterinarios = relationship("Veterinario", back_populates="clinica", cascade="all, delete-orphan")

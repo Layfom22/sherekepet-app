@@ -295,6 +295,13 @@ def test_ciclo_pagos_yape_gracia_y_modo_solo_lectura(client, db_session):
     assert clinica.tiene_suscripcion_activa is True
     assert clinica.dias_restantes_suscripcion >= 29
 
+    # Verificar que el Panel SuperAdmin (/admin/clinicas) refleja los 30 días restantes
+    resp_admin_list = client.get("/admin/clinicas")
+    assert resp_admin_list.status_code == 200
+    clinica_item = next(c for c in resp_admin_list.json() if c["id"] == clinica.id)
+    assert clinica_item["estado_suscripcion"] == "ACTIVE"
+    assert clinica_item["dias_restantes"] >= 29
+
     # 5. Simular vencimiento hace 1 día (entra en Periodo de Gracia de 3 días)
     clinica.subscription_ends_at = ahora - timedelta(days=1)
     db_session.commit()

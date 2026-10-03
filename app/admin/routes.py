@@ -122,7 +122,17 @@ def _serializar_clinica_admin(clinica: Clinica, db: Session) -> dict:
     ).count()
 
     estado_norm = clinica.estado_suscripcion_normalizado
-    dias_restantes = clinica.dias_restantes_trial
+    es_activa = estado_norm == "ACTIVE"
+    fecha_vencimiento = (
+        (clinica.subscription_ends_at or clinica.trial_ends_at)
+        if es_activa
+        else (clinica.trial_ends_at or clinica.subscription_ends_at)
+    )
+    dias_restantes = (
+        clinica.dias_restantes_suscripcion
+        if es_activa
+        else clinica.dias_restantes_trial
+    )
 
     usuarios_data = [
         {
@@ -154,8 +164,8 @@ def _serializar_clinica_admin(clinica: Clinica, db: Session) -> dict:
         "fecha_registro": clinica.created_at.strftime("%d/%m/%Y %H:%M") if clinica.created_at else None,
         "created_at": clinica.created_at.isoformat() if clinica.created_at else None,
         "estado_suscripcion": estado_norm,
-        "trial_ends_at": clinica.trial_ends_at.isoformat() if clinica.trial_ends_at else None,
-        "trial_ends_at_formatted": clinica.trial_ends_at.strftime("%d/%m/%Y") if clinica.trial_ends_at else "Sin fecha",
+        "trial_ends_at": fecha_vencimiento.isoformat() if fecha_vencimiento else None,
+        "trial_ends_at_formatted": fecha_vencimiento.strftime("%d/%m/%Y") if fecha_vencimiento else "Sin fecha",
         "dias_restantes": dias_restantes,
         "plan_activo": clinica.plan_activo,
         "total_pacientes": total_pacientes,
@@ -277,15 +287,21 @@ def ajustar_dias_clinica(
         )
 
     ahora = get_lima_now()
-    base_time = clinica.trial_ends_at or ahora
+    estado_actual = (clinica.estado_suscripcion or "").upper()
+    if estado_actual in ("ACTIVE", "ACTIVO", "PAGADO") and clinica.subscription_ends_at:
+        base_time = clinica.subscription_ends_at
+    else:
+        base_time = clinica.trial_ends_at or ahora
+
     if base_time.tzinfo is None:
         base_time = base_time.replace(tzinfo=ahora.tzinfo)
 
     nuevo_vencimiento = base_time + timedelta(days=int(payload.dias_a_sumar))
     clinica.trial_ends_at = nuevo_vencimiento
+    if estado_actual in ("ACTIVE", "ACTIVO", "PAGADO"):
+        clinica.subscription_ends_at = nuevo_vencimiento
 
     # Si estaba marcada como EXPIRED/EXPIRADO y ahora tiene fecha futura, reactivar a TRIAL
-    estado_actual = (clinica.estado_suscripcion or "").upper()
     if estado_actual in ("EXPIRED", "EXPIRADO") and nuevo_vencimiento > ahora:
         clinica.estado_suscripcion = "TRIAL"
 
@@ -340,6 +356,7 @@ def cambiar_estado_suscripcion_clinica(
         clinica.plan_activo = "emprendedor"
         if not clinica.subscription_ends_at or clinica.subscription_ends_at <= ahora:
             clinica.subscription_ends_at = ahora + timedelta(days=30)
+        clinica.trial_ends_at = clinica.subscription_ends_at
     elif nuevo_estado in ("EXPIRED", "EXPIRADO"):
         clinica.estado_suscripcion = "EXPIRED"
         clinica.trial_ends_at = ahora - timedelta(days=1)
@@ -394,6 +411,7 @@ def aprobar_pago_suscripcion(
     clinica.estado_suscripcion = "ACTIVE"
     clinica.plan_activo = "emprendedor"
     clinica.subscription_ends_at = nuevo_fin
+    clinica.trial_ends_at = nuevo_fin
 
     pago.estado = "APROBADO"
     pago.periodo_inicio = ahora

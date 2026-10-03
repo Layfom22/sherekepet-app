@@ -2744,6 +2744,7 @@ def _aplicar_activacion_30_dias(
     clinica.estado_suscripcion = "ACTIVO"
     clinica.plan_activo = "emprendedor"
     clinica.subscription_ends_at = nuevo_fin
+    clinica.trial_ends_at = nuevo_fin
 
     ref_final = referencia_operacion or f"MP-{uuid.uuid4().hex[:8].upper()}"
     pago = PagoSuscripcion(

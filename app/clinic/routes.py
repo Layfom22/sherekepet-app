@@ -2792,6 +2792,10 @@ def activar_plan_emprendedor(
         try:
             import httpx
             base_url = str(request.base_url).rstrip("/")
+            forwarded_proto = request.headers.get("x-forwarded-proto", "")
+            if (forwarded_proto == "https" or "onrender.com" in base_url or "sherekepet.com" in base_url) and base_url.startswith("http://"):
+                base_url = "https://" + base_url[len("http://"):]
+
             mp_payload = {
                 "items": [
                     {
@@ -2803,18 +2807,17 @@ def activar_plan_emprendedor(
                         "unit_price": 49.00
                     }
                 ],
-                "payer": {
-                    "email": current_user.email or "cliente@sherekepet.com"
-                },
                 "external_reference": str(clinica.id),
                 "back_urls": {
                     "success": f"{base_url}/configuracion/facturacion/retorno-mp",
                     "failure": f"{base_url}/configuracion/facturacion?alerta=pago_fallido",
                     "pending": f"{base_url}/configuracion/facturacion?mensaje=Tu+pago+está+en+proceso+de+validación."
                 },
-                "auto_return": "approved",
                 "notification_url": f"{base_url}/api/billing/webhook/mercadopago"
             }
+            if base_url.startswith("https://"):
+                mp_payload["auto_return"] = "approved"
+
             resp = httpx.post(
                 "https://api.mercadopago.com/checkout/preferences",
                 headers={
@@ -2825,11 +2828,13 @@ def activar_plan_emprendedor(
                 timeout=10.0
             )
             if resp.status_code in (200, 201):
-                init_point = resp.json().get("init_point")
+                mp_data = resp.json()
+                init_point = mp_data.get("init_point") or mp_data.get("sandbox_init_point")
                 if init_point:
                     return RedirectResponse(url=init_point, status_code=status.HTTP_303_SEE_OTHER)
         except Exception:
             pass
+
 
     # Modo directo / sandbox cuando aún no se configura MP_ACCESS_TOKEN
     _aplicar_activacion_30_dias(

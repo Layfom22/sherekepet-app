@@ -205,14 +205,23 @@
                     <i data-lucide="badge-check" class="w-5 h-5 text-emerald-600" aria-hidden="true"></i>
                     <span>Tu Plan Emprendedor está Activo</span>
                 </div>
-                <div class="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <form method="POST" action="/configuracion/facturacion/activar">
+                        <button 
+                            type="submit"
+                            class="btn-touch w-full py-2.5 px-3 text-xs font-bold text-sky-800 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                            <i data-lucide="credit-card" class="w-4 h-4 text-sky-600" aria-hidden="true"></i>
+                            <span>Extender con Mercado Pago (+30d)</span>
+                        </button>
+                    </form>
                     <button 
                         type="button"
                         onclick="document.getElementById('modalPagoYapePlin').showModal()"
-                        class="btn-touch w-full py-2.5 px-4 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        class="btn-touch w-full py-2.5 px-3 text-xs font-bold text-purple-800 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                         <i data-lucide="qr-code" class="w-4 h-4 text-purple-700" aria-hidden="true"></i>
-                        <span>Adelantar próximo mes con Yape / Plin (+30 días)</span>
+                        <span>Extender con Yape / Plin (+30d)</span>
                     </button>
                 </div>
                 {% else %}

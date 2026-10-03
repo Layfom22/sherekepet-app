@@ -41,7 +41,7 @@ def test_landing_page_footer_y_cookie_banner(client):
     assert "/politica-reembolsos" in resp.text
 
     # Texto visible obligatorio de footer
-    assert "Razón Social: [TU EMPRESA] | RUC: [TU RUC] | Contacto:" in resp.text
+    assert "Razón Social: PROJECT DC HOLDING E.I.R.L. | RUC: 20615335887 | Contacto:" in resp.text
     assert "soporte@sherekepet.com" in resp.text
 
     # Cookie Consent Banner

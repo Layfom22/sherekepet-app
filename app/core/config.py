@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     # Pasarela de Pagos SaaS (Mercado Pago & Yape/Plin Directo)
     MP_ACCESS_TOKEN: str = ""
     MP_PUBLIC_KEY: str = ""
-    YAPE_PLIN_TITULAR: str = "SherekePet SaaS"
+    YAPE_PLIN_TITULAR: str = "PROJECT DC HOLDING E.I.R.L."
     YAPE_PLIN_NUMERO: str = "999 888 777"
     YAPE_PLIN_QR_URL: str = ""
     SOPORTE_EMAIL: str = "roggerjjj@gmail.com"

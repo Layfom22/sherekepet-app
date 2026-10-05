@@ -2716,7 +2716,8 @@ def vista_facturacion_clinica(
             "yape_titular": settings.YAPE_PLIN_TITULAR,
             "yape_numero": settings.YAPE_PLIN_NUMERO,
             "yape_qr_url": settings.YAPE_PLIN_QR_URL,
-            "mp_configured": bool(settings.MP_ACCESS_TOKEN),
+            "mp_enabled": bool(settings.MP_ENABLED),
+            "mp_configured": bool(settings.MP_ENABLED and settings.MP_ACCESS_TOKEN),
             "alerta": alerta,
             "mensaje": mensaje
         }
@@ -2773,7 +2774,7 @@ def activar_plan_emprendedor(
     """
     Activa la suscripción del Plan Emprendedor (S/ 49.00/mes) por 30 días pasando el estado a ACTIVO
     y desbloqueando inmediatamente todas las operaciones de la clínica.
-    Si MP_ACCESS_TOKEN está configurado en producción, redirige al Checkout Pro de Mercado Pago.
+    Si MP_ENABLED y MP_ACCESS_TOKEN están configurados en producción, redirige al Checkout Pro de Mercado Pago.
     """
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
@@ -2788,8 +2789,8 @@ def activar_plan_emprendedor(
     if not clinica:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    # Si hay token de Mercado Pago configurado, intentar crear preferencia Checkout Pro real
-    if settings.MP_ACCESS_TOKEN and settings.MP_ACCESS_TOKEN.strip():
+    # Si Mercado Pago está habilitado y hay token configurado, crear preferencia Checkout Pro real
+    if settings.MP_ENABLED and settings.MP_ACCESS_TOKEN and settings.MP_ACCESS_TOKEN.strip():
         try:
             import httpx
             base_url = str(request.base_url).rstrip("/")

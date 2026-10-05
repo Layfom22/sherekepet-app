@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
 
     # Pasarela de Pagos SaaS (Mercado Pago & Yape/Plin Directo)
+    MP_ENABLED: bool = False
     MP_ACCESS_TOKEN: str = ""
     MP_PUBLIC_KEY: str = ""
     YAPE_PLIN_TITULAR: str = "PROJECT DC HOLDING E.I.R.L."

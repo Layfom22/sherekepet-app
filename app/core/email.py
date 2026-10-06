@@ -6,6 +6,7 @@ Optimizado con buenas prácticas de entregabilidad (Anti-Spam) para Outlook/Hotm
 - Paridad Multipart (text/plain + text/html).
 - Cabeceras X-Entity-Ref-ID y Reply-To explícitas.
 """
+import html
 import uuid
 import smtplib
 import logging
@@ -18,13 +19,19 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _esc(val: Optional[object]) -> str:
+    """Escapa caracteres HTML peligrosos (<, >, &, ", ') para prevenir inyección HTML en correos."""
+    return html.escape(str(val or ""), quote=True)
+
+
 def send_otp_email(destinatario: str, otp_code: str, nombre: Optional[str] = None) -> bool:
     """
     Envía un correo electrónico con el código OTP de verificación.
     Prioriza el SDK oficial de Resend y aplica reglas anti-spam para bandeja principal.
     """
     destinatario = destinatario.strip().lower()
-    saludo_nombre = f" {nombre.strip()}" if nombre and nombre.strip() else ""
+    saludo_nombre = f" {_esc(nombre.strip())}" if nombre and nombre.strip() else ""
+    otp_code = _esc(otp_code)
     remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
     asunto = f"Verifica tu cuenta en SherekePet (Código: {otp_code})"
 
@@ -195,6 +202,14 @@ def send_appointment_notification_email(
     if not destinatario or "@" not in destinatario:
         return False
 
+    cliente_nombre = _esc(cliente_nombre)
+    cliente_telefono = _esc(cliente_telefono)
+    mascota_nombre = _esc(mascota_nombre)
+    fecha_str = _esc(fecha_str)
+    hora_str = _esc(hora_str)
+    motivo = _esc(motivo)
+    clinica_nombre = _esc(clinica_nombre)
+
     remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
     asunto = f"Nueva cita solicitada para {mascota_nombre} ({fecha_str} {hora_str})"
 
@@ -325,6 +340,13 @@ def send_client_appointment_confirmation_email(
     if not destinatario or "@" not in destinatario:
         return False
 
+    cliente_nombre = _esc(cliente_nombre)
+    mascota_nombre = _esc(mascota_nombre)
+    fecha_str = _esc(fecha_str)
+    hora_str = _esc(hora_str)
+    motivo = _esc(motivo)
+    clinica_nombre = _esc(clinica_nombre)
+
     remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
     asunto = f"Cita confirmada para {mascota_nombre} ({fecha_str} a las {hora_str})"
 
@@ -427,6 +449,15 @@ def send_medication_reminder_email(
     if not destinatario or "@" not in destinatario:
         return False
 
+    cliente_nombre = _esc(cliente_nombre)
+    mascota_nombre = _esc(mascota_nombre)
+    medicamento = _esc(medicamento)
+    hora_programada_str = _esc(hora_programada_str)
+    numero_dosis = int(numero_dosis)
+    total_dosis = int(total_dosis)
+    frecuencia_horas = int(frecuencia_horas)
+    mascota_id = int(mascota_id)
+
     remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
     esquema = "Mañana y Noche (cada 12h)" if frecuencia_horas == 12 else f"Cada {frecuencia_horas} horas"
     asunto = f"💊 Próxima toma de {mascota_nombre}: {medicamento} a las {hora_programada_str}"
@@ -519,6 +550,12 @@ def send_bath_suggestion_email(
     destinatario = (destinatario or "").strip().lower()
     if not destinatario or "@" not in destinatario:
         return False
+
+    cliente_nombre = _esc(cliente_nombre)
+    mascota_nombre = _esc(mascota_nombre)
+    fecha_sugerida_str = _esc(fecha_sugerida_str)
+    hora_sugerida_str = _esc(hora_sugerida_str)
+    clinica_nombre = _esc(clinica_nombre)
 
     remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
     asunto = f"🛁 Próximo baño sugerido para {mascota_nombre} ({fecha_sugerida_str}) - {clinica_nombre}"
@@ -649,6 +686,15 @@ def send_payment_report_notification_email(
     """Envía una alerta al SuperAdmin cuando una clínica reporta un pago por Yape/Plin para revisión."""
     destinatario = (settings.SOPORTE_EMAIL or "roggerjjj@gmail.com").strip().lower()
     remitente = settings.SMTP_FROM or "SherekePet Billing <soporte@sherekepet.com>"
+
+    clinica_nombre = _esc(clinica_nombre)
+    clinica_id = int(clinica_id)
+    veterinario_email = _esc(veterinario_email)
+    metodo_pago = _esc(metodo_pago)
+    referencia_operacion = _esc(referencia_operacion)
+    monto = _esc(monto)
+    comprobante_url = _esc(comprobante_url)
+
     asunto = f"💳 Nuevo Pago Reportado ({metodo_pago}): {clinica_nombre} - S/ {monto}"
 
     texto_plano = (
@@ -715,6 +761,10 @@ def send_payment_approved_email(
     destinatario = (destinatario or "").strip().lower()
     if not destinatario or "@" not in destinatario:
         return False
+
+    clinica_nombre = _esc(clinica_nombre)
+    fecha_vencimiento_str = _esc(fecha_vencimiento_str)
+    monto = _esc(monto)
 
     remitente = settings.SMTP_FROM or "SherekePet <soporte@sherekepet.com>"
     asunto = f"✅ Suscripción Activa: Plan Emprendedor ({clinica_nombre})"

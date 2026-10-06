@@ -614,15 +614,33 @@ async function subirLogoClinica(input) {
         if (resp.ok) {
             const data = await resp.json();
             const container = document.getElementById("clinicLogoContainer");
-            const logoUrl = data.logo_url || data.logo_b64;
-            container.innerHTML = `
-                <img id="clinicLogoImg" src="${logoUrl}" alt="Logo de la clínica" class="w-full h-full object-cover" onerror="this.style.display='none'; document.getElementById('clinicLogoPlaceholder')?.classList.remove('hidden');">
-                <span id="clinicLogoPlaceholder" class="hidden text-teal-600 flex items-center justify-center"><i data-lucide="hospital" class="w-8 h-8" aria-hidden="true"></i></span>
-                <div id="logoUploadLoader" class="hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold p-1 text-center">
-                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin mb-0.5 text-white" aria-hidden="true"></i>
-                    <span>Subiendo logo...</span>
-                </div>
-            `;
+            const logoUrl = data.logo_url || data.logo_b64 || "";
+            if (container) {
+                container.textContent = "";
+                const imgNode = document.createElement("img");
+                imgNode.id = "clinicLogoImg";
+                imgNode.src = logoUrl;
+                imgNode.alt = "Logo de la clínica";
+                imgNode.className = "w-full h-full object-cover";
+                imgNode.onerror = function() {
+                    this.style.display = "none";
+                    document.getElementById("clinicLogoPlaceholder")?.classList.remove("hidden");
+                };
+
+                const spanPlaceholder = document.createElement("span");
+                spanPlaceholder.id = "clinicLogoPlaceholder";
+                spanPlaceholder.className = "hidden text-teal-600 flex items-center justify-center";
+                spanPlaceholder.innerHTML = '<i data-lucide="hospital" class="w-8 h-8" aria-hidden="true"></i>';
+
+                const divLoader = document.createElement("div");
+                divLoader.id = "logoUploadLoader";
+                divLoader.className = "hidden absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[10px] font-bold p-1 text-center";
+                divLoader.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mb-0.5 text-white" aria-hidden="true"></i><span>Subiendo logo...</span>';
+
+                container.appendChild(imgNode);
+                container.appendChild(spanPlaceholder);
+                container.appendChild(divLoader);
+            }
             if (window.initLucideIcons) window.initLucideIcons();
         } else {
             let errorMsg = "Revise el formato o tamaño de la imagen.";

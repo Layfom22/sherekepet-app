@@ -35,6 +35,9 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session):
     """Cliente de prueba de FastAPI con sobreescritura de get_db."""
+    from app.core.rate_limit import rate_limiter
+    rate_limiter.clear_all()
+
     def override_get_db():
         try:
             yield db_session
@@ -45,6 +48,7 @@ def client(db_session):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+    rate_limiter.clear_all()
 
 
 @pytest.fixture(scope="function")

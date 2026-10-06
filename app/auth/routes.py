@@ -209,8 +209,13 @@ async def google_callback(
 )
 def check_dni_portal(
     payload: CheckDniRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> CheckDniResponse:
+    from app.core.rate_limit import rate_limiter
+    client_ip = rate_limiter.get_client_ip(request)
+    rate_limiter.check_rate_limit(f"check_dni:{client_ip}", max_requests=12, window_seconds=60)
+
     dni_clean = payload.dni.strip()
     clientes = db.query(Cliente).filter(
         Cliente.dni == dni_clean,
@@ -228,7 +233,8 @@ def check_dni_portal(
         )
 
     cliente = clientes[0]
-    needs_pin = bool(cliente.pin_hash is None or str(cliente.pin_hash).strip() == "")
+    cliente_con_pin = next((c for c in clientes if c.pin_hash and str(c.pin_hash).strip()), None)
+    needs_pin = (cliente_con_pin is None)
     clinica = cliente.clinica
     clinica_nombre = clinica.nombre_mostrado if clinica else None
     clinica_logo = clinica.logo_url if clinica else None
@@ -253,8 +259,12 @@ def check_dni_portal(
 )
 def login_vet(
     payload: VetLoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> VetLoginResponse:
+    from app.core.rate_limit import rate_limiter
+    client_ip = rate_limiter.get_client_ip(request)
+    rate_limiter.check_rate_limit(f"vet_login:{client_ip}", max_requests=10, window_seconds=60)
     return AuthService.login_veterinario(db, payload)
 
 
@@ -267,8 +277,12 @@ def login_vet(
 )
 def verificar_otp_api(
     payload: VerificarOtpRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> VetLoginResponse:
+    from app.core.rate_limit import rate_limiter
+    client_ip = rate_limiter.get_client_ip(request)
+    rate_limiter.check_rate_limit(f"otp_verify:{client_ip}:{payload.email.strip().lower()}", max_requests=6, window_seconds=60)
     return AuthService.verificar_otp(db, payload.email, payload.otp_code)
 
 
@@ -280,8 +294,12 @@ def verificar_otp_api(
 )
 def reenviar_otp_api(
     payload: ReenviarOtpRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    from app.core.rate_limit import rate_limiter
+    client_ip = rate_limiter.get_client_ip(request)
+    rate_limiter.check_rate_limit(f"otp_resend:{client_ip}", max_requests=4, window_seconds=60)
     return AuthService.reenviar_otp(db, payload.email)
 
 
@@ -298,7 +316,12 @@ def reenviar_otp_api(
 )
 def login_client(
     payload: ClientLoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ) -> ClientLoginResponse:
+    from app.core.rate_limit import rate_limiter
+    client_ip = rate_limiter.get_client_ip(request)
+    rate_limiter.check_rate_limit(f"client_login:{client_ip}", max_requests=15, window_seconds=60)
     return AuthService.login_cliente(db, payload)
+
 

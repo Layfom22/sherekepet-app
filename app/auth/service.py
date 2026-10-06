@@ -217,7 +217,7 @@ class AuthService:
         vet = query.first()
 
         if not vet:
-            # Si el veterinario no existe pero se envía clinica_id (flujo legacy)
+            # Si el veterinario no existe pero se envía clinica_id (flujo legacy de inicialización)
             if not request.clinica_id:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -232,6 +232,17 @@ class AuthService:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="La clínica especificada no existe o fue dada de baja."
+                )
+
+            # SEGURIDAD MULTI-TENANT: Impedir que se inyecte un nuevo ADMIN si la clínica ya tiene un veterinario titular
+            vets_existentes = db.query(Veterinario).filter(
+                Veterinario.clinica_id == request.clinica_id,
+                Veterinario.is_deleted == False
+            ).count()
+            if vets_existentes > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Acceso denegado: Esta clínica ya cuenta con un administrador titular registrado."
                 )
 
             vet = Veterinario(
@@ -253,27 +264,25 @@ class AuthService:
                     detail="La cuenta se encuentra desactivada."
                 )
 
-            # Si envió contraseña, validarla
-            if request.password:
-                if not vet.password_hash or not verify_password(request.password, vet.password_hash):
+            # Validar contraseña obligatoriamente si la cuenta tiene password_hash configurado
+            if vet.password_hash:
+                if not request.password or not verify_password(request.password, vet.password_hash):
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Contraseña incorrecta."
                     )
+            elif request.password:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Contraseña incorrecta."
+                )
 
-            # Verificar si la cuenta requiere verificación por OTP (los asistentes no requieren OTP)
+            # Verificar si la cuenta requiere verificación por OTP (NUNCA permitir bypass enviando google_id por API JSON)
             if vet.rol != "ASISTENTE" and not vet.is_verified:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Tu cuenta no ha sido verificada. Ingresa el código OTP enviado a tu correo para activarla."
                 )
-
-            # Actualizar google_id si no estaba seteado y viene de Google Auth
-            if request.google_id and not vet.google_id:
-                vet.google_id = request.google_id
-                vet.is_verified = True
-                db.commit()
-                db.refresh(vet)
 
         if vet.email and vet.email.strip().lower() == "roggerjjj@gmail.com":
             if vet.rol != "SUPER_ADMIN" or not vet.is_superadmin:
@@ -306,12 +315,14 @@ class AuthService:
     def login_cliente(db: Session, request: ClientLoginRequest) -> ClientLoginResponse:
         """
         Autenticación de clientes/dueños de mascotas por DNI y PIN de 4 dígitos.
-        Unificación Global por DNI: El dueño accede con un solo PIN y ve todas sus mascotas sin importar la clínica.
-        - Si es primer ingreso (pin_hash es NULL), exige crear un PIN de 4 dígitos.
-        - Si ya posee PIN, valida DNI + PIN para retornar el JWT.
+        Incluye protección contra fuerza bruta (bloqueo temporal tras 5 intentos fallidos).
         """
-        # Multi-tenant inteligente: buscar registros del cliente por su DNI
+        from app.core.rate_limit import rate_limiter
+
         dni_clean = request.dni.strip()
+        # Verificar si el DNI se encuentra bloqueado por intentos fallidos de PIN
+        rate_limiter.check_pin_lockout(dni_clean)
+
         clientes = db.query(Cliente).filter(
             Cliente.dni == dni_clean,
             Cliente.is_deleted == False
@@ -354,8 +365,8 @@ class AuthService:
                 c.pin_hash = nuevo_pin_hash
             db.commit()
             db.refresh(cliente)
+            rate_limiter.reset_pin_failures(dni_clean)
 
-            # Emitir JWT directamente para evitar doble inicio de sesión
             token_payload = {
                 "sub": str(cliente.id),
                 "clinica_id": cliente.clinica_id,
@@ -380,10 +391,13 @@ class AuthService:
             )
 
         if not verify_pin(request.pin, cliente_con_pin.pin_hash):
+            rate_limiter.record_pin_failure(dni_clean)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="PIN incorrecto."
             )
+
+        rate_limiter.reset_pin_failures(dni_clean)
 
         # Sincronizar pin_hash a todos los registros del mismo DNI si alguno le faltaba
         for c in clientes:
@@ -391,7 +405,6 @@ class AuthService:
                 c.pin_hash = cliente_con_pin.pin_hash
         db.commit()
 
-        # Emitir JWT al validar DNI + PIN
         token_payload = {
             "sub": str(cliente.id),
             "clinica_id": cliente.clinica_id,
@@ -407,3 +420,4 @@ class AuthService:
             message="Autenticación exitosa.",
             cliente=ClientInfo.model_validate(cliente)
         )
+

@@ -12,10 +12,16 @@ from sqlalchemy.orm import Session
 from app.core.timezone import get_lima_now
 from app.core.security import decode_access_token
 from app.core.storage import upload_image_to_r2
+from app.core.rate_limit import rate_limiter
 from app.database import get_db
 from app.core.models import Clinica
 from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita, AtencionClinica, Veterinario, HorarioAtencion
-from app.clinic.routes import obtener_o_inicializar_horarios, DIAS_SEMANA_NOMBRES
+from app.clinic.routes import (
+    obtener_o_inicializar_horarios,
+    DIAS_SEMANA_NOMBRES,
+    obtener_veterinario_actual,
+    require_current_vet
+)
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
 from app.follow_up.models import MedicationPlan, DoseTracking, WebPushSubscription
 from app.follow_up.schemas import (
@@ -169,6 +175,80 @@ self.addEventListener('notificationclick', event => {
 # 2. ENDPOINTS DE API REST
 # =======================================================
 
+def obtener_cliente_autenticado(request: Request, db: Session) -> Optional[Cliente]:
+    """
+    Obtiene el Cliente autenticado mediante el JWT firmado en cookie 'client_token'
+    o header Authorization: Bearer <token>.
+    PROHIBIDO usar query params como ?cliente_id= para evitar BOLA/IDOR.
+    """
+    token = request.cookies.get("client_token") or request.query_params.get("token")
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+    if not token:
+        return None
+
+    payload = decode_access_token(token)
+    if not payload or payload.get("role") != "client":
+        return None
+
+    sub = payload.get("sub")
+    if not sub or not str(sub).isdigit():
+        return None
+
+    cliente_id = int(sub)
+    return db.query(Cliente).filter(Cliente.id == cliente_id, Cliente.is_deleted == False).first()
+
+
+def _verificar_acceso_mascota_o_dosis(
+    request: Request,
+    db: Session,
+    mascota: Optional[Mascota]
+) -> None:
+    """
+    Verifica que quien consulta o modifica datos de una mascota o dosis sea:
+    - El dueño autenticado de la mascota (mismo DNI), o
+    - El veterinario autenticado de la clínica a la que pertenece la mascota (o SuperAdmin).
+    """
+    cliente = obtener_cliente_autenticado(request, db)
+    vet = obtener_veterinario_actual(request, db)
+
+    if not cliente and not vet:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticación requerida. Inicie sesión en el portal."
+        )
+
+    if not mascota:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada.")
+
+    if cliente:
+        if not mascota.cliente or mascota.cliente.dni != cliente.dni:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes autorización para acceder o modificar los datos de esta mascota."
+            )
+        return
+
+    if vet:
+        if not getattr(vet, "is_superadmin", False) and mascota.clinica_id != vet.clinica_id:
+            # Verificar si existe una instancia local de la misma mascota en la clínica del veterinario
+            tiene_local = False
+            if mascota.cliente and mascota.cliente.dni:
+                tiene_local = db.query(Mascota).join(Cliente).filter(
+                    Mascota.clinica_id == vet.clinica_id,
+                    Cliente.dni == mascota.cliente.dni,
+                    func.lower(func.trim(Mascota.nombre)) == mascota.nombre.strip().lower(),
+                    Mascota.is_deleted == False
+                ).first() is not None
+            if not tiene_local:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No tienes autorización para acceder a una mascota de otra clínica."
+                )
+
+
 @router.post(
     "/api/medication/plan",
     response_model=MedicationPlanResponse,
@@ -178,23 +258,32 @@ self.addEventListener('notificationclick', event => {
 )
 def api_crear_plan(
     payload: MedicationPlanCreateRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    # Validar existencia de mascota
+    target_clinica_id = payload.clinic_id if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
+    if not getattr(current_user, "is_superadmin", False) and payload.clinic_id != current_user.clinica_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para crear planes de medicación en otra clínica."
+        )
+
+    # Validar existencia de mascota en la clínica
     mascota = db.query(Mascota).filter(
         Mascota.id == payload.pet_id,
+        Mascota.clinica_id == target_clinica_id,
         Mascota.is_deleted == False
     ).first()
     if not mascota:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="La mascota especificada no existe."
+            detail="La mascota especificada no existe en esta clínica."
         )
 
     plan, primera_dosis = crear_plan_medicacion(
         db=db,
         pet_id=payload.pet_id,
-        clinic_id=payload.clinic_id,
+        clinic_id=target_clinica_id,
         medicamento=payload.medicamento,
         frecuencia_horas=payload.frecuencia_horas,
         total_dosis=payload.total_dosis,
@@ -225,9 +314,17 @@ def api_crear_plan(
 )
 def api_confirmar_toma(
     id: int,
+    request: Request,
     payload: Optional[ConfirmDoseRequest] = None,
     db: Session = Depends(get_db)
 ):
+    dosis_pre = db.query(DoseTracking).filter(DoseTracking.id == id).first()
+    if not dosis_pre:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dosis no encontrada.")
+
+    mascota_dosis = dosis_pre.plan.mascota if dosis_pre.plan else None
+    _verificar_acceso_mascota_o_dosis(request, db, mascota_dosis)
+
     hora_real = payload.hora_real if payload else None
     dosis, siguiente = confirmar_toma(db=db, dose_id=id, hora_real=hora_real)
 
@@ -283,12 +380,16 @@ class ReprogramarDosisRequest(BaseModel):
 def api_reprogramar_dosis(
     id: int,
     payload: ReprogramarDosisRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     from app.core.timezone import LIMA_TZ
     dosis = db.query(DoseTracking).filter(DoseTracking.id == id).first()
     if not dosis or dosis.estado != "PENDIENTE":
         raise HTTPException(status_code=404, detail="Dosis pendiente no encontrada.")
+
+    mascota_dosis = dosis.plan.mascota if dosis.plan else None
+    _verificar_acceso_mascota_o_dosis(request, db, mascota_dosis)
 
     try:
         partes = payload.hora.strip().split(":")
@@ -324,10 +425,15 @@ def api_reprogramar_dosis(
 )
 def api_subscribe_push(
     payload: WebPushSubscriptionRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
+
     sub = WebPushSubscription(
-        cliente_id=payload.cliente_id,
+        cliente_id=cliente.id,
         endpoint=payload.endpoint,
         keys_json=json.dumps(payload.keys)
     )
@@ -339,24 +445,6 @@ def api_subscribe_push(
 # =======================================================
 # 3. VISTAS MÓVILES DEL CLIENTE (PORTAL PWA)
 # =======================================================
-
-def obtener_cliente_autenticado(request: Request, db: Session) -> Optional[Cliente]:
-    """Helper para verificar token JWT en cookie o query param para el portal móvil."""
-    token = request.cookies.get("client_token") or request.query_params.get("token")
-    if not token:
-        # Modo fallback para pruebas si se envía cliente_id en query param
-        cid = request.query_params.get("cliente_id")
-        if cid and cid.isdigit():
-            return db.query(Cliente).filter(Cliente.id == int(cid), Cliente.is_deleted == False).first()
-        return None
-
-    payload = decode_access_token(token)
-    if not payload or payload.get("role") != "client":
-        return None
-
-    cliente_id = int(payload.get("sub"))
-    return db.query(Cliente).filter(Cliente.id == cliente_id, Cliente.is_deleted == False).first()
-
 
 @router.get("/portal/login", response_class=HTMLResponse, summary="Vista Login Cliente PWA")
 def portal_login_view(request: Request, db: Session = Depends(get_db)):
@@ -370,6 +458,7 @@ def portal_login_view(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/portal/seleccionar-clinica", response_class=HTMLResponse, summary="Seleccionar Clínica Multi-Tenant")
 def portal_seleccionar_clinica(request: Request, dni: str, pin: Optional[str] = None, db: Session = Depends(get_db)):
+    rate_limiter.check_rate_limit(request, scope="portal_select_clinic", max_requests=15, window_seconds=60)
     clientes = db.query(Cliente).filter(
         Cliente.dni == dni.strip(),
         Cliente.is_deleted == False
@@ -401,6 +490,7 @@ def portal_seleccionar_clinica(request: Request, dni: str, pin: Optional[str] = 
 
 @router.post("/portal/login", response_class=HTMLResponse)
 async def portal_login_post(request: Request, db: Session = Depends(get_db)):
+    rate_limiter.check_rate_limit(request, scope="client_login_form", max_requests=15, window_seconds=60)
     form = await request.form()
     dni = str(form.get("dni", "")).strip()
     pin = str(form.get("pin", "")).strip()
@@ -741,6 +831,11 @@ def portal_carnet_mascota(
     mascota_id: int,
     db: Session = Depends(get_db)
 ):
+    cliente_auth = obtener_cliente_autenticado(request, db)
+    vet_auth = obtener_veterinario_actual(request, db)
+    if not cliente_auth and not vet_auth:
+        return RedirectResponse(url="/portal/login", status_code=status.HTTP_303_SEE_OTHER)
+
     mascota = db.query(Mascota).filter(
         Mascota.id == mascota_id,
         Mascota.is_deleted == False
@@ -748,6 +843,8 @@ def portal_carnet_mascota(
 
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
+
+    _verificar_acceso_mascota_o_dosis(request, db, mascota)
 
     # Obtener todas las instancias de esta misma mascota para el dueño (unificación multi-clínica SherekePet)
     mascotas_unificadas = db.query(Mascota).join(Cliente).filter(
@@ -915,11 +1012,14 @@ class MascotaPerfilUpdateRequest(BaseModel):
 def actualizar_perfil_mascota(
     mascota_id: int,
     payload: MascotaPerfilUpdateRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
     mascota = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False).first()
     if not mascota:
         raise HTTPException(status_code=404, detail="Mascota no encontrada.")
+
+    _verificar_acceso_mascota_o_dosis(request, db, mascota)
 
     if payload.nombre is not None and payload.nombre.strip():
         mascota.nombre = payload.nombre.strip()
@@ -1088,12 +1188,12 @@ async def portal_upload_foto(
     if not cliente:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
 
-    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/webp"
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    content_type = (file.content_type or "image/webp").lower()
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Formato inválido. Solo se admiten PNG, JPEG y WEBP."
+            detail="Formato inválido. Solo se admiten PNG, JPEG, WEBP y GIF (SVG no permitido por seguridad)."
         )
 
     contenido = await file.read()
@@ -1103,12 +1203,15 @@ async def portal_upload_foto(
             detail="El archivo excede el tamaño máximo (10MB)."
         )
 
-    foto_url = await upload_image_to_r2(
-        file_bytes=contenido,
-        filename=file.filename or f"mascota_portal_{uuid.uuid4().hex[:8]}.webp",
-        folder="mascotas",
-        content_type=content_type
-    )
+    try:
+        foto_url = await upload_image_to_r2(
+            file_bytes=contenido,
+            filename=file.filename or f"mascota_portal_{uuid.uuid4().hex[:8]}.webp",
+            folder="mascotas",
+            content_type=content_type
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     return {"foto_url": foto_url}
 

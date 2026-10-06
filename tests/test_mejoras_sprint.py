@@ -29,8 +29,33 @@ def test_catalogo_especies_y_razas(client, db_session):
     assert "Bulldog Francés" in razas_nombres
 
 
+def _auth_vet(client, db_session, clinica):
+    vet = db_session.query(Veterinario).filter(Veterinario.clinica_id == clinica.id).first()
+    if not vet:
+        vet = Veterinario(
+            clinica_id=clinica.id,
+            nombre="Dr. Test",
+            email=f"vet_{clinica.id}@test.com",
+            rol="ADMIN",
+            is_verified=True,
+            is_active=True
+        )
+        db_session.add(vet)
+        db_session.commit()
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", token)
+    return vet
+
+
 def test_subir_logo_clinica(client, test_clinica, db_session):
     """Verifica la subida de logo a Cloudflare R2 y actualización de logo_url."""
+    _auth_vet(client, db_session, test_clinica)
     fake_webp = b"RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00"
     files = {"file": ("logo.webp", io.BytesIO(fake_webp), "image/webp")}
     data = {"clinica_id": str(test_clinica.id)}
@@ -52,6 +77,7 @@ def test_subir_logo_clinica(client, test_clinica, db_session):
 
 def test_subir_foto_mascota(client, test_clinica, db_session):
     """Verifica la subida de foto de mascota a Cloudflare R2 y actualización de foto_url."""
+    _auth_vet(client, db_session, test_clinica)
     cliente = Cliente(clinica_id=test_clinica.id, dni="99887766", nombre_completo="Ana Lopez")
     db_session.add(cliente)
     db_session.flush()
@@ -80,6 +106,7 @@ def test_subir_foto_mascota(client, test_clinica, db_session):
 
 def test_paciente_rapido_con_nuevos_campos(client, test_clinica, db_session):
     """Verifica registro con especie_id, raza_id, alergias dinámicas y condiciones previas."""
+    _auth_vet(client, db_session, test_clinica)
     especie = Especie(nombre="Felino (Gato)")
     db_session.add(especie)
     db_session.flush()
@@ -121,6 +148,7 @@ def test_paciente_rapido_con_nuevos_campos(client, test_clinica, db_session):
 
 def test_atencion_vacunacion_con_enfermedades_cubiertas(client, test_clinica, db_session):
     """Verifica el guardado y consulta de vacunas con lista de enfermedades cubiertas."""
+    _auth_vet(client, db_session, test_clinica)
     cliente = Cliente(clinica_id=test_clinica.id, dni="12121212", nombre_completo="Roberto Gomez")
     db_session.add(cliente)
     db_session.flush()
@@ -277,6 +305,13 @@ def test_actualizar_perfil_mascota_dni(client, test_clinica, db_session):
     db_session.add(m)
     db_session.commit()
 
+    client.cookies.set("client_token", create_access_token({
+        "sub": str(c.id),
+        "role": "client",
+        "dni": c.dni,
+        "clinica_id": test_clinica.id
+    }))
+
     payload = {
         "sexo": "Hembra",
         "fecha_nacimiento": "2022-05-15",
@@ -354,6 +389,7 @@ def test_auth_veterinario_registro_login_logout(client, db_session):
 def test_resetear_pin_cliente(client, test_clinica, db_session):
     """Verifica el endpoint PATCH /api/clinic/clientes/{id}/reset-pin."""
     from app.core.security import hash_pin
+    _auth_vet(client, db_session, test_clinica)
     c = Cliente(
         clinica_id=test_clinica.id,
         dni="88776655",
@@ -417,10 +453,12 @@ def test_catalogo_extendido_con_especies_y_razas(client, db_session):
 
 
 @pytest.mark.anyio
-async def test_subida_imagen_local_fallback_y_serving(client, test_clinica):
+async def test_subida_imagen_local_fallback_y_serving(client, test_clinica, db_session):
     """Verifica que sin R2 configurado, la imagen se guarde en uploads/ y se sirva estáticamente."""
     from unittest.mock import patch
     import io
+
+    _auth_vet(client, db_session, test_clinica)
 
     with patch("app.core.storage.get_r2_client", return_value=None):
         fake_png = b"RIFF\x1a\x00\x00\x00WEBPVP8 \x0e\x00\x00\x00"

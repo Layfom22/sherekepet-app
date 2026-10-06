@@ -16,6 +16,13 @@ def test_dni_reutilizacion_global_paciente_rapido(client, db_session):
     db_session.add_all([clinica1, clinica2])
     db_session.flush()
 
+    vet1 = Veterinario(clinica_id=clinica1.id, nombre="Dr. Norte", email="norte@test.com", rol="ADMIN", is_verified=True, is_active=True)
+    vet2 = Veterinario(clinica_id=clinica2.id, nombre="Dr. Sur", email="sur@test.com", rol="ADMIN", is_verified=True, is_active=True)
+    db_session.add_all([vet1, vet2])
+    db_session.flush()
+
+    client.cookies.set("vet_token", create_access_token({"sub": str(vet1.id), "clinica_id": clinica1.id, "role": "vet", "rol": "ADMIN", "email": vet1.email}))
+
     # Registro en Clínica 1
     payload1 = {
         "clinica_id": clinica1.id,
@@ -34,6 +41,7 @@ def test_dni_reutilizacion_global_paciente_rapido(client, db_session):
     assert data1["mascota"]["foto_url"] == "https://r2.sherekepet.com/firulais.webp"
 
     # Registro en Clínica 2 con el MISMO DNI
+    client.cookies.set("vet_token", create_access_token({"sub": str(vet2.id), "clinica_id": clinica2.id, "role": "vet", "rol": "ADMIN", "email": vet2.email}))
     payload2 = {
         "clinica_id": clinica2.id,
         "dni": "44556677",

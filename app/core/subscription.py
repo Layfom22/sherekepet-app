@@ -92,11 +92,12 @@ class SubscriptionMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
-        # Solo auditar métodos de mutación operativa
-        if method not in ("POST", "PUT", "PATCH", "DELETE"):
-            return await call_next(request)
-
         path = request.url.path
+
+        # Auditar métodos de mutación operativa y proxies de cuota externa (RENIEC)
+        es_ruta_get_protegida = (method == "GET" and path.startswith("/api/reniec/"))
+        if method not in ("POST", "PUT", "PATCH", "DELETE") and not es_ruta_get_protegida:
+            return await call_next(request)
 
         # Omitir rutas de autenticación, portal cliente, facturación y administración
         for prefix in self.RUTAS_EXCLUIDAS_PREFIX:

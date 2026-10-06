@@ -18,8 +18,33 @@ def test_whatsapp_service_normalization():
     assert "%C2%A1Hola%21" in enlace or "Hola" in enlace
 
 
-def test_reniec_endpoint_mock(client):
+def _auth_vet(client, db_session, clinica):
+    vet = db_session.query(Veterinario).filter(Veterinario.clinica_id == clinica.id).first()
+    if not vet:
+        vet = Veterinario(
+            clinica_id=clinica.id,
+            nombre="Dr. Test",
+            email=f"vet_{clinica.id}@test.com",
+            rol="ADMIN",
+            is_verified=True,
+            is_active=True
+        )
+        db_session.add(vet)
+        db_session.commit()
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", token)
+    return vet
+
+
+def test_reniec_endpoint_mock(client, test_clinica, db_session):
     """Verifica el proxy de RENIEC mockeando el servicio para evitar consumo de cuota externa en tests."""
+    _auth_vet(client, db_session, test_clinica)
     mock_data = {
         "dni": "72345678",
         "nombres": "JUAN CARLOS",
@@ -39,6 +64,7 @@ def test_reniec_endpoint_mock(client):
 
 def test_paciente_rapido_single_transaction(client, test_clinica, db_session):
     """Verifica el registro atómico de Dueño y Mascota (Registro Cero Fricción)."""
+    _auth_vet(client, db_session, test_clinica)
     payload = {
         "clinica_id": test_clinica.id,
         "dni": "70112233",
@@ -72,6 +98,7 @@ def test_paciente_rapido_single_transaction(client, test_clinica, db_session):
 
 def test_atencion_clinica_general(client, test_clinica, db_session):
     """Verifica el registro de una atención de tipo CONSULTA y actualización de peso."""
+    _auth_vet(client, db_session, test_clinica)
     cliente = Cliente(clinica_id=test_clinica.id, dni="11223344", nombre_completo="Ana Maria")
     db_session.add(cliente)
     db_session.commit()
@@ -114,6 +141,7 @@ def test_atencion_vacunacion_automatic_tracking(client, test_clinica, db_session
     1. El registro en sp_vacunas.
     2. La notificación en sp_seguimientos con la fecha del próximo refuerzo y mensaje personalizado.
     """
+    _auth_vet(client, db_session, test_clinica)
     cliente = Cliente(
         clinica_id=test_clinica.id,
         dni="88776655",
@@ -173,6 +201,7 @@ def test_atencion_vacunacion_automatic_tracking(client, test_clinica, db_session
 
 def test_marcar_seguimiento_enviado(client, test_clinica, db_session):
     """Verifica cambiar el estado de seguimiento a ENVIADO."""
+    _auth_vet(client, db_session, test_clinica)
     cliente = Cliente(clinica_id=test_clinica.id, dni="99887766")
     db_session.add(cliente)
     db_session.commit()

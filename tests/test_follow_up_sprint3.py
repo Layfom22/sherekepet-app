@@ -1,9 +1,20 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from app.core.timezone import LIMA_TZ
-from app.clinic.models import Cliente, Mascota
+from app.clinic.models import Cliente, Mascota, Veterinario
+from app.core.security import create_access_token
 from app.follow_up.models import MedicationPlan, DoseTracking
 from app.follow_up.services import ajustar_ventana_sueno, confirmar_toma, crear_plan_medicacion
+
+
+def _auth_client_cookie(client, cliente):
+    token = create_access_token({
+        "sub": str(cliente.id),
+        "role": "client",
+        "dni": cliente.dni,
+        "clinica_id": cliente.clinica_id
+    })
+    client.cookies.set("client_token", token)
 
 
 def test_ajustar_ventana_sueno_nocturno():
@@ -37,6 +48,15 @@ def test_ajustar_ventana_sueno_nocturno():
 
 def test_api_crear_plan_medicacion(client, test_clinica, db_session):
     """Verifica que el endpoint cree el plan y la primera dosis automáticamente."""
+    vet = Veterinario(
+        clinica_id=test_clinica.id,
+        nombre="Dr. Med",
+        email="med@test.com",
+        rol="ADMIN",
+        is_verified=True,
+        is_active=True
+    )
+    db_session.add(vet)
     cliente = Cliente(clinica_id=test_clinica.id, dni="12345678", nombre_completo="Luis")
     db_session.add(cliente)
     db_session.commit()
@@ -44,6 +64,14 @@ def test_api_crear_plan_medicacion(client, test_clinica, db_session):
     mascota = Mascota(clinica_id=test_clinica.id, cliente_id=cliente.id, nombre="Toby", especie="Canino")
     db_session.add(mascota)
     db_session.commit()
+
+    client.cookies.set("vet_token", create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": test_clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    }))
 
     payload = {
         "pet_id": mascota.id,
@@ -77,6 +105,8 @@ def test_confirmar_toma_y_ventana_sueno(client, test_clinica, db_session):
     mascota = Mascota(clinica_id=test_clinica.id, cliente_id=cliente.id, nombre="Milo", especie="Felino")
     db_session.add(mascota)
     db_session.commit()
+
+    _auth_client_cookie(client, cliente)
 
     # Plan NO estricto: cada 8 horas
     plan, dosis1 = crear_plan_medicacion(
@@ -121,6 +151,8 @@ def test_plan_estricto_sin_ajuste_sueno(client, test_clinica, db_session):
     db_session.add(mascota)
     db_session.commit()
 
+    _auth_client_cookie(client, cliente)
+
     # Plan ESTRICTO
     plan, dosis1 = crear_plan_medicacion(
         db=db_session,
@@ -155,6 +187,8 @@ def test_completar_ultima_dosis(client, test_clinica, db_session):
     mascota = Mascota(clinica_id=test_clinica.id, cliente_id=cliente.id, nombre="Lassie", especie="Canino")
     db_session.add(mascota)
     db_session.commit()
+
+    _auth_client_cookie(client, cliente)
 
     # Plan de solo 1 dosis
     plan, dosis1 = crear_plan_medicacion(

@@ -14,11 +14,14 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
+    # CORS Origins permitidos (separados por coma)
+    ALLOWED_ORIGINS: str = "https://sherekepet.com,https://www.sherekepet.com,http://localhost:8000,http://127.0.0.1:8000"
+
     # Timezone
     DEFAULT_TIMEZONE: str = "America/Lima"
 
-    # RENIEC API
-    APIS_NET_PE_TOKEN: str = "apis-token-13012.n93cG7Vp3E9tcRGXgvH8Hw0UWH31aBRQ"
+    # RENIEC API (Configurar en .env en producción)
+    APIS_NET_PE_TOKEN: str = ""
 
     # Cloudflare R2 Storage (S3-compatible)
     R2_ACCOUNT_ID: str = ""
@@ -47,6 +50,7 @@ class Settings(BaseSettings):
     MP_ENABLED: bool = False
     MP_ACCESS_TOKEN: str = ""
     MP_PUBLIC_KEY: str = ""
+    MP_WEBHOOK_SECRET: str = ""
     YAPE_PLIN_TITULAR: str = "PROJECT DC HOLDING E.I.R.L."
     YAPE_PLIN_NUMERO: str = "999 888 777"
     YAPE_PLIN_QR_URL: str = ""
@@ -61,3 +65,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+

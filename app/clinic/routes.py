@@ -146,6 +146,30 @@ def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veteri
         return None
 
 
+def require_current_vet(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> Veterinario:
+    """
+    Dependencia estricta para endpoints de clínica:
+    1. Bloquea tokens de rol 'client' con 403 Forbidden.
+    2. Exige un token válido de veterinario ('vet_token' o Bearer) y retorna el Veterinario activo.
+    """
+    verificar_acceso_veterinario(request)
+    vet = obtener_veterinario_actual(request, db)
+    if not vet:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Autenticación requerida. Inicie sesión en el panel veterinario."
+        )
+    if not vet.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Su cuenta de veterinario se encuentra desactivada."
+        )
+    return vet
+
+
 # ==========================================
 # 1. ENDPOINTS DE API REST
 # ==========================================
@@ -156,7 +180,7 @@ def obtener_veterinario_actual(request: Request, db: Session) -> Optional[Veteri
     status_code=status.HTTP_200_OK,
     summary="Consulta de DNI en RENIEC",
     description="Proxy seguro hacia apis.net.pe con Bearer token y validación de 8 dígitos.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    dependencies=[Depends(require_current_vet)]
 )
 async def get_reniec_dni(dni: str):
     datos = await consultar_dni_reniec(dni)
@@ -186,38 +210,36 @@ def get_razas_por_especie(especie_id: int, db: Session = Depends(get_db)):
     return [{"id": r.id, "nombre": r.nombre, "especie_id": r.especie_id} for r in razas]
 
 
-
 @router.post(
     "/api/clinic/logo",
     response_model=LogoUploadResponse,
     summary="Subir Logo de la Clínica",
-    description="Permite al Administrador de la clínica subir el logo a Cloudflare R2 y actualizar Clinica.logo_url.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Permite al Administrador de la clínica subir el logo a Cloudflare R2 y actualizar Clinica.logo_url."
 )
 async def upload_logo_clinica(
     request: Request,
     file: UploadFile = File(...),
     clinica_id: int = Form(1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    if current_user and current_user.rol == "ASISTENTE":
+    if current_user.rol == "ASISTENTE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Los asistentes no tienen autorización para cambiar el logo de la clínica."
         )
 
-    target_clinica_id = current_user.clinica_id if current_user else clinica_id
+    target_clinica_id = clinica_id if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
     clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id, Clinica.is_deleted == False).first()
     if not clinica:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clínica no encontrada.")
 
-    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/webp"
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    content_type = (file.content_type or "image/webp").lower()
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y SVG."
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y GIF (SVG no permitido por seguridad)."
         )
 
     contenido = await file.read()
@@ -227,12 +249,15 @@ async def upload_logo_clinica(
             detail="El archivo excede el tamaño máximo permitido (10MB)."
         )
 
-    logo_url = await upload_image_to_r2(
-        file_bytes=contenido,
-        filename=file.filename or "logo.webp",
-        folder="logos",
-        content_type=content_type
-    )
+    try:
+        logo_url = await upload_image_to_r2(
+            file_bytes=contenido,
+            filename=file.filename or "logo.webp",
+            folder="logos",
+            content_type=content_type
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     clinica.logo_url = logo_url
     db.commit()
@@ -344,15 +369,14 @@ def obtener_o_inicializar_horarios(clinica_id: int, db: Session) -> List[Horario
 @router.get(
     "/api/clinic/horarios",
     response_model=HorariosConfigResponse,
-    summary="Obtener Horarios de Atención de la Clínica",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Obtener Horarios de Atención de la Clínica"
 )
 def get_horarios_clinica(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     horarios = obtener_o_inicializar_horarios(target_clinica_id, db)
     intervalo = horarios[0].intervalo_minutos if horarios else 30
@@ -380,16 +404,15 @@ def get_horarios_clinica(
 @router.put(
     "/api/clinic/horarios",
     response_model=HorariosConfigResponse,
-    summary="Guardar o Actualizar Horarios de Atención de la Clínica",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Guardar o Actualizar Horarios de Atención de la Clínica"
 )
 def update_horarios_clinica(
     payload: HorariosConfigRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     # Asegurar que existan los 7 registros
     horarios_actuales = {h.dia_semana: h for h in obtener_o_inicializar_horarios(target_clinica_id, db)}
@@ -553,15 +576,14 @@ def obtener_o_inicializar_servicios_bano(clinica_id: int, db: Session) -> List[S
 @router.get(
     "/api/clinic/servicios-bano",
     response_model=List[ServicioBanoItem],
-    summary="Listar Servicios de Baño y Consumo de Insumos",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Listar Servicios de Baño y Consumo de Insumos"
 )
 def get_servicios_bano(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     servicios = obtener_o_inicializar_servicios_bano(target_clinica_id, db)
     resultado = []
@@ -586,16 +608,15 @@ def get_servicios_bano(
     "/api/clinic/servicios-bano",
     response_model=ServicioBanoItem,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear o Registrar Tipo de Baño",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Crear o Registrar Tipo de Baño"
 )
 def create_servicio_bano(
     payload: ServicioBanoCreateRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else payload.clinica_id
+    target_clinica_id = payload.clinica_id if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
 
     sb = ServicioBano(
         clinica_id=target_clinica_id,
@@ -667,16 +688,15 @@ def vista_mis_productos(
 @router.get(
     "/api/clinic/productos",
     response_model=List[ProductoItem],
-    summary="Listar Productos e Insumos de Inventario",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Listar Productos e Insumos de Inventario"
 )
 def get_productos_inventario(
     request: Request,
     tipo: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     # Asegurar que se inicialicen los insumos por defecto si la clínica es nueva
     obtener_o_inicializar_servicios_bano(target_clinica_id, db)
@@ -697,16 +717,15 @@ def get_productos_inventario(
     "/api/clinic/productos",
     response_model=ProductoItem,
     status_code=status.HTTP_201_CREATED,
-    summary="Crear Nuevo Producto en el Inventario del Veterinario",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Crear Nuevo Producto en el Inventario del Veterinario"
 )
 def crear_producto_inventario(
     payload: ProductoCreateRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     nombre_limpio = payload.nombre.strip()
     if not nombre_limpio:
@@ -737,17 +756,16 @@ def crear_producto_inventario(
 @router.put(
     "/api/clinic/productos/{producto_id}",
     response_model=ProductoItem,
-    summary="Actualizar Datos de un Producto del Veterinario",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Actualizar Datos de un Producto del Veterinario"
 )
 def actualizar_producto_inventario(
     producto_id: int,
     payload: ProductoUpdateRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     prod = db.query(Producto).filter(
         Producto.id == producto_id,
@@ -790,16 +808,15 @@ def actualizar_producto_inventario(
 
 @router.delete(
     "/api/clinic/productos/{producto_id}",
-    summary="Eliminar Producto del Inventario del Veterinario",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Eliminar Producto del Inventario del Veterinario"
 )
 def eliminar_producto_inventario(
     producto_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     prod = db.query(Producto).filter(
         Producto.id == producto_id,
@@ -821,17 +838,16 @@ def eliminar_producto_inventario(
 @router.put(
     "/api/clinic/productos/{producto_id}/stock",
     response_model=ProductoItem,
-    summary="Actualizar o Reabastecer Stock de un Producto",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Actualizar o Reabastecer Stock de un Producto"
 )
 def update_stock_producto(
     producto_id: int,
     payload: ProductoStockUpdateRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     prod = db.query(Producto).filter(
         Producto.id == producto_id,
@@ -918,19 +934,15 @@ def actualizar_perfil_veterinario(
 async def upload_foto_veterinario(
     request: Request,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    verificar_acceso_veterinario(request)
-    current_user = obtener_veterinario_actual(request, db)
-    if not current_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
-
-    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/webp"
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    content_type = (file.content_type or "image/webp").lower()
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y GIF (SVG no permitido por seguridad)."
         )
 
     contenido = await file.read()
@@ -940,12 +952,15 @@ async def upload_foto_veterinario(
             detail="El archivo excede el tamaño máximo permitido (10MB)."
         )
 
-    foto_url = await upload_image_to_r2(
-        file_bytes=contenido,
-        filename=file.filename or f"vet_{current_user.id}.webp",
-        folder="veterinarios",
-        content_type=content_type
-    )
+    try:
+        foto_url = await upload_image_to_r2(
+            file_bytes=contenido,
+            filename=file.filename or f"vet_{current_user.id}.webp",
+            folder="veterinarios",
+            content_type=content_type
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     current_user.foto_perfil = foto_url
     db.commit()
@@ -965,15 +980,14 @@ async def upload_foto_veterinario(
 def buscar_cliente_global_por_dni(
     dni: str,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    verificar_acceso_veterinario(request)
     dni_limpio = dni.strip()
     if not dni_limpio or len(dni_limpio) < 4 or len(dni_limpio) > 20:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El documento debe tener entre 4 y 20 caracteres.")
 
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     clientes = db.query(Cliente).filter(
         Cliente.dni == dni_limpio,
@@ -1126,11 +1140,10 @@ def _asegurar_mascota_local_clinica(
 def vincular_mascota_a_clinica(
     mascota_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    verificar_acceso_veterinario(request)
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     mascota_local = _asegurar_mascota_local_clinica(db, mascota_id, target_clinica_id)
     if not mascota_local:
@@ -1142,7 +1155,6 @@ def vincular_mascota_a_clinica(
     }
 
 
-
 @router.post(
     "/api/mascotas/{mascota_id}/foto",
     response_model=MascotaFotoResponse,
@@ -1152,18 +1164,22 @@ def vincular_mascota_a_clinica(
 async def upload_foto_mascota(
     mascota_id: int,
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    mascota = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False).first()
+    query = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False)
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(Mascota.clinica_id == current_user.clinica_id)
+    mascota = query.first()
     if not mascota:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada en esta clínica.")
 
-    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/webp"
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    content_type = (file.content_type or "image/webp").lower()
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y GIF (SVG no permitido por seguridad)."
         )
 
     contenido = await file.read()
@@ -1173,12 +1189,15 @@ async def upload_foto_mascota(
             detail="El archivo excede el tamaño máximo permitido (10MB)."
         )
 
-    foto_url = await upload_image_to_r2(
-        file_bytes=contenido,
-        filename=file.filename or f"mascota_{mascota_id}.webp",
-        folder="mascotas",
-        content_type=content_type
-    )
+    try:
+        foto_url = await upload_image_to_r2(
+            file_bytes=contenido,
+            filename=file.filename or f"mascota_{mascota_id}.webp",
+            folder="mascotas",
+            content_type=content_type
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     mascota.foto_url = foto_url
     db.commit()
@@ -1193,18 +1212,18 @@ async def upload_foto_mascota(
 @router.post(
     "/api/clinic/upload-foto",
     summary="Subir foto temporal de mascota",
-    description="Permite subir una foto de mascota antes de crear el registro clínico.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Permite subir una foto de mascota antes de crear el registro clínico."
 )
 async def upload_foto_clinica_temp(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif"}
-    content_type = file.content_type or "image/webp"
+    tipos_validos = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    content_type = (file.content_type or "image/webp").lower()
     if content_type not in tipos_validos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG y WEBP."
+            detail="Formato de imagen inválido. Solo se admiten PNG, JPEG, WEBP y GIF (SVG no permitido por seguridad)."
         )
 
     contenido = await file.read()
@@ -1214,15 +1233,17 @@ async def upload_foto_clinica_temp(
             detail="El archivo excede el tamaño máximo permitido (10MB)."
         )
 
-    foto_url = await upload_image_to_r2(
-        file_bytes=contenido,
-        filename=file.filename or "mascota.webp",
-        folder="mascotas",
-        content_type=content_type
-    )
+    try:
+        foto_url = await upload_image_to_r2(
+            file_bytes=contenido,
+            filename=file.filename or "mascota.webp",
+            folder="mascotas",
+            content_type=content_type
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     return {"foto_url": foto_url}
-
 
 
 @router.post(
@@ -1230,24 +1251,22 @@ async def upload_foto_clinica_temp(
     response_model=PacienteRapidoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registro de Paciente y Dueño (Unificación Global por DNI)",
-    description="Crea o reutiliza globalmente el Cliente por DNI y registra su Mascota.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Crea o reutiliza globalmente el Cliente por DNI y registra su Mascota."
 )
 @router.post(
     "/api/clinic/paciente-rapido",
     response_model=PacienteRapidoResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registro rápido de Paciente y Dueño (Cero Fricción)",
-    description="Crea o actualiza el Cliente y registra su Mascota con catálogos y ficha médica en una sola transacción.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Crea o actualiza el Cliente y registra su Mascota con catálogos y ficha médica en una sola transacción."
 )
 def registrar_paciente_rapido(
     payload: PacienteRapidoRequest,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else payload.clinica_id
+    target_clinica_id = payload.clinica_id if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
 
     # 1. Verificar si la clínica existe
     clinica = db.query(Clinica).filter(
@@ -1315,9 +1334,10 @@ def registrar_paciente_rapido(
 
     alergias_legado = payload.detalle_alergias if payload.tiene_alergias else payload.mascota_alergias
 
-    # 4. Registrar o Actualizar Mascota (evitando duplicidad)
+    # 4. Registrar o Actualizar Mascota en la clínica actual (evitando duplicidad sin robar mascotas de otra clínica)
     nombre_mascota_limpio = payload.mascota_nombre.strip()
     mascota_existente = db.query(Mascota).join(Cliente).filter(
+        Mascota.clinica_id == target_clinica_id,
         Cliente.dni == payload.dni.strip(),
         Cliente.is_deleted == False,
         func.lower(func.trim(Mascota.nombre)) == nombre_mascota_limpio.lower(),
@@ -1440,17 +1460,24 @@ def _notificar_sugerencia_bano_dueno(
     response_model=AtencionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Registrar Atención Clínica y Digitalización de Vacunas",
-    description="Guarda la atención médica. Si es 'VACUNACION', guarda la vacuna con sus enfermedades cubiertas y genera el seguimiento.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Guarda la atención médica. Si es 'VACUNACION', guarda la vacuna con sus enfermedades cubiertas y genera el seguimiento."
 )
 def registrar_atencion(
     payload: AtencionCreateRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
+    target_clinica_id = payload.clinica_id if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
+    if not getattr(current_user, "is_superadmin", False) and payload.clinica_id != current_user.clinica_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No tiene permisos para registrar atenciones en otra clínica."
+        )
+
     mascota = db.query(Mascota).filter(
         Mascota.id == payload.mascota_id,
-        Mascota.clinica_id == payload.clinica_id,
+        Mascota.clinica_id == target_clinica_id,
         Mascota.is_deleted == False
     ).first()
 
@@ -1464,10 +1491,12 @@ def registrar_atencion(
     if payload.peso_actual_kg is not None:
         mascota.peso = payload.peso_actual_kg
 
+    vet_id_efectivo = payload.veterinario_id if getattr(current_user, "is_superadmin", False) else current_user.id
+
     atencion = AtencionClinica(
-        clinica_id=payload.clinica_id,
+        clinica_id=target_clinica_id,
         mascota_id=payload.mascota_id,
-        veterinario_id=payload.veterinario_id,
+        veterinario_id=vet_id_efectivo,
         tipo_atencion=payload.tipo_atencion,
         motivo=payload.motivo,
         diagnostico=payload.diagnostico,
@@ -1491,7 +1520,7 @@ def registrar_atencion(
         enfermedades_json = json.dumps(enfermedades_lista, ensure_ascii=False) if enfermedades_lista else None
 
         vacuna = RegistroVacuna(
-            clinica_id=payload.clinica_id,
+            clinica_id=target_clinica_id,
             mascota_id=mascota.id,
             atencion_id=atencion.id,
             tipo_vacuna=tipo_vacuna,
@@ -1516,7 +1545,7 @@ def registrar_atencion(
         )
 
         seguimiento = SeguimientoNotificacion(
-            clinica_id=payload.clinica_id,
+            clinica_id=target_clinica_id,
             cliente_id=mascota.cliente_id,
             mascota_id=mascota.id,
             tipo="REFUERZO_VACUNA",
@@ -1548,7 +1577,7 @@ def registrar_atencion(
             plan_obj, _ = crear_plan_medicacion(
                 db=db,
                 pet_id=mascota.id,
-                clinic_id=payload.clinica_id,
+                clinic_id=target_clinica_id,
                 medicamento=med_nombre,
                 frecuencia_horas=frec_h,
                 total_dosis=tot_d,
@@ -1569,14 +1598,14 @@ def registrar_atencion(
         if payload.servicio_bano_id:
             servicio_bano = db.query(ServicioBano).filter(
                 ServicioBano.id == payload.servicio_bano_id,
-                ServicioBano.clinica_id == payload.clinica_id,
+                ServicioBano.clinica_id == target_clinica_id,
                 ServicioBano.is_deleted == False
             ).first()
 
         if not servicio_bano:
             # Buscar el servicio de baño por defecto o primer activo
             servicio_bano = db.query(ServicioBano).filter(
-                ServicioBano.clinica_id == payload.clinica_id,
+                ServicioBano.clinica_id == target_clinica_id,
                 ServicioBano.activo == True,
                 ServicioBano.is_deleted == False
             ).first()
@@ -1584,7 +1613,7 @@ def registrar_atencion(
         if servicio_bano and servicio_bano.producto_id:
             producto = db.query(Producto).filter(
                 Producto.id == servicio_bano.producto_id,
-                Producto.clinica_id == payload.clinica_id,
+                Producto.clinica_id == target_clinica_id,
                 Producto.is_deleted == False
             ).first()
             if producto:
@@ -1606,7 +1635,7 @@ def registrar_atencion(
                     hora_sug_obj = time(10, 0)
 
             cita_sugerida = Cita(
-                clinica_id=payload.clinica_id,
+                clinica_id=target_clinica_id,
                 cliente_id=mascota.cliente_id,
                 mascota_id=mascota.id,
                 fecha=payload.fecha_proximo_bano,
@@ -1626,7 +1655,7 @@ def registrar_atencion(
                 f"Puedes confirmar tu hora en tu Portal SherekePet o respondiendo a este mensaje."
             )
             seg_bano = SeguimientoNotificacion(
-                clinica_id=payload.clinica_id,
+                clinica_id=target_clinica_id,
                 cliente_id=mascota.cliente_id,
                 mascota_id=mascota.id,
                 tipo="PROXIMO_BANO",
@@ -1640,7 +1669,7 @@ def registrar_atencion(
 
     elif payload.tipo_atencion == "VACUNACION" and payload.tipo_vacuna:
         prod_vacuna = db.query(Producto).filter(
-            Producto.clinica_id == payload.clinica_id,
+            Producto.clinica_id == target_clinica_id,
             func.lower(Producto.nombre) == payload.tipo_vacuna.strip().lower(),
             Producto.is_deleted == False
         ).first()
@@ -1653,7 +1682,7 @@ def registrar_atencion(
 
     if payload.receta_medicamento and payload.receta_medicamento.strip():
         prod_med = db.query(Producto).filter(
-            Producto.clinica_id == payload.clinica_id,
+            Producto.clinica_id == target_clinica_id,
             func.lower(Producto.nombre) == payload.receta_medicamento.strip().lower(),
             Producto.is_deleted == False
         ).first()
@@ -1670,7 +1699,7 @@ def registrar_atencion(
     if payload.cita_id:
         cita_asociada = db.query(Cita).filter(
             Cita.id == payload.cita_id,
-            Cita.clinica_id == payload.clinica_id,
+            Cita.clinica_id == target_clinica_id,
             Cita.is_deleted == False
         ).first()
         if cita_asociada:
@@ -1679,7 +1708,7 @@ def registrar_atencion(
             cita_asociada.cliente_id = mascota.cliente_id
 
     citas_hoy_mascota = db.query(Cita).join(Mascota, Cita.mascota_id == Mascota.id).join(Cliente, Cita.cliente_id == Cliente.id).filter(
-        Cita.clinica_id == payload.clinica_id,
+        Cita.clinica_id == target_clinica_id,
         Cita.fecha == hoy_lima,
         Cita.is_deleted == False,
         func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
@@ -1710,7 +1739,7 @@ def registrar_atencion(
             db=db,
             background_tasks=background_tasks,
             mascota=mascota,
-            clinica_id=payload.clinica_id,
+            clinica_id=target_clinica_id,
             fecha_sugerida=payload.fecha_proximo_bano,
             hora_obj=hora_notif
         )
@@ -1737,17 +1766,20 @@ def registrar_atencion(
     response_model=SeguimientoUpdateResponse,
     status_code=status.HTTP_200_OK,
     summary="Marcar recordatorio como ENVIADO",
-    description="Actualiza el estado de la notificación a 'ENVIADO'.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Actualiza el estado de la notificación a 'ENVIADO'."
 )
 def marcar_seguimiento_enviado(
     id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    seguimiento = db.query(SeguimientoNotificacion).filter(
+    query = db.query(SeguimientoNotificacion).filter(
         SeguimientoNotificacion.id == id,
         SeguimientoNotificacion.is_deleted == False
-    ).first()
+    )
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(SeguimientoNotificacion.clinica_id == current_user.clinica_id)
+    seguimiento = query.first()
 
     if not seguimiento:
         raise HTTPException(
@@ -1769,19 +1801,18 @@ def marcar_seguimiento_enviado(
     "/api/clinic/clientes/{cliente_id}/reset-pin",
     status_code=status.HTTP_200_OK,
     summary="Restablecer PIN de Cliente / Dueño",
-    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso."
 )
 @router.post(
     "/api/clinic/clientes/{cliente_id}/reset-pin",
     status_code=status.HTTP_200_OK,
     summary="Restablecer PIN de Cliente / Dueño (Alias POST)",
-    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Asigna cliente.pin_hash = None para que se le pida crear uno nuevo en su próximo acceso."
 )
 def resetear_pin_cliente(
     cliente_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
@@ -1793,6 +1824,19 @@ def resetear_pin_cliente(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Cliente no encontrado."
         )
+
+    if not getattr(current_user, "is_superadmin", False) and cliente.clinica_id != current_user.clinica_id:
+        # Verificar si la clínica tiene una mascota o cliente vinculado con este mismo DNI
+        tiene_vinculo = db.query(Mascota).join(Cliente).filter(
+            Mascota.clinica_id == current_user.clinica_id,
+            Cliente.dni == cliente.dni,
+            Mascota.is_deleted == False
+        ).first() is not None
+        if not tiene_vinculo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente no encontrado en esta clínica."
+            )
 
     cliente.pin_hash = None
     if cliente.dni:
@@ -2550,14 +2594,14 @@ def vista_ficha_mascota(
             if mascota_local:
                 return RedirectResponse(url=f"/pacientes/{mascota_local.id}{qs}", status_code=status.HTTP_302_FOUND)
 
-            # Si la mascota tiene una cita agendada en esta clínica (o viene del flujo de atender cita), auto-vincular su ficha
+            # Solo auto-vincular si la mascota realmente tiene una cita agendada en esta clínica
             tiene_cita_en_clinica = db.query(Cita).filter(
                 Cita.clinica_id == target_clinica_id,
                 Cita.mascota_id == mascota_externa.id,
                 Cita.is_deleted == False
             ).first() is not None
 
-            if tiene_cita_en_clinica or request.query_params.get("atender_cita"):
+            if tiene_cita_en_clinica:
                 mascota_vinculada = _asegurar_mascota_local_clinica(db, mascota_externa.id, target_clinica_id)
                 if mascota_vinculada:
                     return RedirectResponse(url=f"/pacientes/{mascota_vinculada.id}{qs}", status_code=status.HTTP_302_FOUND)
@@ -2837,7 +2881,6 @@ def activar_plan_emprendedor(
         except Exception:
             pass
 
-
     # Modo directo / sandbox cuando aún no se configura MP_ACCESS_TOKEN
     _aplicar_activacion_30_dias(
         db=db,
@@ -2861,43 +2904,105 @@ def retorno_mercadopago(
     external_reference: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    """Procesa el retorno exitoso de Mercado Pago Checkout Pro y activa los 30 días de suscripción."""
+    """
+    Procesa el retorno de Mercado Pago Checkout Pro verificando que el pago
+    realmente exista y esté aprobado antes de activar los 30 días.
+    """
     verificar_acceso_veterinario(request)
     current_user = obtener_veterinario_actual(request, db)
     if not current_user:
         return RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER)
 
     estado_pago = (status_mp or collection_status or request.query_params.get("status") or "").lower()
-    if estado_pago == "approved":
+    if estado_pago == "approved" and payment_id:
         clinica = db.query(Clinica).filter(
             Clinica.id == current_user.clinica_id,
             Clinica.is_deleted == False
         ).first()
         if clinica:
-            # Evitar duplicar si el webhook ya registró este payment_id
-            existente = None
-            if payment_id:
-                existente = db.query(PagoSuscripcion).filter(
-                    PagoSuscripcion.referencia_operacion == str(payment_id),
-                    PagoSuscripcion.estado == "APROBADO"
-                ).first()
-            if not existente:
-                _aplicar_activacion_30_dias(
-                    db=db,
-                    clinica=clinica,
-                    metodo_pago="MERCADOPAGO",
-                    referencia_operacion=str(payment_id) if payment_id else None,
-                    notas="Pago automático confirmado vía Mercado Pago"
+            # 1. Verificar si el webhook ya aprobó este payment_id para esta clínica
+            existente = db.query(PagoSuscripcion).filter(
+                PagoSuscripcion.clinica_id == clinica.id,
+                PagoSuscripcion.referencia_operacion == str(payment_id),
+                PagoSuscripcion.estado == "APROBADO"
+            ).first()
+            if existente:
+                return RedirectResponse(
+                    url="/configuracion/facturacion?mensaje=¡Pago+confirmado+vía+Mercado+Pago!+Tu+Plan+Emprendedor+está+activo+por+30+días.",
+                    status_code=status.HTTP_303_SEE_OTHER
                 )
-            return RedirectResponse(
-                url="/configuracion/facturacion?mensaje=¡Pago+confirmado+vía+Mercado+Pago!+Tu+Plan+Emprendedor+está+activo+por+30+días.",
-                status_code=status.HTTP_303_SEE_OTHER
-            )
+
+            # 2. Verificar directamente contra la API de Mercado Pago (nunca confiar solo en query params)
+            if settings.MP_ACCESS_TOKEN and settings.MP_ACCESS_TOKEN.strip():
+                try:
+                    import httpx
+                    resp = httpx.get(
+                        f"https://api.mercadopago.com/v1/payments/{payment_id}",
+                        headers={"Authorization": f"Bearer {settings.MP_ACCESS_TOKEN.strip()}"},
+                        timeout=8.0
+                    )
+                    if resp.status_code == 200:
+                        info = resp.json()
+                        mp_status = str(info.get("status") or "").lower()
+                        mp_ext_ref = str(info.get("external_reference") or "")
+                        if mp_status == "approved" and mp_ext_ref == str(clinica.id):
+                            _aplicar_activacion_30_dias(
+                                db=db,
+                                clinica=clinica,
+                                metodo_pago="MERCADOPAGO",
+                                referencia_operacion=str(payment_id),
+                                notas="Pago automático verificado vía API Mercado Pago"
+                            )
+                            return RedirectResponse(
+                                url="/configuracion/facturacion?mensaje=¡Pago+confirmado+vía+Mercado+Pago!+Tu+Plan+Emprendedor+está+activo+por+30+días.",
+                                status_code=status.HTTP_303_SEE_OTHER
+                            )
+                except Exception:
+                    pass
 
     return RedirectResponse(
-        url="/configuracion/facturacion?alerta=El+pago+no+pudo+ser+completado+o+sigue+pendiente.",
+        url="/configuracion/facturacion?alerta=El+pago+no+pudo+ser+verificado+o+sigue+pendiente.",
         status_code=status.HTTP_303_SEE_OTHER
     )
+
+
+def _verificar_firma_webhook_mp(request: Request, payment_id: Optional[str]) -> bool:
+    """
+    Valida la firma HMAC-SHA256 de Mercado Pago (header x-signature) o el token x-webhook-secret.
+    """
+    import hmac
+    import hashlib
+
+    secret = (settings.MP_WEBHOOK_SECRET or "").strip()
+    if not secret:
+        return False
+
+    # 1. Soporte directo por header x-webhook-secret (para pruebas / integraciones internas)
+    custom_header = (request.headers.get("x-webhook-secret") or "").strip()
+    if custom_header and hmac.compare_digest(custom_header, secret):
+        return True
+
+    # 2. Formato oficial de Mercado Pago: x-signature: ts=...,v1=...
+    x_sig = request.headers.get("x-signature") or ""
+    x_req_id = request.headers.get("x-request-id") or ""
+    if not x_sig:
+        return False
+
+    partes = {}
+    for item in x_sig.split(","):
+        if "=" in item:
+            k, v = item.split("=", 1)
+            partes[k.strip()] = v.strip()
+
+    ts = partes.get("ts")
+    v1 = partes.get("v1")
+    if not ts or not v1:
+        return False
+
+    data_id = str(payment_id or request.query_params.get("data.id") or "")
+    manifest = f"id:{data_id};request-id:{x_req_id};ts:{ts};"
+    expected = hmac.new(secret.encode("utf-8"), manifest.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, v1)
 
 
 @router.post("/api/billing/webhook/mercadopago", summary="Webhook Automático de Mercado Pago")
@@ -2907,7 +3012,8 @@ async def webhook_mercadopago(
 ):
     """
     Recibe notificaciones IPN/Webhook de Mercado Pago.
-    Cuando un pago es aprobado, renueva automáticamente la clínica por +30 días.
+    Exige verificación criptográfica de firma (MP_WEBHOOK_SECRET) o validación directa
+    del payment_id contra la API oficial de Mercado Pago (MP_ACCESS_TOKEN).
     """
     try:
         body = await request.json()
@@ -2917,11 +3023,19 @@ async def webhook_mercadopago(
     topic = body.get("type") or body.get("topic") or request.query_params.get("type") or request.query_params.get("topic")
     data_obj = body.get("data") or {}
     payment_id = data_obj.get("id") or request.query_params.get("data.id") or body.get("id")
-    external_ref = body.get("external_reference") or data_obj.get("external_reference")
-    payment_status = body.get("status") or data_obj.get("status")
 
-    # Si tenemos MP_ACCESS_TOKEN y solo llegó el payment_id, consultar la API de Mercado Pago
-    if payment_id and settings.MP_ACCESS_TOKEN and not external_ref:
+    firma_valida = _verificar_firma_webhook_mp(request, str(payment_id) if payment_id else None)
+    if settings.MP_WEBHOOK_SECRET and settings.MP_WEBHOOK_SECRET.strip() and not firma_valida:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Firma de webhook de Mercado Pago inválida."
+        )
+
+    external_ref = None
+    payment_status = None
+
+    # Si tenemos MP_ACCESS_TOKEN y payment_id, consultar la fuente de verdad en la API de Mercado Pago
+    if payment_id and settings.MP_ACCESS_TOKEN and settings.MP_ACCESS_TOKEN.strip():
         try:
             import httpx
             resp = httpx.get(
@@ -2935,8 +3049,17 @@ async def webhook_mercadopago(
                 payment_status = info.get("status")
         except Exception:
             pass
+    elif firma_valida:
+        # Solo si la firma HMAC del webhook fue validada criptográficamente aceptamos el payload firmado
+        external_ref = body.get("external_reference") or data_obj.get("external_reference")
+        payment_status = body.get("status") or data_obj.get("status")
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Webhook no verificado: configure MP_WEBHOOK_SECRET o MP_ACCESS_TOKEN."
+        )
 
-    if external_ref and str(payment_status or "approved").lower() == "approved":
+    if external_ref and str(payment_status or "").lower() == "approved":
         try:
             clinica_id = int(external_ref)
         except (ValueError, TypeError):
@@ -3000,12 +3123,15 @@ async def reportar_pago_yape_plin(
         if len(contenido) > 10 * 1024 * 1024:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La imagen excede los 10MB.")
         if len(contenido) > 0:
-            comprobante_url = await upload_image_to_r2(
-                file_bytes=contenido,
-                filename=comprobante.filename or f"voucher_{clinica.id}_{uuid.uuid4().hex[:6]}.webp",
-                folder="comprobantes",
-                content_type=comprobante.content_type or "image/webp"
-            )
+            try:
+                comprobante_url = await upload_image_to_r2(
+                    file_bytes=contenido,
+                    filename=comprobante.filename or f"voucher_{clinica.id}_{uuid.uuid4().hex[:6]}.webp",
+                    folder="comprobantes",
+                    content_type=comprobante.content_type or "image/webp"
+                )
+            except ValueError as ve:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     metodo_norm = (metodo_pago or "YAPE_PLIN").strip().upper()
     nuevo_pago = PagoSuscripcion(
@@ -3052,7 +3178,6 @@ async def reportar_pago_yape_plin(
         url="/configuracion/facturacion?mensaje=¡Comprobante+recibido+con+éxito!+Nuestro+equipo+validará+tu+operación+y+activará+tus+30+días+en+breve.",
         status_code=status.HTTP_303_SEE_OTHER
     )
-
 
 
 # ==========================================
@@ -3181,18 +3306,17 @@ def confirmar_cita_veterinario(
     request: Request,
     background_tasks: BackgroundTasks,
     payload: Optional[dict] = Body(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    
-    # Buscar la cita por su ID primario asegurando que no esté eliminada
+    # Buscar la cita por su ID primario asegurando que pertenezca a la clínica del veterinario
     query = db.query(Cita).filter(
         Cita.id == cita_id,
         Cita.is_deleted == False
     )
-    if current_user:
+    if not getattr(current_user, "is_superadmin", False):
         query = query.filter(Cita.clinica_id == current_user.clinica_id)
-        
+
     cita = query.first()
 
     if not cita:
@@ -3260,16 +3384,15 @@ def confirmar_cita_veterinario(
 @router.put(
     "/api/clinic/citas/{cita_id}/atendida",
     summary="Marcar Cita como Atendida",
-    description="Actualiza el estado de la cita a ATENDIDA y asegura la ficha local de la mascota.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Actualiza el estado de la cita a ATENDIDA y asegura la ficha local de la mascota."
 )
 def marcar_cita_atendida_veterinario(
     cita_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     cita = db.query(Cita).filter(
         Cita.id == cita_id,
@@ -3308,30 +3431,31 @@ def confirmar_cita_alias_id(
     request: Request,
     background_tasks: BackgroundTasks,
     payload: Optional[dict] = Body(default=None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
     return confirmar_cita_veterinario(
         cita_id=id,
         request=request,
         background_tasks=background_tasks,
         payload=payload,
-        db=db
+        db=db,
+        current_user=current_user
     )
 
 
 @router.put(
     "/api/clinic/citas/{cita_id}/cancelar",
     summary="Cancelar Cita Agendada",
-    description="Actualiza el estado de la cita a CANCELADA.",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    description="Actualiza el estado de la cita a CANCELADA."
 )
 def cancelar_cita_veterinario(
     cita_id: int,
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else 1
+    target_clinica_id = current_user.clinica_id
 
     cita = db.query(Cita).filter(
         Cita.id == cita_id,
@@ -3365,17 +3489,16 @@ class CitaCreateVetRequest(BaseModel):
 
 @router.post(
     "/api/clinic/citas",
-    summary="Registrar Cita desde el Panel del Veterinario",
-    dependencies=[Depends(verificar_acceso_veterinario)]
+    summary="Registrar Cita desde el Panel del Veterinario"
 )
 def crear_cita_veterinario(
     payload: CitaCreateVetRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
 ):
-    current_user = obtener_veterinario_actual(request, db)
-    target_clinica_id = current_user.clinica_id if current_user else (payload.clinica_id or 1)
+    target_clinica_id = (payload.clinica_id or current_user.clinica_id) if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
 
     mascota = db.query(Mascota).filter(
         Mascota.id == payload.mascota_id,

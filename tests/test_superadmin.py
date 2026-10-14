@@ -191,3 +191,135 @@ def test_endpoints_admin_clinicas_ajustar_dias_y_promover(client, db_session):
     for ruta_vet in ["/dashboard", "/pacientes", "/agenda", "/configuracion"]:
         resp_v = client.get(ruta_vet)
         assert resp_v.status_code == 200
+
+
+def test_admin_buscar_clientes_y_reset_pin(client, db_session, test_clinica):
+    """
+    Verifica que el SuperAdmin pueda:
+    1. Buscar propietarios por DNI o nombre de mascota a nivel global.
+    2. Detectar si el PIN está configurado o si está bloqueado por intentos fallidos.
+    3. Restablecer el PIN (pin_hash=None) y desbloquear el DNI en el rate_limiter.
+    4. Garantizar que usuarios sin rol SUPER_ADMIN reciban 403.
+    """
+    from app.clinic.models import Cliente, Mascota
+    from app.core.rate_limit import rate_limiter
+    from app.core.security import hash_pin
+
+    # 1. Crear SuperAdmin y Cliente con Mascota
+    vet_super = Veterinario(
+        clinica_id=test_clinica.id,
+        email="superadmin_pin@vet.pe",
+        nombre="Super Admin PIN",
+        password_hash="hash_test",
+        rol="SUPER_ADMIN",
+        is_superadmin=True,
+        is_active=True,
+        is_verified=True
+    )
+    db_session.add(vet_super)
+    db_session.flush()
+
+    cliente = Cliente(
+        clinica_id=test_clinica.id,
+        dni="76543210",
+        nombre_completo="Carlos Dueño Prueba",
+        nombres="Carlos",
+        apellido_paterno="Dueño",
+        telefono="987654321",
+        email="carlos@gmail.com",
+        pin_hash=hash_pin("1234")
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=test_clinica.id,
+        cliente_id=cliente.id,
+        nombre="Rocky",
+        especie="Canino",
+        raza="Golden Retriever"
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    token_super = create_access_token({
+        "sub": str(vet_super.id),
+        "clinica_id": test_clinica.id,
+        "role": "vet",
+        "rol": "SUPER_ADMIN",
+        "is_superadmin": True,
+        "is_verified": True
+    })
+    client.cookies.set("vet_token", token_super)
+
+    # 2. Búsqueda por DNI
+    resp_busqueda_dni = client.get("/admin/clientes/buscar?q=76543210")
+    assert resp_busqueda_dni.status_code == 200
+    resultados = resp_busqueda_dni.json()
+    assert len(resultados) == 1
+    assert resultados[0]["dni"] == "76543210"
+    assert resultados[0]["nombre_completo"] == "Carlos Dueño Prueba"
+    assert resultados[0]["tiene_pin"] is True
+    assert resultados[0]["esta_bloqueado"] is False
+    assert len(resultados[0]["mascotas"]) == 1
+    assert resultados[0]["mascotas"][0]["nombre"] == "Rocky"
+
+    # 3. Búsqueda por nombre de Mascota
+    resp_busqueda_mascota = client.get("/admin/clientes/buscar?q=Rocky")
+    assert resp_busqueda_mascota.status_code == 200
+    res_m = resp_busqueda_mascota.json()
+    assert len(res_m) >= 1
+    assert any(c["dni"] == "76543210" for c in res_m)
+
+    # 4. Simular 5 intentos fallidos para bloquear al cliente
+    for _ in range(5):
+        try:
+            rate_limiter.record_pin_failure("76543210")
+        except Exception:
+            pass
+
+    import pytest
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc_info:
+        rate_limiter.check_pin_lockout("76543210")
+    assert exc_info.value.status_code == 429
+
+    # Verificar que el buscador reporte `esta_bloqueado = True`
+    resp_bloqueado = client.get("/admin/clientes/buscar?q=76543210")
+    assert resp_bloqueado.status_code == 200
+    assert resp_bloqueado.json()[0]["esta_bloqueado"] is True
+    assert resp_bloqueado.json()[0]["segundos_bloqueo_restantes"] > 0
+
+    # 5. Restablecer PIN mediante POST /admin/clientes/{dni}/reset-pin
+    resp_reset = client.post("/admin/clientes/76543210/reset-pin")
+    assert resp_reset.status_code == 200
+    data_reset = resp_reset.json()
+    assert data_reset["status"] == "ok"
+    assert data_reset["dni"] == "76543210"
+    assert data_reset["tiene_pin"] is False
+    assert data_reset["esta_bloqueado"] is False
+
+    # Verificar en Base de Datos que pin_hash quedó en None
+    db_session.refresh(cliente)
+    assert cliente.pin_hash is None
+
+    # Verificar que el bloqueo en Rate Limiter fue eliminado (no lanza excepción)
+    rate_limiter.check_pin_lockout("76543210")
+
+    # 6. Intentar reset con usuario sin privilegios SuperAdmin
+    token_no_super = create_access_token({
+        "sub": "999",
+        "clinica_id": test_clinica.id,
+        "role": "vet",
+        "rol": "VET",
+        "is_superadmin": False,
+        "is_verified": True
+    })
+    client.cookies.set("vet_token", token_no_super)
+
+    resp_denegado_get = client.get("/admin/clientes/buscar?q=76543210")
+    assert resp_denegado_get.status_code == 403
+
+    resp_denegado_post = client.post("/admin/clientes/76543210/reset-pin")
+    assert resp_denegado_post.status_code == 403
+

@@ -142,8 +142,35 @@
     </div>
 
     <!-- ========================================================== -->
-    <!-- BANDEJA DE COMPROBANTES DE PAGO POR REVISAR (YAPE / PLIN)  -->
+    <!-- SELECTOR DE PESTAÑAS (TABS) DEL PANEL SUPERADMIN           -->
     <!-- ========================================================== -->
+    <div class="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button 
+            type="button" 
+            id="tabBtnClinicas" 
+            onclick="cambiarTabAdmin('clinicas')"
+            class="btn-touch px-4 py-2.5 text-xs sm:text-sm font-black rounded-2xl transition-all bg-indigo-600 text-white shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0"
+        >
+            <i data-lucide="hospital" class="w-4 h-4" aria-hidden="true"></i>
+            <span>Clínicas & Suscripciones</span>
+            <span id="badgeTabClinicasCount" class="px-2 py-0.5 rounded-full text-[10px] bg-white/20 text-white font-extrabold">{{ clinicas|length }}</span>
+        </button>
+        <button 
+            type="button" 
+            id="tabBtnPin" 
+            onclick="cambiarTabAdmin('pin')"
+            class="btn-touch px-4 py-2.5 text-xs sm:text-sm font-bold rounded-2xl transition-all bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-2 cursor-pointer shrink-0"
+        >
+            <i data-lucide="key-round" class="w-4 h-4 text-amber-600" aria-hidden="true"></i>
+            <span>Restablecer PIN de Pacientes (Por DNI)</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-100 text-amber-800 font-extrabold border border-amber-200">Portal Dueños</span>
+        </button>
+    </div>
+
+    <!-- ========================================================== -->
+    <!-- PESTAÑA 1: CLÍNICAS Y SUSCRIPCIONES                        -->
+    <!-- ========================================================== -->
+    <div id="tabContentClinicas" class="space-y-6">
     {% if pagos_pendientes %}
     <div id="seccionPagosPendientesAdmin" class="bg-purple-50/70 rounded-3xl border-2 border-purple-300 shadow-xs overflow-hidden">
         <div class="p-5 sm:p-6 border-b border-purple-200 flex items-center justify-between gap-4 bg-purple-100/50">
@@ -395,15 +422,198 @@
             </table>
         </div>
 
-        <!-- Estado vacío de búsqueda -->
-        <div id="emptyStateClinicas" class="{% if clinicas %}hidden{% endif %} p-10 text-center space-y-2">
-            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
-                <i data-lucide="search-x" class="w-6 h-6" aria-hidden="true"></i>
-            </div>
-            <p class="text-sm font-bold text-slate-700">No se encontraron clínicas que coincidan con el filtro</p>
-            <p class="text-xs text-slate-500">Intenta con otro término de búsqueda o restablece el filtro de estado.</p>
         </div>
     </div>
+    </div> <!-- Fin tabContentClinicas -->
+
+    <!-- ========================================================== -->
+    <!-- PESTAÑA 2: RESTABLECER PIN DE PACIENTES / DUEÑOS (POR DNI) -->
+    <!-- ========================================================== -->
+    <div id="tabContentPin" class="hidden space-y-6">
+        <!-- Banner Informativo del Panel de PIN -->
+        <div class="bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 text-white p-6 sm:p-7 rounded-3xl shadow-md border border-amber-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="space-y-1.5">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-xs font-extrabold uppercase tracking-wider">
+                    <i data-lucide="key-round" class="w-4 h-4 text-amber-400" aria-hidden="true"></i>
+                    <span>Soporte Global de Credenciales &bull; Portal Dueños</span>
+                </div>
+                <h2 class="text-xl sm:text-2xl font-black tracking-tight">
+                    Restablecer PIN de Acceso de Pacientes / Propietarios
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-300 max-w-2xl">
+                    Busca a cualquier cliente por su número de <strong>DNI</strong> en todas las clínicas para verificar si su PIN está activo, desbloquear bloqueos por 5 intentos fallidos y permitirle configurar un nuevo PIN de 4 dígitos en su próximo acceso al portal.
+                </p>
+            </div>
+        </div>
+
+        <!-- Tarjeta de Búsqueda por DNI -->
+        <div class="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden p-6 sm:p-7 space-y-5">
+            <div class="max-w-2xl">
+                <label for="inputBuscarDniPin" class="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
+                    Buscar Propietario por Documento de Identidad (DNI) o Nombre:
+                </label>
+                <div class="flex flex-col sm:flex-row gap-2.5">
+                    <div class="relative flex-1">
+                        <input 
+                            type="search" 
+                            id="inputBuscarDniPin" 
+                            onkeydown="if(event.key === 'Enter') { event.preventDefault(); buscarClientesPin(); }"
+                            placeholder="Ingresa número de DNI (ej. 71234567, 08765432) o nombre..." 
+                            class="w-full pl-11 pr-4 py-3 text-sm font-semibold bg-slate-50 border border-slate-300 rounded-2xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"
+                        >
+                        <div class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                            <i data-lucide="search" class="w-5 h-5" aria-hidden="true"></i>
+                        </div>
+                    </div>
+                    <button 
+                        type="button" 
+                        onclick="buscarClientesPin()" 
+                        id="btnBuscarDniPin"
+                        class="btn-touch px-6 py-3 text-xs sm:text-sm font-black text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 rounded-2xl shadow-sm transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        <i data-lucide="search" class="w-4 h-4" aria-hidden="true"></i>
+                        <span>Buscar Propietario</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="limpiarBusquedaPin()" 
+                        class="btn-touch px-4 py-3 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Ver clientes recientes"
+                    >
+                        <i data-lucide="rotate-ccw" class="w-4 h-4" aria-hidden="true"></i>
+                        <span>Recientes</span>
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2">
+                    💡 <strong>Tip:</strong> Puedes buscar por los 8 dígitos del DNI, nombres del cliente o el nombre de su mascota.
+                </p>
+            </div>
+
+            <!-- Loader de Búsqueda -->
+            <div id="loaderBuscarPin" class="hidden py-8 text-center space-y-2">
+                <i data-lucide="loader-2" class="w-8 h-8 text-amber-600 animate-spin mx-auto" aria-hidden="true"></i>
+                <p class="text-xs font-bold text-slate-500">Consultando propietarios en la base de datos...</p>
+            </div>
+
+            <!-- Tabla de Resultados de Propietarios -->
+            <div id="tablaResultadosPinContainer" class="overflow-x-auto rounded-2xl border border-slate-200">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-50/90 border-b border-slate-200 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+                            <th class="py-3.5 px-4 sm:px-6">Propietario / DNI</th>
+                            <th class="py-3.5 px-4">Clínica(s) Asociada(s)</th>
+                            <th class="py-3.5 px-4">Mascotas Vinculadas</th>
+                            <th class="py-3.5 px-4">Contacto</th>
+                            <th class="py-3.5 px-4">Estado del PIN</th>
+                            <th class="py-3.5 px-4 sm:px-6 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyClientesPin" class="divide-y divide-slate-100 text-xs sm:text-sm">
+                        {% for cliente in clientes_recientes %}
+                        <tr id="filaClienteDni-{{ cliente.dni }}" class="hover:bg-amber-50/20 transition-colors">
+                            <td class="py-4 px-4 sm:px-6">
+                                <div class="space-y-1">
+                                    <p class="font-bold text-slate-900 text-sm">{{ cliente.nombre_completo }}</p>
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                                            DNI: {{ cliente.dni }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <div class="flex flex-wrap gap-1 max-w-xs">
+                                    {% for c_nom in cliente.clinicas %}
+                                    <span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                                        {{ c_nom }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-slate-400">Sin clínica</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <div class="flex flex-wrap gap-1.5 max-w-xs">
+                                    {% for m in cliente.mascotas %}
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                        <span>🐾</span>
+                                        <span>{{ m.nombre }}</span>
+                                        <span class="text-[10px] text-teal-600 font-normal">({{ m.especie }})</span>
+                                    </span>
+                                    {% else %}
+                                    <span class="text-slate-400 italic">Sin mascotas</span>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td class="py-4 px-4 text-xs space-y-0.5 whitespace-nowrap">
+                                {% if cliente.telefono %}
+                                <a 
+                                    href="https://wa.me/51{{ cliente.telefono | replace(' ', '') }}?text=Hola+{{ cliente.nombre_completo | urlencode }},+te+saludamos+de+SherekePet." 
+                                    target="_blank" 
+                                    class="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-bold hover:underline"
+                                >
+                                    <i data-lucide="phone" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>{{ cliente.telefono }}</span>
+                                </a>
+                                {% else %}
+                                <p class="text-slate-400">Sin teléfono</p>
+                                {% endif %}
+                                {% if cliente.email %}
+                                <p class="text-[11px] text-slate-500 font-mono">{{ cliente.email }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-4 whitespace-nowrap" id="celdaEstadoPin-{{ cliente.dni }}">
+                                {% if cliente.esta_bloqueado %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-200">
+                                    <i data-lucide="lock" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>Bloqueado ({{ cliente.segundos_bloqueo_restantes }}s)</span>
+                                </span>
+                                {% elif cliente.tiene_pin %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    <span>PIN Configurado</span>
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                    <span>Sin PIN (Listo p/ crear)</span>
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
+                                <button 
+                                    type="button" 
+                                    id="btnResetPin-{{ cliente.dni }}"
+                                    onclick="ejecutarResetPinDni('{{ cliente.dni }}', '{{ cliente.nombre_completo | e }}')"
+                                    class="btn-touch px-3.5 py-1.5 text-xs font-black rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer {% if cliente.esta_bloqueado %}bg-rose-600 hover:bg-rose-700 text-white shadow-xs{% elif cliente.tiene_pin %}bg-amber-500 hover:bg-amber-600 text-white shadow-xs{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200{% endif %}"
+                                    title="Restablecer PIN para que defina uno nuevo"
+                                >
+                                    <i data-lucide="key-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>{% if cliente.esta_bloqueado %}Desbloquear & Reset PIN{% else %}Restablecer PIN{% endif %}</span>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr id="emptyRowPin">
+                            <td colspan="6" class="p-8 text-center text-slate-500">
+                                <i data-lucide="search" class="w-6 h-6 text-slate-400 mx-auto mb-2" aria-hidden="true"></i>
+                                <p class="font-bold text-slate-700">No hay propietarios para mostrar</p>
+                                <p class="text-xs text-slate-400">Ingresa un número de DNI en el buscador superior para comenzar.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Estado Vacío Dinámico -->
+            <div id="emptyStateResultadosPin" class="hidden p-8 text-center space-y-2 rounded-2xl bg-slate-50 border border-slate-200">
+                <i data-lucide="user-x" class="w-8 h-8 text-slate-400 mx-auto" aria-hidden="true"></i>
+                <p class="text-sm font-black text-slate-700">No se encontraron propietarios con ese criterio de búsqueda</p>
+                <p class="text-xs text-slate-500">Verifica que el número de DNI esté bien digitado o intenta con el nombre del cliente.</p>
+            </div>
+        </div>
+    </div> <!-- Fin tabContentPin -->
 
 </div>
 
@@ -844,6 +1054,267 @@
             mostrarFeedbackAdmin('success', data.mensaje || 'Comprobante rechazado.');
         } catch (error) {
             mostrarFeedbackAdmin('error', error.message);
+        }
+    }
+
+    // ==========================================================
+    // PESTAÑAS (TABS) Y GESTIÓN DE PIN DE PACIENTES POR DNI
+    // ==========================================================
+    function cambiarTabAdmin(tab) {
+        const btnClinicas = document.getElementById('tabBtnClinicas');
+        const btnPin = document.getElementById('tabBtnPin');
+        const contentClinicas = document.getElementById('tabContentClinicas');
+        const contentPin = document.getElementById('tabContentPin');
+
+        if (!btnClinicas || !btnPin || !contentClinicas || !contentPin) return;
+
+        if (tab === 'pin') {
+            btnPin.className = 'btn-touch px-4 py-2.5 text-xs sm:text-sm font-black rounded-2xl transition-all bg-amber-600 text-white shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0';
+            btnClinicas.className = 'btn-touch px-4 py-2.5 text-xs sm:text-sm font-bold rounded-2xl transition-all bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-2 cursor-pointer shrink-0';
+            contentClinicas.classList.add('hidden');
+            contentPin.classList.remove('hidden');
+
+            try {
+                history.replaceState(null, null, '#tab-pin');
+            } catch (e) {}
+
+            const inputDni = document.getElementById('inputBuscarDniPin');
+            if (inputDni) {
+                setTimeout(() => inputDni.focus(), 80);
+            }
+        } else {
+            btnClinicas.className = 'btn-touch px-4 py-2.5 text-xs sm:text-sm font-black rounded-2xl transition-all bg-indigo-600 text-white shadow-xs inline-flex items-center gap-2 cursor-pointer shrink-0';
+            btnPin.className = 'btn-touch px-4 py-2.5 text-xs sm:text-sm font-bold rounded-2xl transition-all bg-slate-100 hover:bg-slate-200 text-slate-700 inline-flex items-center gap-2 cursor-pointer shrink-0';
+            contentPin.classList.add('hidden');
+            contentClinicas.classList.remove('hidden');
+
+            try {
+                history.replaceState(null, null, '#tab-clinicas');
+            } catch (e) {}
+        }
+
+        window.initLucideIcons?.();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.location.hash === '#tab-pin') {
+            cambiarTabAdmin('pin');
+        }
+    });
+
+    async function buscarClientesPin() {
+        const input = document.getElementById('inputBuscarDniPin');
+        const loader = document.getElementById('loaderBuscarPin');
+        const tbody = document.getElementById('tbodyClientesPin');
+        const emptyState = document.getElementById('emptyStateResultadosPin');
+        const term = (input?.value || '').trim();
+
+        if (loader) loader.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        try {
+            const url = term ? `/admin/clientes/buscar?q=${encodeURIComponent(term)}` : '/admin/clientes/buscar';
+            const resp = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.detail || 'Error al buscar propietarios.');
+            }
+
+            const clientes = await resp.json();
+
+            if (!clientes || clientes.length === 0) {
+                if (tbody) tbody.innerHTML = '';
+                if (emptyState) emptyState.classList.remove('hidden');
+                return;
+            }
+
+            if (tbody) {
+                tbody.innerHTML = clientes.map(c => {
+                    const nombreSafe = escapeHtml(c.nombre_completo || 'Sin nombre');
+                    const dniSafe = escapeHtml(c.dni || '');
+                    const telClean = (c.telefono || '').replace(/\s+/g, '');
+                    const telSafe = escapeHtml(c.telefono || '');
+                    const emailSafe = escapeHtml(c.email || '');
+
+                    const clinicasBadges = (c.clinicas && c.clinicas.length > 0)
+                        ? c.clinicas.map(cl => `<span class="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">${escapeHtml(cl)}</span>`).join(' ')
+                        : '<span class="text-slate-400">Sin clínica</span>';
+
+                    const mascotasBadges = (c.mascotas && c.mascotas.length > 0)
+                        ? c.mascotas.map(m => `
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                <span>🐾</span>
+                                <span>${escapeHtml(m.nombre)}</span>
+                                <span class="text-[10px] text-teal-600 font-normal">(${escapeHtml(m.especie)})</span>
+                            </span>
+                        `).join(' ')
+                        : '<span class="text-slate-400 italic">Sin mascotas</span>';
+
+                    let pinBadgeHtml = '';
+                    let btnText = 'Restablecer PIN';
+                    let btnClasses = 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs';
+
+                    if (c.esta_bloqueado) {
+                        pinBadgeHtml = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-200">
+                                <i data-lucide="lock" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                <span>Bloqueado (${c.segundos_bloqueo_restantes}s)</span>
+                            </span>
+                        `;
+                        btnText = 'Desbloquear & Reset PIN';
+                        btnClasses = 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs';
+                    } else if (c.tiene_pin) {
+                        pinBadgeHtml = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                <span>PIN Configurado</span>
+                            </span>
+                        `;
+                        btnText = 'Restablecer PIN';
+                        btnClasses = 'bg-amber-500 hover:bg-amber-600 text-white shadow-xs';
+                    } else {
+                        pinBadgeHtml = `
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                <span>Sin PIN (Listo p/ crear)</span>
+                            </span>
+                        `;
+                        btnText = 'Restablecer PIN';
+                        btnClasses = 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200';
+                    }
+
+                    let contactoHtml = '';
+                    if (c.telefono) {
+                        contactoHtml += `
+                            <a href="https://wa.me/51${escapeHtml(telClean)}?text=Hola+${encodeURIComponent(c.nombre_completo || '')},+te+saludamos+de+SherekePet." 
+                               target="_blank" 
+                               class="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-bold hover:underline">
+                                <i data-lucide="phone" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                <span>${telSafe}</span>
+                            </a>
+                        `;
+                    } else {
+                        contactoHtml += '<p class="text-slate-400">Sin teléfono</p>';
+                    }
+                    if (c.email) {
+                        contactoHtml += `<p class="text-[11px] text-slate-500 font-mono">${emailSafe}</p>`;
+                    }
+
+                    return `
+                        <tr id="filaClienteDni-${dniSafe}" class="hover:bg-amber-50/20 transition-colors">
+                            <td class="py-4 px-4 sm:px-6">
+                                <div class="space-y-1">
+                                    <p class="font-bold text-slate-900 text-sm">${nombreSafe}</p>
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex items-center font-mono font-black text-xs px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                                            DNI: ${dniSafe}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <div class="flex flex-wrap gap-1 max-w-xs">
+                                    ${clinicasBadges}
+                                </div>
+                            </td>
+                            <td class="py-4 px-4">
+                                <div class="flex flex-wrap gap-1.5 max-w-xs">
+                                    ${mascotasBadges}
+                                </div>
+                            </td>
+                            <td class="py-4 px-4 text-xs space-y-0.5 whitespace-nowrap">
+                                ${contactoHtml}
+                            </td>
+                            <td class="py-4 px-4 whitespace-nowrap" id="celdaEstadoPin-${dniSafe}">
+                                ${pinBadgeHtml}
+                            </td>
+                            <td class="py-4 px-4 sm:px-6 text-right whitespace-nowrap">
+                                <button 
+                                    type="button" 
+                                    id="btnResetPin-${dniSafe}"
+                                    onclick="ejecutarResetPinDni('${dniSafe}', '${escapeHtml(c.nombre_completo || '')}')"
+                                    class="btn-touch px-3.5 py-1.5 text-xs font-black rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer ${btnClasses}"
+                                    title="Restablecer PIN para que defina uno nuevo"
+                                >
+                                    <i data-lucide="key-round" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                                    <span>${btnText}</span>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            window.initLucideIcons?.();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+        } finally {
+            if (loader) loader.classList.add('hidden');
+        }
+    }
+
+    function limpiarBusquedaPin() {
+        const input = document.getElementById('inputBuscarDniPin');
+        if (input) input.value = '';
+        buscarClientesPin();
+    }
+
+    async function ejecutarResetPinDni(dni, nombre) {
+        if (!confirm(`¿Restablecer el PIN de acceso del propietario ${nombre ? `"${nombre}"` : ''} (DNI: ${dni})?\n\nAl confirmar:\n1. Se eliminará cualquier bloqueo por 5 intentos fallidos.\n2. Su PIN actual quedará restablecido.\n3. La próxima vez que ingrese al portal se le pedirá definir un PIN nuevo de 4 dígitos.`)) {
+            return;
+        }
+
+        const btn = document.getElementById(`btnResetPin-${dni}`);
+        const celda = document.getElementById(`celdaEstadoPin-${dni}`);
+        const originalContent = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Restableciendo...</span>`;
+            window.initLucideIcons?.();
+        }
+
+        try {
+            const resp = await fetch(`/admin/clientes/${encodeURIComponent(dni)}/reset-pin`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await resp.json().catch(() => ({}));
+            if (!resp.ok) {
+                throw new Error(data.detail || 'No se pudo restablecer el PIN.');
+            }
+
+            mostrarFeedbackAdmin('success', data.mensaje || `PIN restablecido exitosamente para el DNI ${dni}.`);
+
+            if (celda) {
+                celda.innerHTML = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span>Sin PIN (Listo p/ crear)</span>
+                    </span>
+                `;
+            }
+
+            if (btn) {
+                btn.className = 'btn-touch px-3.5 py-1.5 text-xs font-black rounded-xl bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed inline-flex items-center gap-1.5';
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-600"></i><span class="text-emerald-700">PIN Restablecido</span>`;
+            }
+
+            window.initLucideIcons?.();
+        } catch (error) {
+            mostrarFeedbackAdmin('error', error.message);
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                window.initLucideIcons?.();
+            }
         }
     }
 </script>

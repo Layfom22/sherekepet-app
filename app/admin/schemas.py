@@ -41,3 +41,34 @@ class AdminClinicaItem(BaseModel):
     plan_activo: str
     total_pacientes: int = 0
     usuarios: List[AdminUsuarioSummary] = []
+
+
+class AdminMascotaSummary(BaseModel):
+    id: int
+    nombre: str
+    especie: str
+    raza: Optional[str] = None
+    foto_url: Optional[str] = None
+    clinica_nombre: Optional[str] = None
+
+
+class AdminClienteDniGroup(BaseModel):
+    dni: str
+    nombre_completo: str
+    telefono: Optional[str] = None
+    email: Optional[str] = None
+    tiene_pin: bool
+    esta_bloqueado: bool = False
+    segundos_bloqueo_restantes: int = 0
+    clinicas: List[str] = []
+    mascotas: List[AdminMascotaSummary] = []
+    total_mascotas: int = 0
+    ids: List[int] = []
+
+
+class AdminResetPinResponse(BaseModel):
+    status: str
+    mensaje: str
+    dni: str
+    tiene_pin: bool = False
+    esta_bloqueado: bool = False

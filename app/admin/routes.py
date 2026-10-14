@@ -1,20 +1,27 @@
+import time
+from collections import OrderedDict
 from datetime import timedelta
 from typing import List, Optional
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.core.models import Clinica, PagoSuscripcion
 from app.core.security import decode_access_token
 from app.core.timezone import get_lima_now
-from app.clinic.models import Veterinario, Mascota
+from app.core.rate_limit import rate_limiter
+from app.clinic.models import Veterinario, Mascota, Cliente
 from app.database import get_db
 from app.admin.schemas import (
     AjustarDiasRequest,
     CambiarEstadoSuscripcionRequest,
     AdminClinicaItem,
     AdminUsuarioSummary,
+    AdminMascotaSummary,
+    AdminClienteDniGroup,
+    AdminResetPinResponse,
 )
 
 templates = Jinja2Templates(directory="app/templates")
@@ -173,6 +180,72 @@ def _serializar_clinica_admin(clinica: Clinica, db: Session) -> dict:
     }
 
 
+def _info_bloqueo_dni(dni: str) -> tuple[bool, int]:
+    """Determina si un DNI está bloqueado por superar 5 intentos fallidos de PIN."""
+    now = time.time()
+    info = rate_limiter._lockouts.get(dni)
+    if info:
+        fails, lock_until = info
+        if lock_until > now:
+            return True, int(lock_until - now)
+    return False, 0
+
+
+def _serializar_clientes_agrupados_por_dni(clientes: list[Cliente], db: Session) -> list[dict]:
+    """
+    Agrupa registros de clientes por DNI único para una gestión centralizada en SuperAdmin.
+    Permite visualizar todas las clínicas y mascotas asociadas al mismo DNI.
+    """
+    grupos = OrderedDict()
+
+    for c in clientes:
+        dni = (c.dni or "").strip()
+        if not dni:
+            continue
+        if dni not in grupos:
+            esta_bloqueado, segs = _info_bloqueo_dni(dni)
+            grupos[dni] = {
+                "dni": dni,
+                "nombre_completo": c.nombre_completo or f"{c.nombres or ''} {c.apellido_paterno or ''}".strip() or "Dueño de Mascota",
+                "telefono": c.telefono,
+                "email": c.email,
+                "tiene_pin": bool(c.pin_hash and str(c.pin_hash).strip()),
+                "esta_bloqueado": esta_bloqueado,
+                "segundos_bloqueo_restantes": segs,
+                "clinicas": set(),
+                "mascotas": [],
+                "ids": []
+            }
+
+        grupos[dni]["ids"].append(c.id)
+        if c.pin_hash and str(c.pin_hash).strip():
+            grupos[dni]["tiene_pin"] = True
+        if c.telefono and not grupos[dni]["telefono"]:
+            grupos[dni]["telefono"] = c.telefono
+        if c.email and not grupos[dni]["email"]:
+            grupos[dni]["email"] = c.email
+        if c.clinica and c.clinica.nombre_mostrado:
+            grupos[dni]["clinicas"].add(c.clinica.nombre_mostrado)
+
+        for m in c.mascotas:
+            if not m.is_deleted:
+                grupos[dni]["mascotas"].append({
+                    "id": m.id,
+                    "nombre": m.nombre,
+                    "especie": m.especie or "Canino",
+                    "raza": m.raza,
+                    "foto_url": m.foto_url,
+                    "clinica_nombre": c.clinica.nombre_mostrado if c.clinica else "Clínica"
+                })
+
+    resultado = []
+    for g in grupos.values():
+        g["clinicas"] = sorted(list(g["clinicas"]))
+        g["total_mascotas"] = len(g["mascotas"])
+        resultado.append(g)
+    return resultado
+
+
 @router.get(
     "",
     response_class=HTMLResponse,
@@ -203,6 +276,12 @@ def vista_admin_dashboard(
         PagoSuscripcion.estado == "PENDIENTE_REVISION"
     ).order_by(PagoSuscripcion.created_at.desc()).all()
 
+    # Cargar clientes recientes para la pestaña de reseteo de PIN
+    clientes_recientes_db = db.query(Cliente).filter(
+        Cliente.is_deleted == False
+    ).order_by(Cliente.id.desc()).limit(30).all()
+    clientes_recientes = _serializar_clientes_agrupados_por_dni(clientes_recientes_db, db)[:10]
+
     kpis = {
         "total_clinicas": len(clinicas_data),
         "activas": sum(1 for c in clinicas_data if c["estado_suscripcion"] == "ACTIVE"),
@@ -222,6 +301,7 @@ def vista_admin_dashboard(
             "clinicas": clinicas_data,
             "usuarios": usuarios_db,
             "pagos_pendientes": pagos_pendientes_db,
+            "clientes_recientes": clientes_recientes,
             "kpis": kpis
         }
     )
@@ -512,4 +592,119 @@ def promover_usuario_superadmin(
             "clinica_id": usuario.clinica_id
         }
     }
+
+
+# ==========================================================
+# GESTIÓN Y RESETEO DE PIN DE PACIENTES / PROPIETARIOS (DNI)
+# ==========================================================
+
+@router.get(
+    "/clientes/buscar",
+    summary="Buscar propietarios por DNI, nombre o mascota para reseteo de PIN"
+)
+def buscar_clientes_pin_admin(
+    q: Optional[str] = Query(None, description="Término de búsqueda: DNI, nombre de dueño o nombre de mascota"),
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_superadmin)
+):
+    """
+    Permite al SuperAdmin buscar clientes a nivel global (multi-tenant) por número de DNI,
+    nombre completo, teléfono o nombre de mascota para auditar y restablecer su PIN de acceso al portal.
+    """
+    if not q or not q.strip():
+        clientes_db = db.query(Cliente).filter(
+            Cliente.is_deleted == False
+        ).order_by(Cliente.id.desc()).limit(40).all()
+        return _serializar_clientes_agrupados_por_dni(clientes_db, db)
+
+    termino = q.strip()
+    from sqlalchemy import and_
+
+    query = db.query(Cliente).outerjoin(
+        Mascota,
+        and_(Mascota.cliente_id == Cliente.id, Mascota.is_deleted == False)
+    ).filter(
+        Cliente.is_deleted == False,
+        or_(
+            Cliente.dni.ilike(f"%{termino}%"),
+            Cliente.nombre_completo.ilike(f"%{termino}%"),
+            Cliente.nombres.ilike(f"%{termino}%"),
+            Cliente.apellido_paterno.ilike(f"%{termino}%"),
+            Cliente.apellido_materno.ilike(f"%{termino}%"),
+            Cliente.telefono.ilike(f"%{termino}%"),
+            Cliente.email.ilike(f"%{termino}%"),
+            Mascota.nombre.ilike(f"%{termino}%")
+        )
+    ).order_by(Cliente.id.desc()).limit(80).all()
+
+    return _serializar_clientes_agrupados_por_dni(query, db)
+
+
+@router.post(
+    "/clientes/{identificador}/reset-pin",
+    response_model=AdminResetPinResponse,
+    summary="Restablecer PIN y desbloquear intentos fallidos de un propietario por DNI"
+)
+def resetear_pin_cliente_admin(
+    identificador: str,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_superadmin)
+):
+    """
+    Restablece a NULL el pin_hash para todos los registros del propietario con el DNI indicado,
+    eliminando cualquier bloqueo temporal por intentos fallidos de PIN en el rate_limiter.
+    Al siguiente ingreso a /portal/login, el sistema exigirá la creación de un nuevo PIN de 4 dígitos.
+    """
+    ident_clean = identificador.strip()
+    if not ident_clean:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debes especificar un número de DNI o ID válido."
+        )
+
+    # 1. Buscar registros por DNI exacto
+    clientes = db.query(Cliente).filter(
+        Cliente.dni == ident_clean,
+        Cliente.is_deleted == False
+    ).all()
+
+    # 2. Si no encontró por DNI y es numérico, verificar si se envió cliente_id
+    if not clientes and ident_clean.isdigit():
+        c_por_id = db.query(Cliente).filter(
+            Cliente.id == int(ident_clean),
+            Cliente.is_deleted == False
+        ).first()
+        if c_por_id and c_por_id.dni:
+            clientes = db.query(Cliente).filter(
+                Cliente.dni == c_por_id.dni,
+                Cliente.is_deleted == False
+            ).all()
+
+    if not clientes:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No se encontró ningún propietario registrado con el documento '{ident_clean}'."
+        )
+
+    target_dni = clientes[0].dni
+
+    # 3. Restablecer pin_hash = None para todas las clínicas asociadas a ese DNI
+    for c in clientes:
+        c.pin_hash = None
+
+    # 4. Desbloquear intentos fallidos en el Rate Limiter
+    rate_limiter.reset_pin_failures(target_dni)
+
+    db.commit()
+    for c in clientes:
+        db.refresh(c)
+
+    return AdminResetPinResponse(
+        status="ok",
+        mensaje=f"PIN restablecido exitosamente para el DNI {target_dni}. Se desbloquearon los intentos fallidos. En su próximo acceso al portal (/portal/login) se le pedirá configurar un nuevo PIN de 4 dígitos.",
+        dni=target_dni,
+        tiene_pin=False,
+        esta_bloqueado=False
+    )
+
 

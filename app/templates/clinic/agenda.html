@@ -200,9 +200,24 @@
                         <span>Ver Ficha</span>
                     </a>
                     {% else %}
-                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full {% if estado_up == 'CONFIRMADA' %}bg-emerald-50 text-emerald-700 border border-emerald-200{% elif es_cancelada %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-amber-50 text-amber-800 border border-amber-200{% endif %}">
+                    {% if estado_up == 'CONFIRMADA' %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Confirmada
+                    </span>
+                    {% elif estado_up == 'REPROGRAMADA' %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 inline-flex items-center gap-1" title="Reprogramada: esperando confirmación del cliente en su portal">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-indigo-600"></i>
+                        <span>Reprogramada</span>
+                    </span>
+                    {% elif es_cancelada %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                        Cancelada
+                    </span>
+                    {% else %}
+                    <span id="badge-estado-{{ c.id }}" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
                         {{ c.estado }}
                     </span>
+                    {% endif %}
 
                     {% if estado_up == 'PENDIENTE' %}
                     <button 

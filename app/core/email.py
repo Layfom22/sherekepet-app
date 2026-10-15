@@ -481,17 +481,17 @@ def send_client_appointment_reschedule_email(
     clinica_nombre = _esc(clinica_nombre)
 
     remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
-    asunto = f"Cita reprogramada para {mascota_nombre} ({nueva_fecha_str} a las {nueva_hora_str})"
+    asunto = f"⚠️ Cita reprogramada para {mascota_nombre} ({nueva_fecha_str} a las {nueva_hora_str}) - Confirmar Asistencia"
 
     texto_plano = (
         f"Hola {cliente_nombre},\n\n"
-        f"Te informamos que la cita para {mascota_nombre} en {clinica_nombre} ha sido reprogramada.\n\n"
-        f"Nuevos detalles de la cita:\n"
+        f"Te informamos que la cita para {mascota_nombre} en {clinica_nombre} ha sido reprogramada por la clínica.\n\n"
+        f"Nuevos detalles propuestos:\n"
         f"- Nueva Fecha: {nueva_fecha_str}\n"
         f"- Nueva Hora: {nueva_hora_str}\n"
         f"- Motivo: {motivo}\n"
         f"(Horario anterior: {fecha_anterior_str} {hora_anterior_str})\n\n"
-        f"Puedes verificar tu carnet y citas en:\n"
+        f"Por favor ingresa a tu Portal SherekePet para CONFIRMAR tu asistencia a este nuevo horario o seleccionar otra hora disponible:\n"
         f"https://sherekepet.com/portal/dashboard\n"
     )
 
@@ -499,7 +499,7 @@ def send_client_appointment_reschedule_email(
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Cita Reprogramada</title>
+  <title>Cita Reprogramada - Confirmar Asistencia</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
@@ -509,7 +509,7 @@ def send_client_appointment_reschedule_email(
           <tr>
             <td align="center" style="padding-bottom: 12px;">
               <span style="display: inline-block; padding: 4px 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
-                🗓️ Cita Reprogramada
+                🗓️ Cita Reprogramada por la Clínica
               </span>
             </td>
           </tr>
@@ -520,12 +520,12 @@ def send_client_appointment_reschedule_email(
           </tr>
           <tr>
             <td style="font-size: 13px; color: #64748b; line-height: 1.5; padding-bottom: 16px; text-align: center;">
-              Tu cita para <strong>{mascota_nombre}</strong> en <strong>{clinica_nombre}</strong> ha sido actualizada con un nuevo horario.
+              Tu cita para <strong>{mascota_nombre}</strong> en <strong>{clinica_nombre}</strong> ha sido reprogramada por la clínica. Por favor confirma tu asistencia a este nuevo horario.
             </td>
           </tr>
           <tr>
             <td style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px;">
-              <p style="margin: 4px 0; font-size: 14px; font-weight: 800; color: #166534;">✨ Nuevo Horario:</p>
+              <p style="margin: 4px 0; font-size: 14px; font-weight: 800; color: #166534;">✨ Nuevo Horario Propuesto:</p>
               <p style="margin: 4px 0; font-size: 13px;"><strong>Fecha:</strong> {nueva_fecha_str}</p>
               <p style="margin: 4px 0; font-size: 13px;"><strong>Hora:</strong> {nueva_hora_str}</p>
               <p style="margin: 4px 0; font-size: 13px;"><strong>Motivo:</strong> {motivo}</p>
@@ -537,7 +537,7 @@ def send_client_appointment_reschedule_email(
           <tr>
             <td align="center" style="padding-top: 20px;">
               <a href="https://sherekepet.com/portal/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #0f766e; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
-                Ver Cita en Mi Portal
+                Confirmar Asistencia en Mi Portal
               </a>
             </td>
           </tr>

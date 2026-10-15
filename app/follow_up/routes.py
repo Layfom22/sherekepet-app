@@ -710,7 +710,7 @@ def portal_dashboard(
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
@@ -782,7 +782,7 @@ def api_estado_citas_portal(request: Request, db: Session = Depends(get_db)):
         Cliente.dni == cliente.dni,
         Cliente.is_deleted == False,
         Cita.is_deleted == False,
-        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "SUGERIDA"]),
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "SUGERIDA", "REPROGRAMADA"]),
         Cita.fecha >= hoy_lima
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).all()
 
@@ -1321,11 +1321,24 @@ def get_disponibilidad_clinica(
     citas_existentes = db.query(Cita).filter(
         Cita.clinica_id == clinica_id,
         Cita.fecha == fecha_obj,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         Cita.is_deleted == False
     ).all()
 
-    horas_ocupadas = [c.hora.strftime("%H:%M") for c in citas_existentes]
+    # Capacidad máxima por turno según número de veterinarios activos
+    vets_activos = db.query(Veterinario).filter(
+        Veterinario.clinica_id == clinica_id,
+        Veterinario.is_active == True,
+        Veterinario.is_deleted == False
+    ).count()
+    capacidad_max = max(1, vets_activos)
+
+    conteo_citas_por_slot = {}
+    for c in citas_existentes:
+        h_str = c.hora.strftime("%H:%M")
+        conteo_citas_por_slot[h_str] = conteo_citas_por_slot.get(h_str, 0) + 1
+
+    horas_ocupadas = [h for h, cnt in conteo_citas_por_slot.items() if cnt >= capacidad_max]
 
     # Obtener configuración de horarios para el día de la semana
     horarios_semana = obtener_o_inicializar_horarios(clinica_id, db)
@@ -1437,15 +1450,22 @@ def agendar_cita_portal(
     if payload.fecha == hoy_lima and hora_obj <= get_lima_now().time():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha pasado.")
 
-    # Validar que el slot no esté ocupado
-    conflicto = db.query(Cita).filter(
+    # Validar que el slot no supere la capacidad de veterinarios activos
+    vets_activos = db.query(Veterinario).filter(
+        Veterinario.clinica_id == payload.clinica_id,
+        Veterinario.is_active == True,
+        Veterinario.is_deleted == False
+    ).count()
+    capacidad_max = max(1, vets_activos)
+
+    citas_ocupadas = db.query(Cita).filter(
         Cita.clinica_id == payload.clinica_id,
         Cita.fecha == payload.fecha,
         Cita.hora == hora_obj,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         Cita.is_deleted == False
-    ).first()
-    if conflicto:
+    ).count()
+    if citas_ocupadas >= capacidad_max:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este horario ya se encuentra ocupado. Por favor seleccione otro.")
 
     nueva_cita = Cita(
@@ -1464,7 +1484,6 @@ def agendar_cita_portal(
     # Notificación por correo a los veterinarios de la clínica y confirmación al dueño
     try:
         from app.core.email import send_appointment_notification_email, send_client_appointment_confirmation_email
-        from app.clinic.models import Veterinario
         vets = db.query(Veterinario).filter(
             Veterinario.clinica_id == payload.clinica_id,
             Veterinario.is_deleted == False
@@ -1574,16 +1593,23 @@ def editar_cita_portal(
     if payload.fecha == hoy_lima and hora_obj <= get_lima_now().time():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha pasado.")
 
-    # Validar que el slot no esté ocupado por otra cita en la clínica
-    conflicto = db.query(Cita).filter(
+    # Validar que el slot no supere la capacidad de veterinarios activos
+    vets_activos = db.query(Veterinario).filter(
+        Veterinario.clinica_id == cita.clinica_id,
+        Veterinario.is_active == True,
+        Veterinario.is_deleted == False
+    ).count()
+    capacidad_max = max(1, vets_activos)
+
+    citas_ocupadas = db.query(Cita).filter(
         Cita.id != cita.id,
         Cita.clinica_id == cita.clinica_id,
         Cita.fecha == payload.fecha,
         Cita.hora == hora_obj,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         Cita.is_deleted == False
-    ).first()
-    if conflicto:
+    ).count()
+    if citas_ocupadas >= capacidad_max:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este horario ya se encuentra ocupado. Por favor seleccione otro.")
 
     fecha_anterior_str = cita.fecha.strftime("%d/%m/%Y")
@@ -1799,16 +1825,23 @@ def confirmar_cita_sugerida(
     if fecha_final == hoy_lima and hora_obj <= get_lima_now().time():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha transcurrido.")
 
-    # Verificar disponibilidad en la clínica (evitar colisión de horario)
-    conflicto = db.query(Cita).filter(
+    # Verificar disponibilidad en la clínica (evitar colisión de horario según veterinarios activos)
+    vets_activos = db.query(Veterinario).filter(
+        Veterinario.clinica_id == cita.clinica_id,
+        Veterinario.is_active == True,
+        Veterinario.is_deleted == False
+    ).count()
+    capacidad_max = max(1, vets_activos)
+
+    citas_ocupadas = db.query(Cita).filter(
         Cita.id != cita.id,
         Cita.clinica_id == cita.clinica_id,
         Cita.fecha == fecha_final,
         Cita.hora == hora_obj,
-        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         Cita.is_deleted == False
-    ).first()
-    if conflicto:
+    ).count()
+    if citas_ocupadas >= capacidad_max:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Este horario ya se encuentra ocupado en la veterinaria. Por favor selecciona otra hora."
@@ -1879,6 +1912,89 @@ def descartar_cita_sugerida(
     db.commit()
 
     return {"status": "ok", "mensaje": "Sugerencia descartada correctamente."}
+
+
+@router.put(
+    "/api/portal/citas/{cita_id}/aceptar-reprogramacion",
+    status_code=status.HTTP_200_OK,
+    summary="Aceptar Reprogramación de Cita desde el Portal del Paciente",
+    description="Permite al cliente aceptar el nuevo horario propuesto por la clínica, pasando la cita a CONFIRMADA."
+)
+@router.post(
+    "/api/portal/citas/{cita_id}/aceptar-reprogramacion",
+    status_code=status.HTTP_200_OK,
+    summary="Aceptar Reprogramación de Cita desde el Portal del Paciente (Alias POST)"
+)
+def aceptar_reprogramacion_cita_portal(
+    cita_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
+
+    cita = db.query(Cita).join(Cliente).filter(
+        Cita.id == cita_id,
+        Cliente.dni == cliente.dni,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada o no pertenece a su perfil.")
+
+    hoy_lima = get_lima_now().date()
+    if cita.fecha < hoy_lima or (cita.fecha == hoy_lima and cita.hora <= get_lima_now().time()):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El horario propuesto ya ha transcurrido. Por favor selecciona 'Elegir otra hora' para agendar un nuevo horario."
+        )
+
+    cita.estado = "CONFIRMADA"
+    cita.updated_at = get_lima_now()
+    db.commit()
+    db.refresh(cita)
+
+    # Notificar a los veterinarios de la clínica que el cliente aceptó el nuevo horario
+    try:
+        from app.core.email import send_appointment_notification_email
+        vets = db.query(Veterinario).filter(
+            Veterinario.clinica_id == cita.clinica_id,
+            Veterinario.is_deleted == False
+        ).all()
+        clinica = db.query(Clinica).filter(Clinica.id == cita.clinica_id).first()
+        clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+        mascota_nombre = cita.mascota.nombre if cita.mascota else "Mascota"
+        for v in vets:
+            if v.email:
+                background_tasks.add_task(
+                    send_appointment_notification_email,
+                    destinatario=v.email,
+                    cliente_nombre=f"{cliente.nombre_completo or f'DNI {cliente.dni}'} (Confirmó Nuevo Horario)",
+                    cliente_telefono=cliente.telefono or "",
+                    mascota_nombre=mascota_nombre,
+                    fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                    hora_str=cita.hora.strftime("%I:%M %p"),
+                    motivo=f"[HORARIO ACEPTADO POR CLIENTE] {cita.motivo}",
+                    clinica_nombre=clinica_nombre
+                )
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "mensaje": "¡Horario confirmado exitosamente! Tu cita ha quedado confirmada.",
+        "cita": {
+            "id": cita.id,
+            "fecha": cita.fecha.strftime("%Y-%m-%d"),
+            "fecha_str": cita.fecha.strftime("%d/%m/%Y"),
+            "hora": cita.hora.strftime("%H:%M"),
+            "hora_str": cita.hora.strftime("%I:%M %p"),
+            "estado": cita.estado
+        }
+    }
+
 
 
 

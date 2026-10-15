@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from app.core.models import Clinica
 from app.clinic.models import (
     Veterinario, Cliente, Mascota,
-    Producto, ServicioBano, AtencionClinica
+    Producto, ServicioBano, AtencionClinica, Cita
 )
 from app.core.security import create_access_token
 from app.core.timezone import get_lima_now
@@ -851,6 +851,125 @@ def test_flujo_agendar_editar_eliminar_citas_veterinario(client, db_session, vet
     assert resp_crear_sin_nombre.status_code == 200
     data_sn = resp_crear_sin_nombre.json()
     assert "Perrito (Sin Nombre)" in data_sn["mascota_nombre"]
+
+
+def test_control_concurrencia_horarios_y_confirmacion_reprogramacion(client, db_session, vet_setup):
+    """
+    Verifica:
+    1. Si la clínica tiene 1 veterinario activo, NO permite agendar 2 citas en la misma fecha y hora (400 Bad Request).
+    2. Si se agrega un segundo veterinario activo a la clínica, el límite simultáneo aumenta a 2.
+    3. Si el veterinario reprograma la cita (cambio de fecha/hora), el estado pasa a REPROGRAMADA.
+    4. El cliente desde el portal (/api/portal/citas/{id}/aceptar-reprogramacion) confirma el nuevo horario -> CONFIRMADA.
+    """
+    clinica = vet_setup["clinica"]
+    vet = vet_setup["vet"]
+
+    # 1. Crear cliente y dos mascotas
+    cliente = Cliente(clinica_id=clinica.id, dni="44556677", nombre_completo="Carlos Benites", email="carlos@gmail.com", telefono="988776655")
+    db_session.add(cliente)
+    db_session.flush()
+
+    m1 = Mascota(clinica_id=clinica.id, cliente_id=cliente.id, nombre="Pepe", especie="Canino")
+    m2 = Mascota(clinica_id=clinica.id, cliente_id=cliente.id, nombre="Fido", especie="Canino")
+    db_session.add_all([m1, m2])
+    db_session.commit()
+
+    fecha_test = (date.today() + timedelta(days=5)).isoformat()
+    hora_test = "10:35"
+
+    token_vet = create_access_token({"sub": str(vet.id), "clinica_id": clinica.id, "role": "vet", "rol": "ADMIN"})
+    client.cookies.set("vet_token", token_vet)
+
+    # 2. Agendar primera cita para Pepe a las 10:35 -> Exitoso
+    resp1 = client.post("/api/clinic/citas", json={
+        "mascota_id": m1.id,
+        "fecha": fecha_test,
+        "hora": hora_test,
+        "motivo": "Control anual",
+        "estado": "CONFIRMADA",
+        "enviar_email": False
+    })
+    assert resp1.status_code == 200
+    cita_id1 = resp1.json()["cita_id"]
+
+    # 3. Intentar agendar segunda cita para Fido en el MISMO horario (10:35) -> Debe fallar con 400
+    resp2 = client.post("/api/clinic/citas", json={
+        "mascota_id": m2.id,
+        "fecha": fecha_test,
+        "hora": hora_test,
+        "motivo": "Vacunación",
+        "estado": "CONFIRMADA",
+        "enviar_email": False
+    })
+    assert resp2.status_code == 400
+    assert "ya se encuentra ocupado" in resp2.json()["detail"]
+
+    # 4. Agregar un segundo veterinario activo en la clínica (capacidad = 2)
+    vet2 = Veterinario(clinica_id=clinica.id, nombre="Dr. Bruno", email="bruno@vetmejoras.pe", rol="VET", is_verified=True, is_active=True)
+    db_session.add(vet2)
+    db_session.commit()
+
+    # Ahora sí permite la segunda cita en el mismo horario
+    resp2_ok = client.post("/api/clinic/citas", json={
+        "mascota_id": m2.id,
+        "fecha": fecha_test,
+        "hora": hora_test,
+        "motivo": "Vacunación",
+        "estado": "CONFIRMADA",
+        "enviar_email": False
+    })
+    assert resp2_ok.status_code == 200
+    cita_id2 = resp2_ok.json()["cita_id"]
+
+    # Una tercera cita a la misma hora ya supera la capacidad de 2 -> Debe fallar
+    resp3 = client.post("/api/clinic/citas", json={
+        "mascota_id": m2.id,
+        "fecha": fecha_test,
+        "hora": hora_test,
+        "motivo": "Consulta extra",
+        "estado": "CONFIRMADA",
+        "enviar_email": False
+    })
+    assert resp3.status_code == 400
+    assert "ya se encuentra ocupado" in resp3.json()["detail"]
+
+    # 5. El veterinario reprograma la cita de Pepe a un nuevo horario (11:00)
+    resp_rep = client.put(f"/api/clinic/citas/{cita_id1}", json={
+        "fecha": fecha_test,
+        "hora": "11:00",
+        "motivo": "Control anual reprogramado",
+        "enviar_email": False
+    })
+    assert resp_rep.status_code == 200
+    data_rep = resp_rep.json()
+    assert data_rep["reprogramada"] is True
+    assert data_rep["estado"] == "REPROGRAMADA"
+
+    # Verificar en BD que el estado quedó como REPROGRAMADA
+    cita_db = db_session.get(Cita, cita_id1)
+    assert cita_db.estado == "REPROGRAMADA"
+
+    # 6. El cliente inicia sesión en el portal y consulta sus citas
+    token_cliente = create_access_token({"sub": str(cliente.id), "dni": cliente.dni, "role": "client"})
+    client.cookies.clear()
+    client.cookies.set("client_token", token_cliente)
+
+    resp_portal_citas = client.get("/api/portal/citas/estado")
+    assert resp_portal_citas.status_code == 200
+    citas_portal = resp_portal_citas.json()["citas"]
+    cita_portal_pepe = next(c for c in citas_portal if c["id"] == cita_id1)
+    assert cita_portal_pepe["estado"] == "REPROGRAMADA"
+
+    # 7. El cliente acepta el nuevo horario desde el portal
+    resp_aceptar = client.put(f"/api/portal/citas/{cita_id1}/aceptar-reprogramacion")
+    assert resp_aceptar.status_code == 200
+    assert resp_aceptar.json()["status"] == "ok"
+    assert resp_aceptar.json()["cita"]["estado"] == "CONFIRMADA"
+
+    # Verificar en BD que ahora está CONFIRMADA
+    db_session.refresh(cita_db)
+    assert cita_db.estado == "CONFIRMADA"
+
 
 
 

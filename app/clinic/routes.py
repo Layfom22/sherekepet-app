@@ -1711,7 +1711,7 @@ def registrar_atencion(
         Cita.clinica_id == target_clinica_id,
         Cita.fecha == hoy_lima,
         Cita.is_deleted == False,
-        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"]),
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"]),
         or_(
             Cita.mascota_id == mascota.id,
             and_(
@@ -3267,7 +3267,7 @@ def vista_agenda_citas(
         Cita.clinica_id == target_clinica_id,
         Cita.is_deleted == False,
         Cita.fecha >= hoy,
-        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA"])
+        func.upper(Cita.estado).in_(["PENDIENTE", "CONFIRMADA", "REPROGRAMADA"])
     ).order_by(Cita.fecha.asc(), Cita.hora.asc()).limit(20).all()
 
     return templates.TemplateResponse(
@@ -3550,7 +3550,7 @@ def _construir_enlace_whatsapp_cita(
         msg = (
             f"Hola {nom}, te informamos de {clinica_nombre} que tu cita para {mascota_nombre} "
             f"ha sido reprogramada para el {fecha_str} a las {hora_str}. "
-            f"Motivo: {motivo}. ¡Gracias por tu confianza!"
+            f"Motivo: {motivo}. Por favor confirma si te acomoda este nuevo horario desde tu Portal SherekePet o respondiendo a este mensaje."
         )
     elif tipo_mensaje == "CANCELACION":
         msg = (
@@ -3733,6 +3733,29 @@ def crear_cita_veterinario(
     partes = payload.hora.strip().split(":")
     hora_obj = time(int(partes[0]), int(partes[1]))
 
+    # Validar capacidad de citas simultáneas según veterinarios activos en la clínica
+    vets_activos = db.query(Veterinario).filter(
+        Veterinario.clinica_id == target_clinica_id,
+        Veterinario.is_active == True,
+        Veterinario.is_deleted == False
+    ).count()
+    capacidad_max = max(1, vets_activos)
+
+    citas_ocupadas = db.query(Cita).filter(
+        Cita.clinica_id == target_clinica_id,
+        Cita.fecha == payload.fecha,
+        Cita.hora == hora_obj,
+        Cita.is_deleted == False,
+        Cita.estado.in_(["CONFIRMADA", "PENDIENTE", "REPROGRAMADA"])
+    ).count()
+
+    if citas_ocupadas >= capacidad_max:
+        hora_display = hora_obj.strftime("%I:%M %p")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El horario {hora_display} ya se encuentra ocupado por otra cita. En esta veterinaria solo se puede atender a {capacidad_max} paciente(s) al mismo tiempo."
+        )
+
     cita = Cita(
         clinica_id=target_clinica_id,
         cliente_id=resolved_cliente_id,
@@ -3848,24 +3871,51 @@ def actualizar_cita_veterinario(
 
     fecha_anterior = cita.fecha
     hora_anterior = cita.hora
+    nueva_fecha = payload.fecha or cita.fecha
+    nueva_hora = cita.hora
     reprogramada = False
-
-    if payload.fecha and payload.fecha != cita.fecha:
-        cita.fecha = payload.fecha
-        reprogramada = True
 
     if payload.hora:
         partes = payload.hora.strip().split(":")
         nueva_hora = time(int(partes[0]), int(partes[1]))
-        if nueva_hora != cita.hora:
-            cita.hora = nueva_hora
-            reprogramada = True
+
+    if (nueva_fecha != cita.fecha) or (nueva_hora != cita.hora):
+        reprogramada = True
+
+    # Si se reprograma la fecha u hora, validar conflicto de horario y capacidad de veterinarios
+    if reprogramada:
+        vets_activos = db.query(Veterinario).filter(
+            Veterinario.clinica_id == cita.clinica_id,
+            Veterinario.is_active == True,
+            Veterinario.is_deleted == False
+        ).count()
+        capacidad_max = max(1, vets_activos)
+
+        citas_ocupadas = db.query(Cita).filter(
+            Cita.id != cita.id,
+            Cita.clinica_id == cita.clinica_id,
+            Cita.fecha == nueva_fecha,
+            Cita.hora == nueva_hora,
+            Cita.is_deleted == False,
+            Cita.estado.in_(["CONFIRMADA", "PENDIENTE", "REPROGRAMADA"])
+        ).count()
+
+        if citas_ocupadas >= capacidad_max:
+            hora_display = nueva_hora.strftime("%I:%M %p")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El horario {hora_display} ya se encuentra ocupado por otra cita. En esta veterinaria solo se puede atender a {capacidad_max} paciente(s) al mismo tiempo."
+            )
+
+        cita.fecha = nueva_fecha
+        cita.hora = nueva_hora
+        # Pasa a REPROGRAMADA para que el cliente confirme si puede a esa nueva hora
+        cita.estado = "REPROGRAMADA"
+    elif payload.estado is not None and payload.estado.strip():
+        cita.estado = payload.estado.strip()
 
     if payload.motivo is not None and payload.motivo.strip():
         cita.motivo = payload.motivo.strip()
-
-    if payload.estado is not None and payload.estado.strip():
-        cita.estado = payload.estado.strip()
 
     db.commit()
     db.refresh(cita)

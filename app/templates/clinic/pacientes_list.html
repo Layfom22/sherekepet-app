@@ -40,6 +40,16 @@
                     {% endif %}
                 </form>
 
+                <button 
+                    type="button" 
+                    onclick="abrirModalQRPortal()" 
+                    class="btn-touch px-3.5 py-2.5 text-sm font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 active:bg-teal-200 border border-teal-200 rounded-xl shadow-2xs transition-all flex items-center justify-center space-x-1.5 cursor-pointer"
+                    title="Mostrar código QR del Portal para mostrador o celular del cliente"
+                >
+                    <i data-lucide="qr-code" class="w-4 h-4 text-teal-700" aria-hidden="true"></i>
+                    <span>QR Portal</span>
+                </button>
+
                 <a 
                     href="/pacientes/nuevo" 
                     class="btn-touch px-4 py-2.5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center space-x-1.5"
@@ -115,6 +125,18 @@
                         >
                             <i data-lucide="smartphone" class="w-3.5 h-3.5" aria-hidden="true"></i>
                             <span>Invitar al Portal</span>
+                        </button>
+
+                        <button 
+                            type="button" 
+                            data-dni="{{ p.cliente.dni }}"
+                            data-dueno="{{ p.cliente.nombre_completo or p.cliente.dni or 'Estimado(a)' }}"
+                            onclick="abrirModalQRCliente(this)"
+                            class="btn-touch px-2.5 py-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl shadow-2xs transition-all flex items-center space-x-1 cursor-pointer"
+                            title="Código QR directo para este dueño (DNI pre-cargado)"
+                        >
+                            <i data-lucide="qr-code" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                            <span>QR</span>
                         </button>
 
                         <button 
@@ -251,7 +273,98 @@
             </div>
         </div>
         {% endif %}
-    </div>
+    <!-- ========================================================== -->
+    <!-- MODAL NATIVO: CÓDIGO QR PARA EL PORTAL DEL DUEÑO           -->
+    <!-- ========================================================== -->
+    <dialog id="modalQRPortal" class="w-full max-w-md rounded-3xl bg-white p-0 shadow-2xl border border-slate-200 backdrop:bg-slate-900/60 transition-all">
+        <div class="p-6 space-y-4">
+            <!-- Header Modal -->
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center shrink-0">
+                        <i data-lucide="qr-code" class="w-5 h-5" aria-hidden="true"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 id="modalQRHeaderTitulo" class="text-base font-black text-slate-900 leading-tight truncate">Portal del Dueño</h3>
+                        <p id="modalQRHeaderSubtitulo" class="text-xs text-slate-500 truncate">Carnet Digital y Citas PWA</p>
+                    </div>
+                </div>
+                <button 
+                    type="button" 
+                    onclick="cerrarModalQRPortal()" 
+                    class="p-2 text-slate-400 hover:text-slate-700 rounded-xl transition-colors cursor-pointer"
+                    aria-label="Cerrar modal"
+                >
+                    <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <!-- Contenedor del Código QR -->
+            <div class="bg-slate-50/80 p-5 rounded-2xl border border-slate-200/90 text-center space-y-3">
+                <div class="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs inline-block mx-auto">
+                    <img 
+                        id="imgCodigoQR" 
+                        src="" 
+                        alt="Código QR del Portal SherekePet" 
+                        class="w-52 h-52 sm:w-60 sm:h-60 mx-auto object-contain transition-all"
+                    >
+                </div>
+                <div class="space-y-1">
+                    <p id="modalQRTituloDueno" class="text-sm font-black text-slate-900 truncate">
+                        {{ clinica.nombre_comercial or clinica.nombre }}
+                    </p>
+                    <p id="modalQRDescripcion" class="text-xs text-slate-600">
+                        Apunta la cámara de tu celular a este código para ver tus vacunas, recetas y agendar citas.
+                    </p>
+                </div>
+            </div>
+
+            <!-- URL copiable -->
+            <div class="space-y-1.5">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Enlace Directo del Portal:
+                </label>
+                <div class="flex items-center gap-2">
+                    <input 
+                        type="text" 
+                        id="inputUrlPortalQR" 
+                        readonly 
+                        class="flex-1 px-3 py-2 text-xs font-mono font-semibold bg-slate-50 border border-slate-200 rounded-xl text-slate-700 select-all"
+                    >
+                    <button 
+                        type="button" 
+                        id="btnCopiarUrlQR"
+                        onclick="copiarUrlPortalQR()" 
+                        class="btn-touch px-3 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-900 active:bg-black rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+                    >
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                        <span>Copiar</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Botones de Acción: Imprimir Cartel de Mostrador y Descargar -->
+            <div class="pt-2 flex items-center justify-between gap-2 border-t border-slate-100 flex-wrap">
+                <button 
+                    type="button" 
+                    onclick="imprimirCartelMostrador()" 
+                    class="btn-touch px-3.5 py-2 text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                    title="Imprimir cartel para colocar en el mostrador de recepción"
+                >
+                    <i data-lucide="printer" class="w-4 h-4 text-teal-600"></i>
+                    <span>Imprimir Cartel Mostrador</span>
+                </button>
+
+                <button 
+                    type="button" 
+                    onclick="cerrarModalQRPortal()" 
+                    class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors ml-auto cursor-pointer"
+                >
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </dialog>
 
 </div>
 
@@ -410,6 +523,203 @@ async function resetearPinClienteDirectorio(clienteId, btn) {
             btn.classList.remove("opacity-50");
         }
     }
+}
+
+// ==============================================================
+// GESTIÓN DEL MODAL CÓDIGO QR PORTAL DEL DUEÑO
+// ==============================================================
+let currentQRUrl = '';
+let currentQRTitulo = '';
+
+function abrirModalQRPortal() {
+    const origin = window.location.origin;
+    currentQRUrl = `${origin}/portal/login`;
+    currentQRTitulo = "{{ (clinica.nombre_comercial or clinica.nombre)|escape }}";
+    
+    document.getElementById('modalQRHeaderTitulo').textContent = "Portal del Dueño";
+    document.getElementById('modalQRHeaderSubtitulo').textContent = "Acceso General de Clientes";
+    document.getElementById('modalQRTituloDueno').textContent = currentQRTitulo;
+    document.getElementById('modalQRDescripcion').textContent = "Muestra este QR en recepción o mostrador. Al escanearlo, el cliente ingresará con su DNI a su carnet digital y citas.";
+    document.getElementById('inputUrlPortalQR').value = currentQRUrl;
+    
+    // Generar imagen QR nítida usando qrserver API
+    const qrImg = document.getElementById('imgCodigoQR');
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(currentQRUrl)}`;
+    
+    const dialog = document.getElementById('modalQRPortal');
+    if (dialog) {
+        dialog.showModal();
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+function abrirModalQRCliente(btn) {
+    const dni = btn.getAttribute('data-dni') || '';
+    const dueno = btn.getAttribute('data-dueno') || 'Propietario';
+    const origin = window.location.origin;
+    
+    currentQRUrl = dni ? `${origin}/portal/login?dni=${encodeURIComponent(dni)}` : `${origin}/portal/login`;
+    currentQRTitulo = dueno;
+    
+    document.getElementById('modalQRHeaderTitulo').textContent = `Portal: ${dueno}`;
+    document.getElementById('modalQRHeaderSubtitulo').textContent = `DNI: ${dni} • Acceso Rápido`;
+    document.getElementById('modalQRTituloDueno').textContent = dueno;
+    document.getElementById('modalQRDescripcion').textContent = `Pide a ${dueno} que escanee este código con su celular. Su DNI (${dni}) se cargará automáticamente para ingresar con su PIN.`;
+    document.getElementById('inputUrlPortalQR').value = currentQRUrl;
+    
+    const qrImg = document.getElementById('imgCodigoQR');
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(currentQRUrl)}`;
+    
+    const dialog = document.getElementById('modalQRPortal');
+    if (dialog) {
+        dialog.showModal();
+        if (window.lucide) lucide.createIcons();
+    }
+}
+
+function cerrarModalQRPortal() {
+    const dialog = document.getElementById('modalQRPortal');
+    if (dialog) dialog.close();
+}
+
+function copiarUrlPortalQR() {
+    const input = document.getElementById('inputUrlPortalQR');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = document.getElementById('btnCopiarUrlQR');
+        const prev = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i><span>¡Copiado!</span>`;
+        if (window.lucide) lucide.createIcons();
+        setTimeout(() => {
+            btn.innerHTML = prev;
+            if (window.lucide) lucide.createIcons();
+        }, 1800);
+    }).catch(() => {
+        alert("Enlace: " + input.value);
+    });
+}
+
+function imprimirCartelMostrador() {
+    const clinicaNombre = "{{ (clinica.nombre_comercial or clinica.nombre)|escape }}";
+    const qrSrc = document.getElementById('imgCodigoQR').src;
+    const urlTexto = document.getElementById('inputUrlPortalQR').value;
+    
+    const ventana = window.open('', '_blank');
+    ventana.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cartel Mostrador QR - ${clinicaNombre}</title>
+    <style>
+        @page { size: A4 portrait; margin: 15mm; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            text-align: center;
+            color: #0f172a;
+            margin: 0;
+            padding: 30px 20px;
+            background: #ffffff;
+        }
+        .cartel {
+            max-width: 480px;
+            margin: 0 auto;
+            border: 3px solid #0d9488;
+            border-radius: 28px;
+            padding: 36px 28px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+        }
+        .badge {
+            display: inline-block;
+            background: #ccfbf1;
+            color: #0f766e;
+            padding: 6px 16px;
+            border-radius: 9999px;
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+        h1 {
+            font-size: 26px;
+            font-weight: 900;
+            margin: 0 0 6px 0;
+            color: #0f172a;
+        }
+        h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: #0d9488;
+            margin: 0 0 24px 0;
+        }
+        .qr-box {
+            background: #ffffff;
+            padding: 16px;
+            border-radius: 20px;
+            display: inline-block;
+            border: 2px solid #cbd5e1;
+            margin-bottom: 20px;
+        }
+        .qr-box img {
+            width: 250px;
+            height: 250px;
+            display: block;
+        }
+        .pasos {
+            text-align: left;
+            background: #f8fafc;
+            border-radius: 16px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #334155;
+            border: 1px solid #e2e8f0;
+        }
+        .pasos strong { color: #0f172a; }
+        .url-box {
+            font-family: monospace;
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 10px;
+            word-break: break-all;
+        }
+        .footer {
+            margin-top: 24px;
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: bold;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+    <div class="cartel">
+        <span class="badge">🐾 Carnet Digital de Mascotas</span>
+        <h1>${clinicaNombre}</h1>
+        <h2>¡Escanea aquí para ver tu Carnet y Citas!</h2>
+        
+        <div class="qr-box">
+            <img src="${qrSrc}" alt="Código QR">
+        </div>
+        
+        <div class="pasos">
+            <div><strong>1.</strong> Abre la cámara de tu celular y apunta al código QR.</div>
+            <div><strong>2.</strong> Toca la notificación o enlace que aparecerá en pantalla.</div>
+            <div><strong>3.</strong> Ingresa con tu <strong>DNI</strong> para ver vacunas, recetas y agendar citas.</div>
+        </div>
+
+        <div class="url-box">${urlTexto}</div>
+        <div class="footer">SHEREKEPET &bull; GESTIÓN VETERINARIA INTELIGENTE</div>
+    </div>
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    <\/script>
+</body>
+</html>`);
+    ventana.document.close();
 }
 </script>
 {% endblock %}

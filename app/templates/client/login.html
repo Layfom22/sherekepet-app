@@ -392,5 +392,18 @@ document.getElementById("inputDni").addEventListener("keydown", function(e) {
         verificarDniPaso1();
     }
 });
+
+// Auto-ejecución si se escaneó un código QR con DNI pre-cargado (?dni=...)
+window.addEventListener("DOMContentLoaded", function() {
+    const params = new URLSearchParams(window.location.search);
+    const dniParam = params.get("dni");
+    if (dniParam) {
+        const inputDni = document.getElementById("inputDni");
+        if (inputDni) {
+            inputDni.value = dniParam.trim();
+            verificarDniPaso1();
+        }
+    }
+});
 </script>
 {% endblock %}

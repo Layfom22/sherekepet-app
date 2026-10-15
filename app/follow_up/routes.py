@@ -3,7 +3,7 @@ import uuid
 from datetime import date, datetime, time
 from typing import Optional
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
@@ -15,7 +15,16 @@ from app.core.storage import upload_image_to_r2
 from app.core.rate_limit import rate_limiter
 from app.database import get_db
 from app.core.models import Clinica
-from app.clinic.models import Cliente, Mascota, RegistroVacuna, Cita, AtencionClinica, Veterinario, HorarioAtencion
+from app.clinic.models import (
+    Cliente,
+    Mascota,
+    RegistroVacuna,
+    Cita,
+    AtencionClinica,
+    Veterinario,
+    HorarioAtencion,
+    SeguimientoNotificacion
+)
 from app.clinic.routes import (
     obtener_o_inicializar_horarios,
     DIAS_SEMANA_NOMBRES,
@@ -781,11 +790,15 @@ def api_estado_citas_portal(request: Request, db: Session = Depends(get_db)):
         "citas": [
             {
                 "id": c.id,
+                "clinica_id": c.clinica_id,
+                "mascota_id": c.mascota_id,
                 "mascota": c.mascota.nombre if c.mascota else "Mascota",
                 "clinica": (c.clinica.nombre_comercial or c.clinica.nombre) if c.clinica else "Veterinaria",
                 "fecha": c.fecha.strftime("%d/%m/%Y") if c.fecha else "",
+                "fecha_iso": c.fecha.strftime("%Y-%m-%d") if c.fecha else "",
                 "es_hoy": c.fecha == hoy_lima if c.fecha else False,
                 "hora": c.hora.strftime("%I:%M %p") if c.hora else "",
+                "hora_24": c.hora.strftime("%H:%M") if c.hora else "",
                 "motivo": c.motivo or "Consulta",
                 "estado": (c.estado or "PENDIENTE").upper()
             }
@@ -1494,6 +1507,250 @@ def agendar_cita_portal(
             "estado": nueva_cita.estado
         }
     }
+
+
+class CitaEditarPortalRequest(BaseModel):
+    fecha: date
+    hora: str  # "HH:MM"
+    motivo: Optional[str] = None
+
+
+@router.put(
+    "/api/portal/citas/{cita_id}",
+    summary="Reprogramar / Editar Cita desde el Portal del Dueño"
+)
+def editar_cita_portal(
+    cita_id: int,
+    payload: CitaEditarPortalRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado. Inicie sesión en el portal.")
+
+    cita = db.query(Cita).join(Cliente).filter(
+        Cita.id == cita_id,
+        Cliente.dni == cliente.dni,
+        Cita.is_deleted == False
+    ).first()
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada o no pertenece a su perfil.")
+
+    # Validar clínica
+    clinica = db.query(Clinica).filter(Clinica.id == cita.clinica_id, Clinica.is_deleted == False).first()
+    if not clinica or not clinica.tiene_suscripcion_activa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La agenda en línea de esta clínica no está disponible temporalmente. Por favor contáctelos directamente."
+        )
+
+    # Parsear hora
+    try:
+        partes = payload.hora.strip().split(":")
+        hora_obj = time(hour=int(partes[0]), minute=int(partes[1]))
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de hora inválido (use HH:MM).")
+
+    hoy_lima = get_lima_now().date()
+    if payload.fecha < hoy_lima:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No se pueden reprogramar citas en fechas pasadas.")
+
+    # Validar que corresponda a horario laborable
+    horarios_semana = obtener_o_inicializar_horarios(cita.clinica_id, db)
+    horario_dia = next((h for h in horarios_semana if h.dia_semana == payload.fecha.weekday()), None)
+    if not horario_dia or not horario_dia.activo:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La clínica no atiende en el día seleccionado.")
+
+    slots_validos = generar_slots_horario(horario_dia)
+    hora_str = f"{hora_obj.hour:02d}:{hora_obj.minute:02d}"
+    if hora_str not in slots_validos:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El horario seleccionado no corresponde a los turnos de atención del veterinario."
+        )
+
+    if payload.fecha == hoy_lima and hora_obj <= get_lima_now().time():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La hora seleccionada ya ha pasado.")
+
+    # Validar que el slot no esté ocupado por otra cita en la clínica
+    conflicto = db.query(Cita).filter(
+        Cita.id != cita.id,
+        Cita.clinica_id == cita.clinica_id,
+        Cita.fecha == payload.fecha,
+        Cita.hora == hora_obj,
+        Cita.estado.in_(["PENDIENTE", "CONFIRMADA"]),
+        Cita.is_deleted == False
+    ).first()
+    if conflicto:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este horario ya se encuentra ocupado. Por favor seleccione otro.")
+
+    fecha_anterior_str = cita.fecha.strftime("%d/%m/%Y")
+    hora_anterior_str = cita.hora.strftime("%I:%M %p")
+    reprogramada = (cita.fecha != payload.fecha or cita.hora != hora_obj)
+
+    cita.fecha = payload.fecha
+    cita.hora = hora_obj
+    if payload.motivo and payload.motivo.strip():
+        cita.motivo = payload.motivo.strip()
+
+    # Si cambió fecha u hora, pasa a estado PENDIENTE para que la clínica confirme la reprogramación
+    if reprogramada:
+        cita.estado = "PENDIENTE"
+
+    cita.updated_at = get_lima_now()
+    db.commit()
+    db.refresh(cita)
+
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+    mascota_nombre = cita.mascota.nombre if cita.mascota else "Mascota"
+
+    # Enviar correo de reprogramación al dueño si tiene email
+    if cliente.email:
+        from app.core.email import send_client_appointment_reschedule_email
+        background_tasks.add_task(
+            send_client_appointment_reschedule_email,
+            destinatario=cliente.email,
+            cliente_nombre=cliente.nombre_completo or f"DNI {cliente.dni}",
+            mascota_nombre=mascota_nombre,
+            fecha_anterior_str=fecha_anterior_str,
+            hora_anterior_str=hora_anterior_str,
+            nueva_fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+            nueva_hora_str=cita.hora.strftime("%I:%M %p"),
+            motivo=cita.motivo,
+            clinica_nombre=clinica_nombre
+        )
+
+    # Notificar a los veterinarios de la clínica de la reprogramación
+    try:
+        from app.core.email import send_appointment_notification_email
+        vets = db.query(Veterinario).filter(
+            Veterinario.clinica_id == cita.clinica_id,
+            Veterinario.is_deleted == False
+        ).all()
+        for v in vets:
+            if v.email:
+                background_tasks.add_task(
+                    send_appointment_notification_email,
+                    destinatario=v.email,
+                    cliente_nombre=f"{cliente.nombre_completo or f'DNI {cliente.dni}'} (Reprogramación)",
+                    cliente_telefono=cliente.telefono or "",
+                    mascota_nombre=mascota_nombre,
+                    fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                    hora_str=cita.hora.strftime("%I:%M %p"),
+                    motivo=f"[REPROGRAMADA] {cita.motivo}",
+                    clinica_nombre=clinica_nombre
+                )
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "mensaje": "¡Cita reprogramada exitosamente!",
+        "cita": {
+            "id": cita.id,
+            "clinica_id": cita.clinica_id,
+            "clinica_nombre": clinica_nombre,
+            "mascota_nombre": mascota_nombre,
+            "fecha": cita.fecha.strftime("%Y-%m-%d"),
+            "fecha_str": cita.fecha.strftime("%d/%m/%Y"),
+            "hora": cita.hora.strftime("%H:%M"),
+            "hora_str": cita.hora.strftime("%I:%M %p"),
+            "motivo": cita.motivo,
+            "estado": cita.estado
+        }
+    }
+
+
+@router.post(
+    "/api/portal/citas/{cita_id}/cancelar",
+    status_code=status.HTTP_200_OK,
+    summary="Cancelar Cita desde el Portal del Dueño"
+)
+@router.delete(
+    "/api/portal/citas/{cita_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Cancelar Cita desde el Portal del Dueño (Alias DELETE)"
+)
+def cancelar_cita_portal(
+    cita_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
+    cliente = obtener_cliente_autenticado(request, db)
+    if not cliente:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autorizado.")
+
+    cita = db.query(Cita).join(Cliente).filter(
+        Cita.id == cita_id,
+        Cliente.dni == cliente.dni,
+        Cita.is_deleted == False
+    ).first()
+
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada o ya cancelada.")
+
+    fecha_str = cita.fecha.strftime("%d/%m/%Y")
+    hora_str = cita.hora.strftime("%I:%M %p")
+    mascota_nombre = cita.mascota.nombre if cita.mascota else "Mascota"
+    clinica = db.query(Clinica).filter(Clinica.id == cita.clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+
+    cita.estado = "CANCELADA"
+    cita.is_deleted = True
+    cita.deleted_at = datetime.utcnow()
+    cita.updated_at = get_lima_now()
+
+    # Cancelar notificaciones de seguimiento pendientes vinculadas
+    db.query(SeguimientoNotificacion).filter(
+        SeguimientoNotificacion.mascota_id == cita.mascota_id,
+        SeguimientoNotificacion.clinica_id == cita.clinica_id,
+        SeguimientoNotificacion.estado == "PENDIENTE",
+        SeguimientoNotificacion.fecha_programada == cita.fecha
+    ).update({"estado": "CANCELADO", "is_deleted": True, "deleted_at": datetime.utcnow()}, synchronize_session=False)
+
+    db.commit()
+
+    # Enviar correo de cancelación al dueño
+    if cliente.email:
+        from app.core.email import send_client_appointment_cancellation_email
+        background_tasks.add_task(
+            send_client_appointment_cancellation_email,
+            destinatario=cliente.email,
+            cliente_nombre=cliente.nombre_completo or f"DNI {cliente.dni}",
+            mascota_nombre=mascota_nombre,
+            fecha_str=fecha_str,
+            hora_str=hora_str,
+            motivo=cita.motivo or "Consulta Médica",
+            clinica_nombre=clinica_nombre
+        )
+
+    # Notificar a los veterinarios de la clínica que el dueño canceló su cita
+    try:
+        from app.core.email import send_appointment_notification_email
+        vets = db.query(Veterinario).filter(
+            Veterinario.clinica_id == cita.clinica_id,
+            Veterinario.is_deleted == False
+        ).all()
+        for v in vets:
+            if v.email:
+                background_tasks.add_task(
+                    send_appointment_notification_email,
+                    destinatario=v.email,
+                    cliente_nombre=f"{cliente.nombre_completo or f'DNI {cliente.dni}'} (CANCELADA)",
+                    cliente_telefono=cliente.telefono or "",
+                    mascota_nombre=mascota_nombre,
+                    fecha_str=fecha_str,
+                    hora_str=hora_str,
+                    motivo=f"[CANCELADA POR DUEÑO] {cita.motivo}",
+                    clinica_nombre=clinica_nombre
+                )
+    except Exception:
+        pass
+
+    return {"status": "ok", "mensaje": "Cita cancelada correctamente."}
 
 
 class CitaConfirmarSugerenciaRequest(BaseModel):

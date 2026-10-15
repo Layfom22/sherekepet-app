@@ -209,48 +209,78 @@
             <div 
                 id="cita-card-{{ c.id }}"
                 data-cita-id="{{ c.id }}"
+                data-cita-clinica-id="{{ c.clinica_id }}"
+                data-cita-clinica-nombre="{{ c.clinica.nombre_comercial or c.clinica.nombre }}"
+                data-cita-mascota-nombre="{{ c.mascota.nombre }}"
+                data-cita-fecha="{{ c.fecha.strftime('%Y-%m-%d') }}"
+                data-cita-hora="{{ c.hora.strftime('%H:%M') }}"
+                data-cita-motivo="{{ c.motivo }}"
                 data-cita-estado="{{ (c.estado or 'PENDIENTE')|upper }}"
-                class="p-3.5 rounded-2xl border-2 {% if es_confirmada %}border-emerald-400 bg-emerald-50/50{% else %}border-amber-200 bg-amber-50/30{% endif %} flex items-start space-x-3 transition-all"
+                class="p-3.5 rounded-2xl border-2 {% if es_confirmada %}border-emerald-400 bg-emerald-50/50{% else %}border-amber-200 bg-amber-50/30{% endif %} flex flex-col justify-between transition-all"
             >
-                <div class="w-12 h-12 rounded-xl bg-white border {% if es_confirmada %}border-emerald-300 text-emerald-800{% else %}border-amber-200 text-amber-800{% endif %} flex flex-col items-center justify-center font-mono shrink-0 shadow-2xs">
-                    <span class="text-xs font-black">{{ c.hora.strftime('%I:%M') }}</span>
-                    <span class="text-[9px] font-bold uppercase text-slate-400">{{ c.hora.strftime('%p') }}</span>
-                </div>
-                <div class="min-w-0 flex-1 text-xs">
-                    <div class="flex items-center justify-between gap-1 flex-wrap">
-                        <div class="flex items-center gap-1.5">
-                            <p class="font-black text-slate-900 truncate">{{ c.mascota.nombre }}</p>
-                            {% if es_hoy %}
-                            <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">HOY</span>
+                <div class="flex items-start space-x-3">
+                    <div class="w-12 h-12 rounded-xl bg-white border {% if es_confirmada %}border-emerald-300 text-emerald-800{% else %}border-amber-200 text-amber-800{% endif %} flex flex-col items-center justify-center font-mono shrink-0 shadow-2xs">
+                        <span class="text-xs font-black">{{ c.hora.strftime('%I:%M') }}</span>
+                        <span class="text-[9px] font-bold uppercase text-slate-400">{{ c.hora.strftime('%p') }}</span>
+                    </div>
+                    <div class="min-w-0 flex-1 text-xs">
+                        <div class="flex items-center justify-between gap-1 flex-wrap">
+                            <div class="flex items-center gap-1.5">
+                                <p class="font-black text-slate-900 truncate">{{ c.mascota.nombre }}</p>
+                                {% if es_hoy %}
+                                <span class="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">HOY</span>
+                                {% endif %}
+                            </div>
+                            {% if es_confirmada %}
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white inline-flex items-center space-x-1" title="Cita Confirmada por Veterinario">
+                                <span>✓ Confirmada</span>
+                            </span>
+                            {% else %}
+                            <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                                ⏳ Por confirmar
+                            </span>
                             {% endif %}
                         </div>
+                        <p class="text-[11px] font-semibold text-teal-700 truncate mt-0.5 flex items-center space-x-1">
+                            <i data-lucide="hospital" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
+                            <span class="truncate">{{ c.clinica.nombre_comercial or c.clinica.nombre }}</span>
+                        </p>
+                        <p class="text-[11px] text-slate-500 mt-0.5 truncate flex items-center space-x-1">
+                            <i data-lucide="calendar-days" class="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true"></i>
+                            <span class="truncate">{{ c.fecha.strftime('%d/%m/%Y') }} &bull; {{ c.motivo }}</span>
+                        </p>
                         {% if es_confirmada %}
-                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-600 text-white inline-flex items-center space-x-1" title="Cita Confirmada por Veterinario">
-                            <span>✓ Confirmada</span>
-                        </span>
+                        <p class="text-[10px] font-bold text-emerald-700 mt-1">
+                            ✅ El veterinario aceptó y confirmó tu cita.
+                        </p>
                         {% else %}
-                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                            ⏳ Por confirmar
-                        </span>
+                        <p class="text-[10px] font-medium text-amber-700 mt-1">
+                            🔔 Te notificaremos apenas el veterinario confirme.
+                        </p>
                         {% endif %}
                     </div>
-                    <p class="text-[11px] font-semibold text-teal-700 truncate mt-0.5 flex items-center space-x-1">
-                        <i data-lucide="hospital" class="w-3.5 h-3.5 shrink-0" aria-hidden="true"></i>
-                        <span class="truncate">{{ c.clinica.nombre_comercial or c.clinica.nombre }}</span>
-                    </p>
-                    <p class="text-[11px] text-slate-500 mt-0.5 truncate flex items-center space-x-1">
-                        <i data-lucide="calendar-days" class="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true"></i>
-                        <span class="truncate">{{ c.fecha.strftime('%d/%m/%Y') }} &bull; {{ c.motivo }}</span>
-                    </p>
-                    {% if es_confirmada %}
-                    <p class="text-[10px] font-bold text-emerald-700 mt-1">
-                        ✅ El veterinario aceptó y confirmó tu cita.
-                    </p>
-                    {% else %}
-                    <p class="text-[10px] font-medium text-amber-700 mt-1">
-                        🔔 Te notificaremos apenas el veterinario confirme.
-                    </p>
-                    {% endif %}
+                </div>
+
+                <!-- Acciones del Dueño: Editar / Reprogramar y Cancelar -->
+                <div class="mt-3 pt-2.5 border-t border-slate-200/70 flex items-center justify-end space-x-2">
+                    <button 
+                        type="button" 
+                        onclick="abrirModalEditarCitaPortal({{ c.id }}, {{ c.clinica_id }}, '{{ (c.clinica.nombre_comercial or c.clinica.nombre)|escape }}', '{{ c.mascota.nombre|escape }}', '{{ c.fecha.strftime('%Y-%m-%d') }}', '{{ c.hora.strftime('%H:%M') }}', '{{ c.motivo|escape }}')"
+                        class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-indigo-700 bg-white hover:bg-indigo-50 active:bg-indigo-100 border border-indigo-200 shadow-2xs inline-flex items-center space-x-1 transition"
+                        title="Cambiar fecha, hora o motivo de la cita"
+                    >
+                        <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-indigo-600"></i>
+                        <span>Reprogramar</span>
+                    </button>
+                    <button 
+                        type="button" 
+                        onclick="abrirModalCancelarCitaPortal({{ c.id }}, '{{ c.mascota.nombre|escape }}', '{{ c.fecha.strftime('%d/%m/%Y') }}', '{{ c.hora.strftime('%I:%M %p') }}', '{{ (c.clinica.nombre_comercial or c.clinica.nombre)|escape }}')"
+                        class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-rose-700 bg-white hover:bg-rose-50 active:bg-rose-100 border border-rose-200 shadow-2xs inline-flex items-center space-x-1 transition"
+                        title="Cancelar esta cita"
+                    >
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-600"></i>
+                        <span>Cancelar</span>
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -867,6 +897,156 @@
     </div>
 </div>
 
+<!-- Modal Reprogramar / Editar Cita -->
+<div id="modalEditarCitaPortal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-100 my-8">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 class="text-base font-black text-slate-900 flex items-center space-x-2">
+                <i data-lucide="calendar-clock" class="w-5 h-5 text-indigo-600" aria-hidden="true"></i>
+                <span>Reprogramar Cita</span>
+            </h3>
+            <button type="button" onclick="cerrarModalEditarCitaPortal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors" aria-label="Cerrar modal">
+                <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <div class="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3 text-xs space-y-1">
+            <p class="font-bold text-indigo-950 flex items-center space-x-1.5">
+                <i data-lucide="paw-print" class="w-4 h-4 text-indigo-600"></i>
+                <span>Paciente: <strong id="editCitaMascotaLabel" class="text-slate-900 font-black"></strong></span>
+            </p>
+            <p class="text-indigo-800 text-[11px] flex items-center space-x-1.5">
+                <i data-lucide="hospital" class="w-3.5 h-3.5 text-indigo-500"></i>
+                <span id="editCitaClinicaLabel"></span>
+            </p>
+        </div>
+
+        <form id="formEditarCitaPortal" onsubmit="guardarEdicionCitaPortal(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="editCitaId">
+            <input type="hidden" id="editCitaClinicaId">
+            <input type="hidden" id="editCitaHoraSeleccionada">
+
+            <!-- Nueva Fecha -->
+            <div>
+                <label for="editCitaFecha" class="block font-bold text-slate-700 mb-1">
+                    Nueva Fecha de Cita *
+                </label>
+                <input 
+                    type="date" 
+                    id="editCitaFecha" 
+                    name="fecha" 
+                    min="{{ hoy_lima.strftime('%Y-%m-%d') }}"
+                    onchange="consultarDisponibilidadEdicionCita()" 
+                    required 
+                    class="btn-touch w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+            </div>
+
+            <!-- Nuevo Horario -->
+            <div id="editCitaContenedorHoras">
+                <label class="block font-bold text-slate-700 mb-1">
+                    Selecciona el Horario *
+                </label>
+                <div id="editCitaLoaderHoras" class="hidden py-4 text-center text-indigo-600 font-semibold flex items-center justify-center space-x-2">
+                    <svg class="animate-spin w-4 h-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                    <span>Cargando horarios disponibles...</span>
+                </div>
+                <div id="editCitaGridHoras" class="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
+                    <!-- Botones de turnos generados por JS -->
+                </div>
+            </div>
+
+            <!-- Fallback de Urgencia -->
+            <div id="editCitaFallbackUrgencia" class="hidden p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 space-y-1">
+                <p class="font-bold text-xs flex items-center space-x-1.5">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+                    <span>Sin turnos disponibles en esta fecha</span>
+                </p>
+                <p class="text-[11px] text-amber-800">
+                    Por favor selecciona otro día o comunícate directamente con la veterinaria para coordinar un sobrecupo.
+                </p>
+            </div>
+
+            <!-- Motivo de la Cita -->
+            <div>
+                <label for="editCitaMotivo" class="block font-bold text-slate-700 mb-1">
+                    Motivo de la Cita *
+                </label>
+                <input 
+                    type="text" 
+                    id="editCitaMotivo" 
+                    name="motivo" 
+                    required 
+                    placeholder="Ej. Control post-tratamiento, vacuna, etc."
+                    class="btn-touch w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+            </div>
+
+            <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalEditarCitaPortal()" 
+                    class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnGuardarEdicionCita" 
+                    class="btn-touch px-5 py-2 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-md hover:shadow transition-all inline-flex items-center space-x-1.5"
+                >
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Guardar Cambios</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Confirmar Cancelación de Cita -->
+<div id="modalCancelarCitaPortal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-100">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <i data-lucide="alert-circle" class="w-5 h-5"></i>
+            </div>
+            <div>
+                <h3 class="text-base font-black text-slate-900">¿Cancelar Cita?</h3>
+                <p class="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
+            </div>
+        </div>
+
+        <input type="hidden" id="cancelarCitaId">
+        <div class="bg-rose-50/70 border border-rose-100 rounded-2xl p-3.5 text-xs text-rose-950 space-y-1">
+            <p>Se cancelará la cita de <strong id="cancelarCitaMascota" class="font-black"></strong> en <span id="cancelarCitaClinica" class="font-bold"></span>.</p>
+            <p class="text-[11px] text-rose-800 font-mono" id="cancelarCitaFechaHora"></p>
+        </div>
+
+        <p class="text-xs text-slate-600">
+            El horario quedará liberado en la veterinaria y se avisará al equipo médico de la clínica.
+        </p>
+
+        <div class="pt-2 flex items-center justify-end space-x-2 border-t border-slate-100">
+            <button 
+                type="button" 
+                onclick="cerrarModalCancelarCitaPortal()" 
+                class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+            >
+                No, mantener cita
+            </button>
+            <button 
+                type="button" 
+                id="btnEjecutarCancelacionCita" 
+                onclick="ejecutarCancelacionCitaPortal()" 
+                class="btn-touch px-4 py-2 bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white font-bold rounded-xl shadow-md transition-all inline-flex items-center space-x-1.5"
+            >
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span>Sí, cancelar cita</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast Flotante -->
 <div id="toastDashboard" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center space-x-2.5 text-xs font-bold transition-all">
     <i data-lucide="circle-check" class="w-5 h-5 text-emerald-400 shrink-0" aria-hidden="true"></i>
@@ -1072,6 +1252,213 @@ async function enviarAgendarCita(e) {
         if (btn) {
             btn.disabled = false;
             btn.textContent = "Confirmar Cita";
+        }
+    }
+}
+
+// Gestión de Edición / Reprogramación de Citas desde el Portal del Dueño
+function abrirModalEditarCitaPortal(citaId, clinicaId, clinicaNombre, mascotaNombre, fechaIso, hora24, motivo) {
+    const modal = document.getElementById("modalEditarCitaPortal");
+    if (!modal) return;
+
+    document.getElementById("editCitaId").value = citaId;
+    document.getElementById("editCitaClinicaId").value = clinicaId;
+    document.getElementById("editCitaMascotaLabel").textContent = mascotaNombre;
+    document.getElementById("editCitaClinicaLabel").textContent = clinicaNombre;
+    document.getElementById("editCitaFecha").value = fechaIso;
+    document.getElementById("editCitaHoraSeleccionada").value = hora24;
+    document.getElementById("editCitaMotivo").value = motivo || "Consulta";
+
+    modal.classList.remove("hidden");
+    window.initLucideIcons?.();
+    consultarDisponibilidadEdicionCita(hora24);
+}
+
+function cerrarModalEditarCitaPortal() {
+    document.getElementById("modalEditarCitaPortal")?.classList.add("hidden");
+}
+
+function seleccionarHoraEdicionCita(hora) {
+    const input = document.getElementById("editCitaHoraSeleccionada");
+    if (input) input.value = hora;
+
+    const botones = document.querySelectorAll("#editCitaGridHoras button");
+    botones.forEach(b => {
+        if (b.getAttribute("data-hora") === hora) {
+            b.className = "btn-touch py-2 text-xs font-black rounded-xl bg-indigo-600 text-white border border-indigo-600 shadow-sm transition-all";
+        } else {
+            b.className = "btn-touch py-2 text-xs font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 transition-all";
+        }
+    });
+}
+
+async function consultarDisponibilidadEdicionCita(horaPrevia = null) {
+    const clinicaId = document.getElementById("editCitaClinicaId")?.value;
+    const fechaInput = document.getElementById("editCitaFecha");
+    const loader = document.getElementById("editCitaLoaderHoras");
+    const gridHoras = document.getElementById("editCitaGridHoras");
+    const contenedorHoras = document.getElementById("editCitaContenedorHoras");
+    const fallbackUrgencia = document.getElementById("editCitaFallbackUrgencia");
+    const btnGuardar = document.getElementById("btnGuardarEdicionCita");
+    const horaSeleccionadaInput = document.getElementById("editCitaHoraSeleccionada");
+
+    if (!clinicaId || !fechaInput) return;
+    const fecha = fechaInput.value;
+    if (!fecha) return;
+
+    const horaActual = horaPrevia || horaSeleccionadaInput?.value || "";
+
+    if (loader) loader.classList.remove("hidden");
+    if (gridHoras) gridHoras.innerHTML = "";
+    if (fallbackUrgencia) fallbackUrgencia.classList.add("hidden");
+    if (contenedorHoras) contenedorHoras.classList.remove("hidden");
+    if (btnGuardar) btnGuardar.disabled = false;
+
+    try {
+        const resp = await fetch(`/api/portal/clinica/${clinicaId}/disponibilidad?fecha=${fecha}`);
+        if (!resp.ok) throw new Error("No se pudo obtener disponibilidad");
+        const data = await resp.json();
+
+        let horas = data.horas_disponibles || [];
+        // Si la hora previamente agendada pertenece a esta misma fecha, permitir conservarla
+        if (horaActual && !horas.includes(horaActual)) {
+            horas.push(horaActual);
+            horas.sort();
+        }
+
+        if (horas.length > 0) {
+            gridHoras.innerHTML = "";
+            horas.forEach(hora => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.setAttribute("data-hora", hora);
+                if (hora === horaActual) {
+                    btn.className = "btn-touch py-2 text-xs font-black rounded-xl bg-indigo-600 text-white border border-indigo-600 shadow-sm transition-all";
+                    if (horaSeleccionadaInput) horaSeleccionadaInput.value = hora;
+                } else {
+                    btn.className = "btn-touch py-2 text-xs font-semibold rounded-xl bg-white text-slate-700 border border-slate-200 hover:bg-indigo-50 hover:border-indigo-300 transition-all";
+                }
+                btn.textContent = hora;
+                btn.onclick = () => seleccionarHoraEdicionCita(hora);
+                gridHoras.appendChild(btn);
+            });
+            contenedorHoras.classList.remove("hidden");
+            fallbackUrgencia.classList.add("hidden");
+        } else {
+            contenedorHoras.classList.add("hidden");
+            fallbackUrgencia.classList.remove("hidden");
+            if (btnGuardar) btnGuardar.disabled = true;
+        }
+    } catch (e) {
+        console.error("Error consultando disponibilidad:", e);
+        if (gridHoras) gridHoras.innerHTML = '<p class="col-span-3 text-rose-500 text-xs">Error de conexión al cargar horarios.</p>';
+    } finally {
+        if (loader) loader.classList.add("hidden");
+    }
+}
+
+async function guardarEdicionCitaPortal(e) {
+    e.preventDefault();
+    const citaId = document.getElementById("editCitaId")?.value;
+    const fecha = document.getElementById("editCitaFecha")?.value;
+    const hora = document.getElementById("editCitaHoraSeleccionada")?.value;
+    const motivo = document.getElementById("editCitaMotivo")?.value.trim();
+    const btn = document.getElementById("btnGuardarEdicionCita");
+
+    if (!citaId || !fecha || !hora) {
+        alert("Por favor selecciona una fecha y una hora para la cita.");
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin w-4 h-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Guardando...</span>`;
+    }
+
+    try {
+        const resp = await fetch(`/api/portal/citas/${citaId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ fecha, hora, motivo })
+        });
+
+        if (resp.ok) {
+            cerrarModalEditarCitaPortal();
+            mostrarToast("¡Cita reprogramada con éxito!");
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            const err = await resp.json();
+            alert("Error al reprogramar cita: " + (err.detail || "Verifique los datos ingresados"));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>Guardar Cambios</span>`;
+                window.initLucideIcons?.();
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al reprogramar la cita.");
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>Guardar Cambios</span>`;
+            window.initLucideIcons?.();
+        }
+    }
+}
+
+// Cancelación de Citas desde el Portal del Dueño
+function abrirModalCancelarCitaPortal(citaId, mascotaNombre, fechaStr, horaStr, clinicaNombre) {
+    const modal = document.getElementById("modalCancelarCitaPortal");
+    if (!modal) return;
+
+    document.getElementById("cancelarCitaId").value = citaId;
+    document.getElementById("cancelarCitaMascota").textContent = mascotaNombre;
+    document.getElementById("cancelarCitaClinica").textContent = clinicaNombre;
+    document.getElementById("cancelarCitaFechaHora").textContent = `${fechaStr} a las ${horaStr}`;
+
+    modal.classList.remove("hidden");
+    window.initLucideIcons?.();
+}
+
+function cerrarModalCancelarCitaPortal() {
+    document.getElementById("modalCancelarCitaPortal")?.classList.add("hidden");
+}
+
+async function ejecutarCancelacionCitaPortal() {
+    const citaId = document.getElementById("cancelarCitaId")?.value;
+    const btn = document.getElementById("btnEjecutarCancelacionCita");
+    if (!citaId) return;
+
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<svg class="animate-spin w-4 h-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Cancelando...</span>`;
+    }
+
+    try {
+        const resp = await fetch(`/api/portal/citas/${citaId}/cancelar`, {
+            method: "POST"
+        });
+
+        if (resp.ok) {
+            cerrarModalCancelarCitaPortal();
+            mostrarToast("Cita cancelada correctamente.");
+            setTimeout(() => window.location.reload(), 700);
+        } else {
+            const err = await resp.json();
+            alert("No se pudo cancelar la cita: " + (err.detail || "Intente nuevamente"));
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i><span>Sí, cancelar cita</span>`;
+                window.initLucideIcons?.();
+            }
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al cancelar la cita.");
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="trash-2" class="w-4 h-4"></i><span>Sí, cancelar cita</span>`;
+            window.initLucideIcons?.();
         }
     }
 }
@@ -1436,6 +1823,52 @@ async function lanzarNotificacionNativaCitaConfirmada(cita) {
     }
 }
 
+async function lanzarNotificacionNativaCitaAgendadaPorVet(cita) {
+    if (!sonAlertasGlobalesActivas()) return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sw = reg?.active || navigator.serviceWorker?.controller;
+        const title = `📅 ¡Nueva cita agendada por ${cita.clinica}!`;
+        const body = `El veterinario agendó una cita para ${cita.mascota} el ${cita.fecha} a las ${cita.hora} (${cita.motivo}).`;
+        if (sw) {
+            sw.postMessage({
+                type: 'SHOW_DOSE_NOTIFICATION',
+                title: title,
+                body: body,
+                tag: `cita-nueva-${cita.id}`,
+                url: '/portal/dashboard#seccionProximasCitas'
+            });
+        } else {
+            new Notification(title, { body: body, icon: '/static/img/icon-192.png' });
+        }
+    } catch (err) {
+        console.warn('No se pudo lanzar notificación nativa de nueva cita:', err);
+    }
+}
+
+async function lanzarNotificacionNativaCitaReprogramada(cita) {
+    if (!sonAlertasGlobalesActivas()) return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        const sw = reg?.active || navigator.serviceWorker?.controller;
+        const title = `🔄 ¡Cita reprogramada en ${cita.clinica}!`;
+        const body = `Tu cita para ${cita.mascota} ha sido reprogramada para el ${cita.fecha} a las ${cita.hora}.`;
+        if (sw) {
+            sw.postMessage({
+                type: 'SHOW_DOSE_NOTIFICATION',
+                title: title,
+                body: body,
+                tag: `cita-reprogramada-${cita.id}`,
+                url: '/portal/dashboard#seccionProximasCitas'
+            });
+        } else {
+            new Notification(title, { body: body, icon: '/static/img/icon-192.png' });
+        }
+    } catch (err) {
+        console.warn('No se pudo lanzar notificación nativa de reprogramación:', err);
+    }
+}
+
 async function lanzarNotificacionNativaCitaSugerida(cita) {
     if (!sonAlertasGlobalesActivas()) return;
     try {
@@ -1466,11 +1899,11 @@ async function verificarEstadoCitasEnTiempoReal() {
         const data = await resp.json();
         const citas = data.citas || [];
 
-        let estadoPrevioMap = {};
+        let citasInfoMap = {};
         let notificadasMap = {};
         let sugeridasNotificadasMap = {};
         try {
-            estadoPrevioMap = JSON.parse(localStorage.getItem('sherekepet_citas_estado_map') || '{}');
+            citasInfoMap = JSON.parse(localStorage.getItem('sherekepet_citas_info_map') || '{}');
             notificadasMap = JSON.parse(localStorage.getItem('sherekepet_citas_notificadas') || '{}');
             sugeridasNotificadasMap = JSON.parse(localStorage.getItem('sherekepet_citas_sugeridas_notificadas') || '{}');
         } catch (_) {}
@@ -1478,12 +1911,12 @@ async function verificarEstadoCitasEnTiempoReal() {
         let huboCambioEnPantalla = false;
 
         for (const c of citas) {
-            const estadoAnterior = estadoPrevioMap[c.id];
+            const prev = citasInfoMap[c.id];
             const cardEl = document.getElementById(`cita-card-${c.id}`);
             const sugerenciaEl = document.getElementById(`card-sugerencia-${c.id}`);
             const estadoEnDom = cardEl?.getAttribute('data-cita-estado');
 
-            // Si la cita es SUGERIDA (ej. próximo baño sugerido por el veterinario) y aún no se ha notificado en el celular
+            // 1. Cita SUGERIDA (ej. próximo baño sugerido por el veterinario)
             if (c.estado === 'SUGERIDA' && !sugeridasNotificadasMap[c.id]) {
                 sugeridasNotificadasMap[c.id] = true;
                 mostrarToast(`🛁 ¡${c.clinica} te sugiere agendar el próximo baño de ${c.mascota} para el ${c.fecha}!`);
@@ -1494,8 +1927,16 @@ async function verificarEstadoCitasEnTiempoReal() {
                 }
             }
 
-            // Si la cita está CONFIRMADA y antes estaba PENDIENTE (o aún no se ha notificado al dueño)
-            if (c.estado === 'CONFIRMADA' && (!notificadasMap[c.id] || estadoAnterior === 'PENDIENTE' || estadoEnDom === 'PENDIENTE')) {
+            // 2. Cita NUEVA agendada directamente por el veterinario
+            else if (!prev && !cardEl && c.estado !== 'SUGERIDA') {
+                notificadasMap[c.id] = true;
+                mostrarToast(`📅 ¡${c.clinica} agendó una cita para ${c.mascota} el ${c.fecha} a las ${c.hora}!`);
+                await lanzarNotificacionNativaCitaAgendadaPorVet(c);
+                huboCambioEnPantalla = true;
+            }
+
+            // 3. Cita CONFIRMADA por el veterinario (antes estaba PENDIENTE)
+            else if (c.estado === 'CONFIRMADA' && (!notificadasMap[c.id] || prev?.estado === 'PENDIENTE' || estadoEnDom === 'PENDIENTE')) {
                 notificadasMap[c.id] = true;
                 mostrarToast(`✅ ¡${c.clinica} confirmó tu cita para ${c.mascota} (${c.hora})!`);
                 await lanzarNotificacionNativaCitaConfirmada(c);
@@ -1504,11 +1945,27 @@ async function verificarEstadoCitasEnTiempoReal() {
                     huboCambioEnPantalla = true;
                 }
             }
-            estadoPrevioMap[c.id] = c.estado;
+
+            // 4. Cita REPROGRAMADA por el veterinario (cambio de fecha o de hora)
+            else if (prev && (prev.fecha !== c.fecha || prev.hora !== c.hora)) {
+                mostrarToast(`🔄 ¡Tu cita para ${c.mascota} en ${c.clinica} fue reprogramada para el ${c.fecha} a las ${c.hora}!`);
+                await lanzarNotificacionNativaCitaReprogramada(c);
+                huboCambioEnPantalla = true;
+            }
+
+            citasInfoMap[c.id] = {
+                id: c.id,
+                estado: c.estado,
+                fecha: c.fecha,
+                hora: c.hora,
+                clinica: c.clinica,
+                mascota: c.mascota,
+                motivo: c.motivo
+            };
         }
 
         try {
-            localStorage.setItem('sherekepet_citas_estado_map', JSON.stringify(estadoPrevioMap));
+            localStorage.setItem('sherekepet_citas_info_map', JSON.stringify(citasInfoMap));
             localStorage.setItem('sherekepet_citas_notificadas', JSON.stringify(notificadasMap));
             localStorage.setItem('sherekepet_citas_sugeridas_notificadas', JSON.stringify(sugeridasNotificadasMap));
         } catch (_) {}

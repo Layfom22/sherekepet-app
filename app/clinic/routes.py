@@ -3447,11 +3447,13 @@ def confirmar_cita_alias_id(
 @router.put(
     "/api/clinic/citas/{cita_id}/cancelar",
     summary="Cancelar Cita Agendada",
-    description="Actualiza el estado de la cita a CANCELADA."
+    description="Actualiza el estado de la cita a CANCELADA y notifica al cliente si corresponde."
 )
 def cancelar_cita_veterinario(
     cita_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
+    enviar_email: bool = True,
     db: Session = Depends(get_db),
     current_user: Veterinario = Depends(require_current_vet)
 ):
@@ -3467,8 +3469,35 @@ def cancelar_cita_veterinario(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
 
     cita.estado = "CANCELADA"
+
+    # Cancelar notificaciones de seguimiento vinculadas
+    db.query(SeguimientoNotificacion).filter(
+        SeguimientoNotificacion.mascota_id == cita.mascota_id,
+        SeguimientoNotificacion.clinica_id == cita.clinica_id,
+        SeguimientoNotificacion.estado == "PENDIENTE",
+        SeguimientoNotificacion.fecha_programada == cita.fecha
+    ).update({"estado": "CANCELADO", "is_deleted": True, "deleted_at": datetime.utcnow()}, synchronize_session=False)
+
     db.commit()
     db.refresh(cita)
+
+    # Notificar por correo al cliente si tiene correo registrado
+    if enviar_email and cita.cliente and cita.mascota:
+        destinatario_email = _resolver_email_cliente(db, cita.cliente)
+        if destinatario_email:
+            clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id).first()
+            clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+            from app.core.email import send_client_appointment_cancellation_email
+            background_tasks.add_task(
+                send_client_appointment_cancellation_email,
+                destinatario=destinatario_email,
+                cliente_nombre=cita.cliente.nombre_completo or f"DNI {cita.cliente.dni}",
+                mascota_nombre=cita.mascota.nombre,
+                fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                hora_str=cita.hora.strftime("%I:%M %p"),
+                motivo=cita.motivo or "Consulta Médica",
+                clinica_nombre=clinica_nombre
+            )
 
     return {
         "mensaje": "Cita cancelada.",

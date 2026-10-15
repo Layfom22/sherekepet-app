@@ -870,9 +870,11 @@ def portal_carnet_mascota(
         todas_ids.append(mascota.id)
 
     # 1. Atenciones clínicas veterinarias ordenadas cronológicamente (de todas las sedes)
+    # Excluir atenciones marcadas expresamente como no visibles en carnet por el veterinario
     atenciones = db.query(AtencionClinica).filter(
         AtencionClinica.mascota_id.in_(todas_ids),
-        AtencionClinica.is_deleted == False
+        AtencionClinica.is_deleted == False,
+        (AtencionClinica.visible_en_carnet == True) | (AtencionClinica.visible_en_carnet.is_(None))
     ).order_by(AtencionClinica.created_at.desc()).all()
 
     grupos_vets = {}
@@ -898,7 +900,7 @@ def portal_carnet_mascota(
             "fecha": at.created_at,
             "tipo": at.tipo_atencion,
             "motivo": at.motivo,
-            "diagnostico": at.diagnostico,
+            "diagnostico": None,  # Confidencial: El diagnóstico clínico técnico no se expone al cliente ni a terceros
             "tratamiento": at.tratamiento,
             "tratamiento_limpio": tratamiento_limpio,
             "receta_info": receta_info,

@@ -601,109 +601,83 @@
                 </button>
             </div>
 
-            <!-- Canales Directos -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <!-- Canal WhatsApp -->
-                <a 
-                    href="https://wa.me/51922508449?text=Hola%20SherekePet,%20necesito%20soporte%20o%20reportar%20un%20inconveniente%20en%20mi%20cl%C3%ADnica%20veterinaria." 
-                    target="_blank" 
-                    class="btn-touch p-3 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all flex items-center gap-3 group"
-                >
-                    <div class="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                        <i data-lucide="message-circle" class="w-5 h-5"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <span class="block text-[10px] font-bold uppercase text-emerald-800">WhatsApp Directo</span>
-                        <span class="text-xs font-black text-emerald-950 font-mono">922 508 449</span>
-                    </div>
-                </a>
-
-                <!-- Canal Correo -->
-                <a 
-                    href="mailto:soporte@sherekepet.com?subject=Reporte%20de%20Error%20/%20Soporte%20T%C3%A9cnico%20SherekePet" 
-                    class="btn-touch p-3 rounded-2xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all flex items-center gap-3 group"
-                >
-                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-                        <i data-lucide="mail" class="w-5 h-5"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <span class="block text-[10px] font-bold uppercase text-indigo-800">Correo Soporte</span>
-                        <span class="text-xs font-black text-indigo-950 truncate block">soporte@sherekepet.com</span>
-                    </div>
-                </a>
-            </div>
-
-            <!-- Formulario Rápido de Reporte -->
-            <div class="border-t border-slate-100 pt-3">
-                <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5">
-                    <i data-lucide="send" class="w-3.5 h-3.5 text-teal-600"></i>
-                    <span>O envíanos un reporte desde aquí</span>
-                </h4>
-
-                <form id="formReporteSoporte" onsubmit="enviarReporteSoporte(event)" class="space-y-3 text-xs">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div>
-                            <label for="soporteTipo" class="block font-bold text-slate-700 mb-1">Tipo de Solicitud</label>
-                            <select id="soporteTipo" name="tipo" class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 bg-white font-medium text-slate-900">
-                                <option value="ERROR">Reportar Error en el Sistema</option>
-                                <option value="CONSULTA">Duda o Consulta de Uso</option>
-                                <option value="SUGERENCIA">Sugerencia de Nueva Función</option>
-                            </select>
+            <!-- Canales Directos de Atención -->
+            <div class="space-y-3.5 py-1">
+                <!-- Canal WhatsApp Directo -->
+                <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/90 shadow-2xs space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <i data-lucide="message-circle" class="w-6 h-6"></i>
                         </div>
-                        <div>
-                            <label for="soporteTelefono" class="block font-bold text-slate-700 mb-1">Tu Teléfono (para respuesta)</label>
-                            <input 
-                                type="tel" 
-                                id="soporteTelefono" 
-                                name="telefono" 
-                                placeholder="Ej. 922508449"
-                                class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 text-slate-900 font-mono"
-                            >
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-2 flex-wrap">
+                                <span class="text-[11px] font-black uppercase text-emerald-800 tracking-wider">WhatsApp Directo • Respuesta Rápida</span>
+                                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Recomendado</span>
+                            </div>
+                            <p class="text-base font-black text-slate-900 font-mono mt-0.5">922 508 449</p>
+                            <p class="text-xs text-slate-600 mt-1 leading-snug">
+                                Escríbenos directamente para resolver dudas, guiarte en el uso o si necesitas enviar capturas de pantalla de algún error.
+                            </p>
                         </div>
                     </div>
+                    <a 
+                        href="https://wa.me/51922508449?text=Hola%20SherekePet,%20necesito%20soporte%20o%20reportar%20un%20inconveniente%20en%20mi%20cl%C3%ADnica%20veterinaria." 
+                        target="_blank" 
+                        class="btn-touch w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-xl font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2"
+                    >
+                        <i data-lucide="send" class="w-4 h-4"></i>
+                        <span>Abrir Chat de WhatsApp</span>
+                    </a>
+                </div>
 
-                    <div>
-                        <label for="soporteAsunto" class="block font-bold text-slate-700 mb-1">Asunto / Título Breve</label>
-                        <input 
-                            type="text" 
-                            id="soporteAsunto" 
-                            name="asunto" 
-                            placeholder="Ej. Error al guardar ficha clínica..."
-                            required 
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 text-slate-900 font-medium"
+                <!-- Canal Correo Electrónico -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-2xs space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                            <i data-lucide="mail" class="w-6 h-6"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <span class="text-[11px] font-black uppercase text-indigo-800 tracking-wider">Correo de Soporte</span>
+                            <p class="text-sm font-bold text-slate-900 truncate mt-0.5 font-mono">soporte@sherekepet.com</p>
+                            <p class="text-xs text-slate-500 mt-1 leading-snug">
+                                Si prefieres reportes detallados o adjuntar documentos, puedes redactar un correo directamente a nuestro buzón de soporte.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <a 
+                            href="mailto:soporte@sherekepet.com?subject=Soporte%20T%C3%A9cnico%20SherekePet" 
+                            class="btn-touch py-2 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
                         >
-                    </div>
-
-                    <div>
-                        <label for="soporteMensaje" class="block font-bold text-slate-700 mb-1">Descripción del Problema o Consulta *</label>
-                        <textarea 
-                            id="soporteMensaje" 
-                            name="mensaje" 
-                            rows="3" 
-                            required 
-                            placeholder="Explica qué ocurrió, qué intentabas hacer o cómo te podemos ayudar..."
-                            class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 text-slate-900"
-                        ></textarea>
-                    </div>
-
-                    <div class="pt-2 flex items-center justify-end space-x-2 border-t border-slate-100">
+                            <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>Abrir Correo</span>
+                        </a>
                         <button 
                             type="button" 
-                            onclick="cerrarModalSoportePlataforma()" 
-                            class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold"
+                            onclick="navigator.clipboard.writeText('soporte@sherekepet.com'); alert('¡Correo soporte@sherekepet.com copiado al portapapeles!');"
+                            class="btn-touch py-2 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-800 rounded-xl font-semibold text-xs transition-colors flex items-center justify-center gap-1.5"
                         >
-                            Cerrar
-                        </button>
-                        <button 
-                            type="submit" 
-                            id="btnEnviarReporteSoporte" 
-                            class="btn-touch px-5 py-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl font-bold shadow-sm transition-all flex items-center space-x-1.5"
-                        >
-                            <i data-lucide="send" class="w-4 h-4"></i>
-                            <span>Enviar Reporte</span>
+                            <i data-lucide="copy" class="w-3.5 h-3.5 text-slate-500"></i>
+                            <span>Copiar Email</span>
                         </button>
                     </div>
-                </form>
+                </div>
+
+                <!-- Aviso de Horario y Atención -->
+                <div class="p-3 bg-slate-100/80 rounded-xl border border-slate-200 flex items-start gap-2.5 text-slate-600 text-[11px]">
+                    <i data-lucide="clock" class="w-4 h-4 text-slate-500 shrink-0 mt-0.5"></i>
+                    <span><strong>Horario de Atención:</strong> Lunes a Sábado de 8:00 AM a 8:00 PM. Para urgencias de sistema, escríbenos directamente por WhatsApp.</span>
+                </div>
+            </div>
+
+            <div class="pt-2 flex items-center justify-end border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalSoportePlataforma()" 
+                    class="btn-touch px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors"
+                >
+                    Entendido / Cerrar
+                </button>
             </div>
         </div>
     </div>
@@ -773,7 +747,13 @@
                     cerrarModalSoportePlataforma();
                 } else {
                     const err = await resp.json();
-                    alert("Error al enviar reporte: " + (err.detail || "Verifique los datos"));
+                    let msg = "Verifique los datos ingresados.";
+                    if (typeof err.detail === "string") {
+                        msg = err.detail;
+                    } else if (Array.isArray(err.detail)) {
+                        msg = err.detail.map(d => d.msg || d.message || JSON.stringify(d)).join("\n");
+                    }
+                    alert("Error al enviar reporte:\n" + msg);
                 }
             } catch (err) {
                 console.error(err);

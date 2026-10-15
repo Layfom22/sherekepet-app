@@ -145,6 +145,13 @@ def run_auto_migrations(target_engine) -> None:
         if "sp_servicio_productos" not in tables:
             Base.metadata.create_all(target_engine, tables=[ServicioProducto.__table__])
 
+        # sp_atenciones
+        if "sp_atenciones" in tables:
+            cols = {c["name"] for c in inspector.get_columns("sp_atenciones")}
+            with target_engine.begin() as conn:
+                if "visible_en_carnet" not in cols:
+                    conn.execute(text("ALTER TABLE sp_atenciones ADD COLUMN visible_en_carnet BOOLEAN DEFAULT TRUE;"))
+
         # sp_clientes
         if "sp_clientes" in tables:
             cols = {c["name"] for c in inspector.get_columns("sp_clientes")}

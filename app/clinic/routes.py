@@ -1617,7 +1617,8 @@ def registrar_atencion(
         motivo=payload.motivo,
         diagnostico=payload.diagnostico,
         tratamiento=payload.tratamiento,
-        peso_actual_kg=payload.peso_actual_kg
+        peso_actual_kg=payload.peso_actual_kg,
+        visible_en_carnet=payload.visible_en_carnet
     )
     db.add(atencion)
     db.flush()

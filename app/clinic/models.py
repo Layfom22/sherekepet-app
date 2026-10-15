@@ -231,6 +231,7 @@ class AtencionClinica(Base, SoftDeleteMixin, TimestampMixin):
     diagnostico: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     tratamiento: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     peso_actual_kg: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
+    visible_en_carnet: Mapped[bool] = mapped_column(Boolean, default=True, nullable=True)
 
     # Relaciones
     mascota = relationship("Mascota", back_populates="atenciones")

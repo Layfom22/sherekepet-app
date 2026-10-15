@@ -127,6 +127,7 @@ class AtencionCreateRequest(BaseModel):
     fecha_proximo_bano: Optional[date] = Field(None, description="Fecha sugerida para el próximo baño (ej. cada 15 o 30 días)")
     hora_proximo_bano: Optional[str] = Field("10:00", description="Hora tentativa sugerida para el próximo baño (HH:MM)")
     cita_id: Optional[int] = Field(None, description="ID de la cita asociada para marcarla como ATENDIDA automáticamente")
+    visible_en_carnet: bool = Field(default=True, description="Si es True, se muestra el resumen de cuidados en el carnet del dueño")
 
     @field_validator("tipo_atencion")
     @classmethod
@@ -312,6 +313,6 @@ class MascotaUpdateRequest(BaseModel):
 class SoporteMensajeRequest(BaseModel):
     tipo: str = Field(default="ERROR", description="Tipo de reporte: ERROR, CONSULTA, SUGERENCIA")
     asunto: Optional[str] = Field(default="Reporte de Soporte Técnico", max_length=150)
-    mensaje: str = Field(..., min_length=5, description="Descripción del error o consulta")
+    mensaje: str = Field(..., min_length=2, description="Descripción del error o consulta")
     telefono_contacto: Optional[str] = Field(default=None, max_length=30)
 

@@ -1142,6 +1142,103 @@ def test_enviar_reporte_soporte_veterinario(client, db_session, vet_setup):
     assert "wa.me/51922508449" in data["whatsapp_url"]
 
 
+def test_confidencialidad_atencion_y_filtro_carnet(client, db_session, vet_setup):
+    """
+    Verifica la estricta confidencialidad médica de las atenciones:
+    1. Si visible_en_carnet=True: El carnet digital del dueño muestra el motivo y cuidados,
+       pero NUNCA expone el campo interno 'diagnostico' técnico ni conjeturas clínicas.
+    2. Si visible_en_carnet=False: La atención se oculta completamente del carnet del dueño,
+       pero permanece 100% visible para el equipo veterinario en la ficha clínica de la mascota.
+    """
+    clinica = vet_setup["clinica"]
+    vet = vet_setup["vet"]
+
+    # Crear cliente y mascota
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="44556677",
+        nombre_completo="Juan Paciente",
+        telefono="987654321"
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Firulais Privado",
+        especie="Canino"
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    # 1. Registrar atención con visible_en_carnet=True y diagnóstico técnico
+    client.cookies.clear()
+    token_vet = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.set("vet_token", token_vet)
+
+    resp_at1 = client.post("/api/clinic/atenciones", json={
+        "clinica_id": clinica.id,
+        "mascota_id": mascota.id,
+        "tipo_atencion": "CONSULTA",
+        "motivo": "Fiebre y decaimiento leve",
+        "diagnostico": "DIAGNOSTICO_CONFIDENCIAL_SOSPECHA_HEMOPARASITO",
+        "tratamiento": "Reposo absoluto y suero oral en casa",
+        "peso_actual_kg": 15.5,
+        "visible_en_carnet": True
+    })
+    assert resp_at1.status_code == 201
+
+    # 2. Registrar atención con visible_en_carnet=False
+    resp_at2 = client.post("/api/clinic/atenciones", json={
+        "clinica_id": clinica.id,
+        "mascota_id": mascota.id,
+        "tipo_atencion": "CONSULTA",
+        "motivo": "PROCEDIMIENTO_INTERNO_OCULTO",
+        "diagnostico": "DIAGNOSTICO_SECRETO_CLINICO",
+        "tratamiento": "Tratamiento interno exclusivamente intrahospitalario",
+        "visible_en_carnet": False
+    })
+    assert resp_at2.status_code == 201
+
+    # 3. Comprobar que en la ficha clínica del veterinario ambas atenciones existen y el diagnóstico es visible
+    resp_ficha = client.get(f"/pacientes/{mascota.id}")
+    assert resp_ficha.status_code == 200
+    assert "DIAGNOSTICO_CONFIDENCIAL_SOSPECHA_HEMOPARASITO" in resp_ficha.text
+    assert "DIAGNOSTICO_SECRETO_CLINICO" in resp_ficha.text
+    assert "PROCEDIMIENTO_INTERNO_OCULTO" in resp_ficha.text
+
+    # 4. Cambiar a sesión del dueño autenticado (Portal de Clientes)
+    client.cookies.clear()
+    token_client = create_access_token({
+        "sub": str(cliente.id),
+        "dni": cliente.dni,
+        "role": "client"
+    })
+    client.cookies.set("client_token", token_client)
+
+    resp_carnet = client.get(f"/portal/carnet/{mascota.id}")
+    assert resp_carnet.status_code == 200
+
+    # Debe contener el motivo público y cuidados de la atención 1
+    assert "Fiebre y decaimiento leve" in resp_carnet.text
+    assert "Reposo absoluto y suero oral en casa" in resp_carnet.text
+
+    # NUNCA debe contener el diagnóstico confidencial
+    assert "DIAGNOSTICO_CONFIDENCIAL_SOSPECHA_HEMOPARASITO" not in resp_carnet.text
+
+    # La atención 2 con visible_en_carnet=False NUNCA debe aparecer
+    assert "PROCEDIMIENTO_INTERNO_OCULTO" not in resp_carnet.text
+    assert "DIAGNOSTICO_SECRETO_CLINICO" not in resp_carnet.text
+
+
+
 
 
 

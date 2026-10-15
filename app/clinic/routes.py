@@ -3642,12 +3642,23 @@ def crear_cita_veterinario(
             )
         resolved_cliente_id = payload.cliente_id or mascota.cliente_id
         cliente = mascota.cliente
-    elif payload.nuevo_mascota_nombre and payload.nuevo_mascota_nombre.strip():
-        # Registro rápido de nuevo cliente / mascota
+    elif payload.nuevo_cliente_nombre or payload.nuevo_cliente_telefono or payload.nuevo_cliente_dni or payload.nuevo_mascota_nombre:
+        # Registro rápido de nuevo cliente / mascota (nombre de mascota opcional)
         dni_limpio = (payload.nuevo_cliente_dni or "").strip()
         nom_cliente = (payload.nuevo_cliente_nombre or "").strip() or "Propietario"
         tel_cliente = (payload.nuevo_cliente_telefono or "").strip()
         email_cliente = (payload.nuevo_cliente_email or "").strip().lower()
+
+        # Nombre de mascota opcional: si el veterinario no lo especifica, asignar nombre descriptivo
+        nom_mascota = (payload.nuevo_mascota_nombre or "").strip()
+        especie_mascota = (payload.nuevo_mascota_especie or "Canino").strip()
+        if not nom_mascota:
+            if especie_mascota.lower() in ("canino", "perro"):
+                nom_mascota = "Perrito (Sin Nombre)"
+            elif especie_mascota.lower() in ("felino", "gato"):
+                nom_mascota = "Gatito (Sin Nombre)"
+            else:
+                nom_mascota = f"Mascota ({especie_mascota})"
 
         if dni_limpio:
             cliente = db.query(Cliente).filter(
@@ -3677,8 +3688,8 @@ def crear_cita_veterinario(
         mascota = Mascota(
             clinica_id=target_clinica_id,
             cliente_id=resolved_cliente_id,
-            nombre=payload.nuevo_mascota_nombre.strip(),
-            especie=(payload.nuevo_mascota_especie or "Canino").strip(),
+            nombre=nom_mascota,
+            especie=especie_mascota,
             raza="Mestizo"
         )
         db.add(mascota)

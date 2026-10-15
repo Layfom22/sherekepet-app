@@ -84,14 +84,22 @@
             </a>
         </div>
 
-        <!-- Botón Rápido: Nuevo Paciente -->
-        <div class="p-4 pb-2">
+        <!-- Botones Rápidos: Nuevo Paciente & Agendar Cita -->
+        <div class="p-3 pb-2 space-y-1.5">
             <a 
                 href="/pacientes/nuevo" 
                 class="btn-touch w-full px-4 py-2.5 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 group"
             >
                 <i data-lucide="plus-circle" class="w-4 h-4 transition-transform group-hover:rotate-90" aria-hidden="true"></i>
                 <span>Nuevo Paciente</span>
+            </a>
+            <a 
+                href="/agenda?agendar=1" 
+                class="btn-touch w-full px-4 py-2 text-xs font-bold text-teal-800 bg-teal-50 hover:bg-teal-100 hover:text-teal-900 border border-teal-200 rounded-xl transition-all flex items-center justify-center gap-2"
+                title="Agendar cita por llamada o WhatsApp"
+            >
+                <i data-lucide="calendar-plus" class="w-4 h-4 text-teal-600" aria-hidden="true"></i>
+                <span>+ Agendar Cita</span>
             </a>
         </div>
 
@@ -238,7 +246,16 @@
             </span>
         </a>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5">
+            <a 
+                href="/agenda?agendar=1" 
+                class="btn-touch px-2.5 py-1.5 text-xs font-bold text-teal-800 bg-teal-50 border border-teal-200 active:bg-teal-100 rounded-xl flex items-center gap-1 shadow-2xs"
+                title="Agendar Cita Médica"
+            >
+                <i data-lucide="calendar-plus" class="w-3.5 h-3.5 text-teal-600" aria-hidden="true"></i>
+                <span class="hidden sm:inline">Cita</span>
+            </a>
+
             <a 
                 href="/pacientes/nuevo" 
                 class="btn-touch px-3 py-1.5 text-xs font-bold text-white bg-teal-600 active:bg-teal-700 rounded-xl flex items-center gap-1 shadow-2xs"

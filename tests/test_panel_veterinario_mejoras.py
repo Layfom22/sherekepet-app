@@ -836,6 +836,22 @@ def test_flujo_agendar_editar_eliminar_citas_veterinario(client, db_session, vet
     # Verificar correo de cancelación
     assert any(c["tipo"] == "CANCELACION" and c["destinatario"] == "roberto@sherekepet.com" for c in correos_enviados)
 
+    # 8. Agendar cita con nombre de mascota opcional (omitido en la llamada)
+    resp_crear_sin_nombre = client.post("/api/clinic/citas", json={
+        "nuevo_cliente_dni": "88990011",
+        "nuevo_cliente_nombre": "Mario Vargas",
+        "nuevo_cliente_telefono": "955443322",
+        "nuevo_mascota_especie": "Canino",
+        "fecha": fecha_manana,
+        "hora": "18:00",
+        "motivo": "Revisión rápida por llamada",
+        "estado": "CONFIRMADA",
+        "enviar_email": False
+    })
+    assert resp_crear_sin_nombre.status_code == 200
+    data_sn = resp_crear_sin_nombre.json()
+    assert "Perrito (Sin Nombre)" in data_sn["mascota_nombre"]
+
 
 
 

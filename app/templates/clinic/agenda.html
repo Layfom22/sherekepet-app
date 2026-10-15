@@ -450,19 +450,41 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-700 mb-1">DNI del Dueño (Opcional):</label>
-                        <input type="text" id="nuevoDni" placeholder="Ej. 72345678" maxlength="12" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                        <div class="flex items-center justify-between mb-1">
+                            <label class="block text-[11px] font-bold text-slate-700">DNI del Dueño (Opcional):</label>
+                            <span id="reniecStatusAgendar" class="text-[10px] font-semibold text-teal-600"></span>
+                        </div>
+                        <div class="relative flex items-center">
+                            <input 
+                                type="text" 
+                                id="nuevoDni" 
+                                placeholder="DNI (8 dígitos)..." 
+                                maxlength="8" 
+                                class="w-full pl-3 pr-20 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold"
+                                oninput="onDniNuevoInput(this.value)"
+                            >
+                            <button 
+                                type="button" 
+                                id="btnBuscarDniNuevo" 
+                                onclick="consultarDniNuevoPaciente()" 
+                                class="btn-touch absolute right-1 px-2.5 py-1 text-[10px] font-black text-teal-700 hover:text-white bg-teal-50 hover:bg-teal-600 rounded-lg border border-teal-200 transition-colors flex items-center gap-1 cursor-pointer"
+                                title="Buscar en RENIEC y red SherekePet"
+                            >
+                                <i data-lucide="search" class="w-3 h-3"></i>
+                                <span>RENIEC</span>
+                            </button>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 mb-1">Nombre del Dueño *:</label>
-                        <input type="text" id="nuevoNombreDueno" placeholder="Ej. Carlos Mendoza" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                        <input type="text" id="nuevoNombreDueno" placeholder="Se autocompleta con RENIEC o escribe aquí" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 mb-1">Teléfono / WhatsApp *:</label>
-                        <input type="tel" id="nuevoTelefono" placeholder="Ej. 987654321" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                        <input type="tel" id="nuevoTelefono" placeholder="Ej. 987654321" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold">
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 mb-1">Correo Electrónico:</label>
@@ -472,12 +494,12 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Nombre de la Mascota *:</label>
-                        <input type="text" id="nuevoNombreMascota" placeholder="Ej. Firulais" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Nombre de la Mascota <span class="text-slate-400 font-normal">(Opcional)</span>:</label>
+                        <input type="text" id="nuevoNombreMascota" placeholder="Ej. Firulais (o dejar en blanco)" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
                     </div>
                     <div>
                         <label class="block text-[11px] font-bold text-slate-700 mb-1">Especie:</label>
-                        <select id="nuevoEspecie" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                        <select id="nuevoEspecie" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold">
                             <option value="Canino">Canino (Perro)</option>
                             <option value="Felino">Felino (Gato)</option>
                             <option value="Conejo">Conejo</option>
@@ -818,6 +840,108 @@ async function cargarPacientePreseleccionado(mascotaId) {
     } catch(e) {}
 }
 
+// Consulta de DNI con soporte dual: Base SherekePet y RENIEC
+let dniConsultadoUltimo = "";
+let timerDniNuevo = null;
+
+function onDniNuevoInput(val) {
+    const clean = val.replace(/\D/g, '');
+    document.getElementById('nuevoDni').value = clean;
+    clearTimeout(timerDniNuevo);
+    if (clean.length === 8 && clean !== dniConsultadoUltimo) {
+        timerDniNuevo = setTimeout(() => {
+            consultarDniNuevoPaciente();
+        }, 350);
+    }
+}
+
+async function consultarDniNuevoPaciente() {
+    const dni = document.getElementById('nuevoDni').value.trim();
+    const statusMsg = document.getElementById('reniecStatusAgendar');
+    const btn = document.getElementById('btnBuscarDniNuevo');
+
+    if (!dni || dni.length !== 8 || !/^\d{8}$/.test(dni)) {
+        if (statusMsg) {
+            statusMsg.className = "text-[10px] font-bold text-rose-600";
+            statusMsg.textContent = "Ingresa 8 dígitos";
+        }
+        return;
+    }
+
+    dniConsultadoUltimo = dni;
+    if (statusMsg) {
+        statusMsg.className = "text-[10px] font-bold text-teal-600 animate-pulse";
+        statusMsg.textContent = "Buscando...";
+    }
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>`;
+        lucide.createIcons();
+    }
+
+    try {
+        // 1. Paso 1: Búsqueda en la red SherekePet (Cross-Tenant)
+        const respRed = await fetch(`/api/clinic/buscar-dni/${encodeURIComponent(dni)}`);
+        if (respRed.ok) {
+            const dataRed = await respRed.json();
+            if (dataRed.encontrado && dataRed.cliente) {
+                if (dataRed.cliente.nombre_completo) {
+                    document.getElementById('nuevoNombreDueno').value = dataRed.cliente.nombre_completo;
+                }
+                if (dataRed.cliente.telefono) {
+                    document.getElementById('nuevoTelefono').value = dataRed.cliente.telefono;
+                }
+                if (statusMsg) {
+                    statusMsg.className = "text-[10px] font-bold text-emerald-700";
+                    statusMsg.textContent = "✓ Encontrado en SherekePet";
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<i data-lucide="check" class="w-3 h-3 text-emerald-600"></i><span>Listo</span>`;
+                    lucide.createIcons();
+                }
+                return;
+            }
+        }
+
+        // 2. Paso 2: Consulta RENIEC
+        if (statusMsg) statusMsg.textContent = "Consultando RENIEC...";
+        const respReniec = await fetch(`/api/reniec/dni/${dni}`);
+        if (respReniec.ok) {
+            const dataReniec = await respReniec.json();
+            if (dataReniec.nombre_completo) {
+                document.getElementById('nuevoNombreDueno').value = dataReniec.nombre_completo;
+                if (statusMsg) {
+                    statusMsg.className = "text-[10px] font-bold text-emerald-700";
+                    statusMsg.textContent = "✓ Encontrado en RENIEC";
+                }
+            } else {
+                if (statusMsg) {
+                    statusMsg.className = "text-[10px] font-medium text-amber-600";
+                    statusMsg.textContent = "No encontrado en RENIEC";
+                }
+            }
+        } else {
+            if (statusMsg) {
+                statusMsg.className = "text-[10px] font-medium text-amber-600";
+                statusMsg.textContent = "No registrado en RENIEC";
+            }
+        }
+    } catch (e) {
+        console.error("Error consultando DNI:", e);
+        if (statusMsg) {
+            statusMsg.className = "text-[10px] font-medium text-rose-600";
+            statusMsg.textContent = "Error al consultar";
+        }
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="search" class="w-3 h-3"></i><span>RENIEC</span>`;
+            lucide.createIcons();
+        }
+    }
+}
+
 // Guardar nueva cita
 async function guardarNuevaCita() {
     const btn = document.getElementById('btnGuardarCita');
@@ -855,8 +979,8 @@ async function guardarNuevaCita() {
         const telefono = document.getElementById('nuevoTelefono').value.trim();
         const nombreMascota = document.getElementById('nuevoNombreMascota').value.trim();
 
-        if (!nombreDueno || !telefono || !nombreMascota) {
-            alert("Por favor completa los campos obligatorios del nuevo paciente (Dueño, Teléfono y Mascota).");
+        if (!nombreDueno || !telefono) {
+            alert("Por favor completa los campos del dueño (Nombre y Teléfono son obligatorios para registrar la cita).");
             return;
         }
 
@@ -1076,12 +1200,15 @@ async function cambiarEstadoCita(citaId, accion) {
     }
 }
 
-// Auto apertura si viene parámetro por URL (ej. desde ficha de mascota)
+// Auto apertura si viene parámetro por URL (ej. desde ficha de mascota o dashboard)
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const mascotaId = params.get('agendar_mascota_id');
+    const agendar = params.get('agendar');
     if (mascotaId) {
         abrirModalAgendarCita(mascotaId);
+    } else if (agendar === '1' || agendar === 'true') {
+        abrirModalAgendarCita();
     }
 });
 </script>

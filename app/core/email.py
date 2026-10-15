@@ -1094,4 +1094,107 @@ def send_payment_approved_email(
     return False
 
 
+def send_support_ticket_email(
+    clinica_nombre: str,
+    clinica_id: int,
+    veterinario_nombre: str,
+    veterinario_email: str,
+    tipo: str,
+    asunto_usuario: str,
+    mensaje: str,
+    telefono_contacto: Optional[str] = None
+) -> bool:
+    """Envía un correo de ticket de soporte o reporte de error a la dirección de soporte (roggerjjj@gmail.com)."""
+    destinatario = (settings.SOPORTE_EMAIL or "roggerjjj@gmail.com").strip().lower()
+    remitente = settings.SMTP_FROM or "SherekePet Soporte <soporte@sherekepet.com>"
+
+    c_nom = _esc(clinica_nombre)
+    v_nom = _esc(veterinario_nombre)
+    v_email = _esc(veterinario_email)
+    t_tipo = _esc(tipo.upper())
+    a_usr = _esc(asunto_usuario)
+    msg_esc = _esc(mensaje).replace("\n", "<br>")
+    tel_esc = _esc(telefono_contacto or "No especificado")
+
+    asunto = f"🚨 [{t_tipo}] {a_usr} - {c_nom}"
+
+    texto_plano = (
+        f"Nuevo reporte de soporte recibido en SherekePet:\n\n"
+        f"- Tipo: {tipo}\n"
+        f"- Clínica: {clinica_nombre} (ID #{clinica_id})\n"
+        f"- Veterinario: {veterinario_nombre} ({veterinario_email})\n"
+        f"- Teléfono: {telefono_contacto or 'No especificado'}\n"
+        f"- Asunto: {asunto_usuario}\n\n"
+        f"Mensaje:\n{mensaje}\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Reporte de Soporte SherekePet</title></head>
+<body style="margin:0;padding:24px;background-color:#f8fafc;font-family:sans-serif;color:#0f172a;">
+  <div style="max-width:540px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;">
+    <div style="margin-bottom:16px;">
+      <span style="display:inline-block;padding:4px 12px;background:#fee2e2;color:#991b1b;border-radius:999px;font-size:11px;font-weight:bold;">
+        {t_tipo} PLATAFORMA
+      </span>
+      <h2 style="margin:12px 0 4px 0;font-size:18px;color:#0f172a;">{a_usr}</h2>
+      <p style="margin:0;font-size:13px;color:#64748b;">De: {c_nom} (ID #{clinica_id})</p>
+    </div>
+
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;font-size:13px;">
+      <tr><td style="padding:6px 0;color:#64748b;width:120px;">Veterinario:</td><td style="font-weight:bold;">{v_nom}</td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;">Email:</td><td><a href="mailto:{v_email}">{v_email}</a></td></tr>
+      <tr><td style="padding:6px 0;color:#64748b;">Teléfono:</td><td>{tel_esc}</td></tr>
+    </table>
+
+    <div style="padding:16px;background-color:#f1f5f9;border-radius:12px;font-size:14px;color:#1e293b;line-height:1.6;margin-bottom:20px;">
+      <strong style="display:block;margin-bottom:6px;color:#475569;font-size:12px;text-transform:uppercase;">Detalle del Reporte:</strong>
+      {msg_esc}
+    </div>
+
+    <div style="font-size:12px;color:#94a3b8;border-top:1px solid #e2e8f0;padding-top:12px;text-align:center;">
+      SherekePet Soporte &bull; WhatsApp: {settings.SOPORTE_WHATSAPP} &bull; {settings.SOPORTE_EMAIL_PUBLIC}
+    </div>
+  </div>
+</body>
+</html>"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando ticket de soporte vía Resend: {e}")
+
+    if settings.SMTP_USER and settings.SMTP_PASS:
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = asunto
+            msg["From"] = remitente
+            msg["To"] = destinatario
+            msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+            msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+            if settings.SMTP_TLS:
+                server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASS)
+            server.send_message(msg)
+            server.quit()
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando ticket de soporte vía SMTP: {e}")
+
+    return False
+
+
+
 

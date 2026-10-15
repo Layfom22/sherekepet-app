@@ -1013,15 +1013,22 @@ def portal_carnet_mascota(
 
 class MascotaPerfilUpdateRequest(BaseModel):
     nombre: Optional[str] = None
+    especie: Optional[str] = None
     sexo: Optional[str] = None
     fecha_nacimiento: Optional[date] = None
+    peso: Optional[float] = None
     rasgos_distintivos: Optional[str] = None
     microchip: Optional[str] = None
     foto_url: Optional[str] = None
     raza: Optional[str] = None
+    tiene_alergias: Optional[bool] = None
+    alergias: Optional[str] = None
+    detalle_alergias: Optional[str] = None
+    condiciones_previas: Optional[str] = None
 
 
-@router.post("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos de la Mascota")
+@router.put("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos de la Mascota")
+@router.post("/api/portal/mascotas/{mascota_id}", summary="Actualizar Datos de la Mascota (Alias POST)")
 def actualizar_perfil_mascota(
     mascota_id: int,
     payload: MascotaPerfilUpdateRequest,
@@ -1036,10 +1043,14 @@ def actualizar_perfil_mascota(
 
     if payload.nombre is not None and payload.nombre.strip():
         mascota.nombre = payload.nombre.strip()
+    if payload.especie is not None and payload.especie.strip():
+        mascota.especie = payload.especie.strip()
     if payload.sexo is not None:
         mascota.sexo = payload.sexo
     if payload.fecha_nacimiento is not None:
         mascota.fecha_nacimiento = payload.fecha_nacimiento
+    if payload.peso is not None:
+        mascota.peso = payload.peso
     if payload.rasgos_distintivos is not None:
         mascota.rasgos_distintivos = payload.rasgos_distintivos
     if payload.microchip is not None:
@@ -1048,6 +1059,16 @@ def actualizar_perfil_mascota(
         mascota.foto_url = payload.foto_url
     if payload.raza is not None:
         mascota.raza = payload.raza.strip() if payload.raza.strip() else None
+    if payload.alergias is not None:
+        mascota.alergias = payload.alergias.strip() if payload.alergias.strip() else None
+        if mascota.alergias:
+            mascota.tiene_alergias = True
+    if payload.tiene_alergias is not None:
+        mascota.tiene_alergias = payload.tiene_alergias
+    if payload.detalle_alergias is not None:
+        mascota.detalle_alergias = payload.detalle_alergias.strip() if payload.detalle_alergias.strip() else None
+    if payload.condiciones_previas is not None:
+        mascota.condiciones_previas = payload.condiciones_previas.strip() if payload.condiciones_previas.strip() else None
 
     db.commit()
     db.refresh(mascota)
@@ -1056,10 +1077,17 @@ def actualizar_perfil_mascota(
         "mensaje": "Perfil de la mascota actualizado correctamente.",
         "mascota_id": mascota.id,
         "nombre": mascota.nombre,
+        "especie": mascota.especie,
+        "raza": mascota.raza,
         "sexo": mascota.sexo,
         "fecha_nacimiento": mascota.fecha_nacimiento.isoformat() if mascota.fecha_nacimiento else None,
+        "peso": mascota.peso,
         "rasgos_distintivos": mascota.rasgos_distintivos,
         "microchip": mascota.microchip,
+        "tiene_alergias": mascota.tiene_alergias,
+        "alergias": mascota.alergias,
+        "detalle_alergias": mascota.detalle_alergias,
+        "condiciones_previas": mascota.condiciones_previas,
         "foto_url": mascota.foto_url
     }
 

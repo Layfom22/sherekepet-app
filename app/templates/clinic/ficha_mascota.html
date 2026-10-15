@@ -75,6 +75,16 @@
 
             <!-- Botones de Acción Principal de la Mascota -->
             <div class="flex items-center space-x-2.5 self-start md:self-center flex-wrap gap-y-2">
+                <button 
+                    type="button" 
+                    onclick="abrirModalEditarMascota()"
+                    class="btn-touch px-3.5 py-3 text-sm font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl shadow-xs transition-all flex items-center space-x-1.5"
+                    title="Editar datos de la mascota (nombre, especie, raza, peso, alergias, etc.)"
+                >
+                    <i data-lucide="edit-3" class="w-4 h-4 text-teal-600" aria-hidden="true"></i>
+                    <span>Editar Datos</span>
+                </button>
+
                 <a 
                     href="/agenda?agendar_mascota_id={{ mascota.id }}"
                     class="btn-touch px-4 py-3 text-sm font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl shadow-xs transition-all flex items-center space-x-2"
@@ -663,6 +673,223 @@
                 Cerrar
             </button>
         </div>
+    </div>
+</div>
+
+<!-- ========================================================== -->
+<!-- MODAL: EDITAR DATOS DE LA MASCOTA                          -->
+<!-- ========================================================== -->
+<div 
+    id="modalEditarMascota" 
+    class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center overflow-y-auto"
+>
+    <div class="bg-white rounded-3xl max-w-xl w-full p-5 sm:p-6 shadow-2xl space-y-4 my-8 animate-in fade-in zoom-in duration-150 border border-slate-200">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
+                    <i data-lucide="edit" class="w-4 h-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-slate-900">Editar Datos de {{ mascota.nombre }}</h3>
+                    <p class="text-xs text-slate-500">Actualiza la ficha médica e identidad del paciente</p>
+                </div>
+            </div>
+            <button 
+                type="button" 
+                onclick="cerrarModalEditarMascota()" 
+                class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors"
+                aria-label="Cerrar modal"
+            >
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <form id="formEditarMascota" onsubmit="guardarEdicionMascota(event)" class="space-y-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <!-- Nombre -->
+                <div>
+                    <label for="editMascotaNombre" class="block font-bold text-slate-700 mb-1">Nombre del Paciente *</label>
+                    <input 
+                        type="text" 
+                        id="editMascotaNombre" 
+                        name="nombre" 
+                        value="{{ mascota.nombre }}" 
+                        required 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-bold text-slate-900"
+                    >
+                </div>
+
+                <!-- Especie -->
+                <div>
+                    <label for="editMascotaEspecie" class="block font-bold text-slate-700 mb-1">Especie *</label>
+                    <select 
+                        id="editMascotaEspecie" 
+                        name="especie" 
+                        required 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-semibold text-slate-900 bg-white"
+                    >
+                        <option value="Canino" {% if mascota.especie == 'Canino' %}selected{% endif %}>Canino (Perro)</option>
+                        <option value="Felino" {% if mascota.especie == 'Felino' %}selected{% endif %}>Felino (Gato)</option>
+                        <option value="Ave" {% if mascota.especie == 'Ave' %}selected{% endif %}>Ave</option>
+                        <option value="Roedor" {% if mascota.especie == 'Roedor' %}selected{% endif %}>Roedor / Cobaya</option>
+                        <option value="Conejo" {% if mascota.especie == 'Conejo' %}selected{% endif %}>Conejo</option>
+                        <option value="Reptil" {% if mascota.especie == 'Reptil' %}selected{% endif %}>Reptil</option>
+                        <option value="Otro" {% if mascota.especie not in ['Canino', 'Felino', 'Ave', 'Roedor', 'Conejo', 'Reptil'] %}selected{% endif %}>Otro</option>
+                    </select>
+                </div>
+
+                <!-- Raza -->
+                <div>
+                    <label for="editMascotaRaza" class="block font-bold text-slate-700 mb-1">Raza</label>
+                    <input 
+                        type="text" 
+                        id="editMascotaRaza" 
+                        name="raza" 
+                        value="{{ mascota.raza or '' }}" 
+                        placeholder="Ej. Mestizo, Poodle, Siames..."
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >
+                </div>
+
+                <!-- Sexo -->
+                <div>
+                    <label for="editMascotaSexo" class="block font-bold text-slate-700 mb-1">Sexo</label>
+                    <select 
+                        id="editMascotaSexo" 
+                        name="sexo" 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 bg-white font-medium"
+                    >
+                        <option value="" {% if not mascota.sexo %}selected{% endif %}>No especificado</option>
+                        <option value="Macho" {% if mascota.sexo == 'Macho' %}selected{% endif %}>Macho</option>
+                        <option value="Hembra" {% if mascota.sexo == 'Hembra' %}selected{% endif %}>Hembra</option>
+                    </select>
+                </div>
+
+                <!-- Fecha de Nacimiento -->
+                <div>
+                    <label for="editMascotaFechaNac" class="block font-bold text-slate-700 mb-1">Fecha de Nacimiento</label>
+                    <input 
+                        type="date" 
+                        id="editMascotaFechaNac" 
+                        name="fecha_nacimiento" 
+                        value="{{ mascota.fecha_nacimiento.strftime('%Y-%m-%d') if mascota.fecha_nacimiento else '' }}"
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >
+                </div>
+
+                <!-- Peso -->
+                <div>
+                    <label for="editMascotaPeso" class="block font-bold text-slate-700 mb-1">Peso (kg)</label>
+                    <input 
+                        type="number" 
+                        step="0.01" 
+                        min="0" 
+                        id="editMascotaPeso" 
+                        name="peso" 
+                        value="{{ mascota.peso if mascota.peso is not none else '' }}" 
+                        placeholder="Ej. 12.5" 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-mono"
+                    >
+                </div>
+
+                <!-- Microchip -->
+                <div class="sm:col-span-2">
+                    <label for="editMascotaMicrochip" class="block font-bold text-slate-700 mb-1">Código de Microchip</label>
+                    <input 
+                        type="text" 
+                        id="editMascotaMicrochip" 
+                        name="microchip" 
+                        value="{{ mascota.microchip or '' }}" 
+                        placeholder="Ej. 900215000123456" 
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 font-mono"
+                    >
+                </div>
+
+                <!-- Rasgos Distintivos -->
+                <div class="sm:col-span-2">
+                    <label for="editMascotaRasgos" class="block font-bold text-slate-700 mb-1">Rasgos Distintivos / Señas</label>
+                    <textarea 
+                        id="editMascotaRasgos" 
+                        name="rasgos_distintivos" 
+                        rows="2" 
+                        placeholder="Ej. Mancha blanca en pecho, cicatriz pata trasera..."
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >{{ mascota.rasgos_distintivos or '' }}</textarea>
+                </div>
+
+                <!-- Alergias -->
+                <div class="sm:col-span-2 p-3 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-2">
+                    <div class="flex items-center gap-2">
+                        <input 
+                            type="checkbox" 
+                            id="editMascotaTieneAlergias" 
+                            name="tiene_alergias" 
+                            {% if mascota.tiene_alergias or mascota.alergias %}checked{% endif %}
+                            onchange="document.getElementById('editMascotaAlergiasContainer').classList.toggle('hidden', !this.checked)"
+                            class="w-4 h-4 text-teal-600 rounded focus:ring-teal-500 border-slate-300"
+                        >
+                        <label for="editMascotaTieneAlergias" class="font-bold text-amber-900 cursor-pointer">
+                            ¿Tiene alergias o condiciones médicas adversas?
+                        </label>
+                    </div>
+
+                    <div id="editMascotaAlergiasContainer" class="{% if not (mascota.tiene_alergias or mascota.alergias) %}hidden{% endif %} space-y-2 pt-1">
+                        <div>
+                            <label for="editMascotaAlergias" class="block font-bold text-amber-950 mb-0.5">Resumen de Alergias</label>
+                            <input 
+                                type="text" 
+                                id="editMascotaAlergias" 
+                                name="alergias" 
+                                value="{{ mascota.alergias or '' }}" 
+                                placeholder="Ej. Alergia a la penicilina, picadura de pulga..." 
+                                class="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-slate-900"
+                            >
+                        </div>
+                        <div>
+                            <label for="editMascotaDetalleAlergias" class="block font-bold text-amber-950 mb-0.5">Detalle / Reacción Alérgica</label>
+                            <input 
+                                type="text" 
+                                id="editMascotaDetalleAlergias" 
+                                name="detalle_alergias" 
+                                value="{{ mascota.detalle_alergias or '' }}" 
+                                placeholder="Ej. Shock anafiláctico, dermatitis aguda..." 
+                                class="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-slate-900"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Condiciones Previas / Antecedentes -->
+                <div class="sm:col-span-2">
+                    <label for="editMascotaCondiciones" class="block font-bold text-slate-700 mb-1">Condiciones Previas / Enfermedades Crónicas</label>
+                    <textarea 
+                        id="editMascotaCondiciones" 
+                        name="condiciones_previas" 
+                        rows="2" 
+                        placeholder="Ej. Insuficiencia renal estadio 1, displasia de cadera..."
+                        class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500"
+                    >{{ mascota.condiciones_previas or '' }}</textarea>
+                </div>
+            </div>
+
+            <div class="pt-3 flex items-center justify-end space-x-2 border-t border-slate-100">
+                <button 
+                    type="button" 
+                    onclick="cerrarModalEditarMascota()" 
+                    class="btn-touch px-4 py-2 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 font-bold"
+                >
+                    Cancelar
+                </button>
+                <button 
+                    type="submit" 
+                    id="btnGuardarEdicionMascota" 
+                    class="btn-touch px-5 py-2 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl font-bold shadow-sm transition-all flex items-center space-x-1.5"
+                >
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Guardar Cambios</span>
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}
@@ -1268,6 +1495,73 @@ async function resetearPinCliente(clienteId) {
         if (btn) {
             btn.disabled = false;
             btn.classList.remove("opacity-50");
+        }
+    }
+}
+
+function abrirModalEditarMascota() {
+    const modal = document.getElementById("modalEditarMascota");
+    if (modal) {
+        modal.classList.remove("hidden");
+        window.initLucideIcons?.();
+    }
+}
+
+function cerrarModalEditarMascota() {
+    const modal = document.getElementById("modalEditarMascota");
+    if (modal) modal.classList.add("hidden");
+}
+
+async function guardarEdicionMascota(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnGuardarEdicionMascota");
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add("opacity-75");
+        btn.innerHTML = `<svg class="animate-spin w-4 h-4 text-white inline mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg><span>Guardando...</span>`;
+    }
+
+    const tieneAlergias = document.getElementById("editMascotaTieneAlergias")?.checked || false;
+    const pesoVal = document.getElementById("editMascotaPeso")?.value;
+
+    const payload = {
+        nombre: document.getElementById("editMascotaNombre")?.value.trim(),
+        especie: document.getElementById("editMascotaEspecie")?.value,
+        raza: document.getElementById("editMascotaRaza")?.value.trim() || null,
+        sexo: document.getElementById("editMascotaSexo")?.value || null,
+        fecha_nacimiento: document.getElementById("editMascotaFechaNac")?.value || null,
+        peso: pesoVal ? parseFloat(pesoVal) : null,
+        microchip: document.getElementById("editMascotaMicrochip")?.value.trim() || null,
+        rasgos_distintivos: document.getElementById("editMascotaRasgos")?.value.trim() || null,
+        tiene_alergias: tieneAlergias,
+        alergias: document.getElementById("editMascotaAlergias")?.value.trim() || null,
+        detalle_alergias: document.getElementById("editMascotaDetalleAlergias")?.value.trim() || null,
+        condiciones_previas: document.getElementById("editMascotaCondiciones")?.value.trim() || null
+    };
+
+    try {
+        const resp = await fetch(`/api/clinic/mascotas/{{ mascota.id }}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            alert("¡Datos del paciente actualizados exitosamente!");
+            window.location.reload();
+        } else {
+            const err = await resp.json();
+            alert("Error al actualizar: " + (err.detail || "Verifique los datos ingresados"));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al guardar cambios.");
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove("opacity-75");
+            btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>Guardar Cambios</span>`;
+            window.initLucideIcons?.();
         }
     }
 }

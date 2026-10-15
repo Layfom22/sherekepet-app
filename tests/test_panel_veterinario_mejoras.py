@@ -971,6 +971,178 @@ def test_control_concurrencia_horarios_y_confirmacion_reprogramacion(client, db_
     assert cita_db.estado == "CONFIRMADA"
 
 
+def test_actualizar_mascota_veterinario(client, db_session, vet_setup):
+    """
+    Verifica que el veterinario pueda editar todos los datos de una mascota (nombre, peso, raza, alergias, etc.)
+    en cualquier momento sin requerir registrar una atención clínica, con aislamiento multi-tenant estricto.
+    """
+    clinica = vet_setup["clinica"]
+    vet = vet_setup["vet"]
+
+    # Crear cliente y mascota en la clínica
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="77665544",
+        nombre_completo="Carlos Méndez",
+        telefono="987111222"
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Boby",
+        especie="Canino",
+        raza="Criollo",
+        peso=10.0
+    )
+    db_session.add(mascota)
+    db_session.commit()
+    db_session.refresh(mascota)
+
+    # 1. El veterinario actualiza los datos de Boby
+    resp = client.put(f"/api/clinic/mascotas/{mascota.id}", json={
+        "nombre": "Boby Pro",
+        "especie": "Canino",
+        "raza": "Golden Retriever",
+        "sexo": "Macho",
+        "fecha_nacimiento": "2023-05-15",
+        "peso": 14.5,
+        "microchip": "900123456789",
+        "rasgos_distintivos": "Mancha blanca en pata delantera",
+        "tiene_alergias": True,
+        "alergias": "Pollo y pulgas",
+        "detalle_alergias": "Dermatitis atópica por contacto",
+        "condiciones_previas": "Sensibilidad digestiva"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["nombre"] == "Boby Pro"
+    assert data["raza"] == "Golden Retriever"
+    assert data["peso"] == 14.5
+    assert data["alergias"] == "Pollo y pulgas"
+    assert data["tiene_alergias"] is True
+
+    # Verificar en BD
+    db_session.refresh(mascota)
+    assert mascota.nombre == "Boby Pro"
+    assert mascota.raza == "Golden Retriever"
+    assert mascota.peso == 14.5
+    assert mascota.detalle_alergias == "Dermatitis atópica por contacto"
+
+    # 2. Multi-tenant: Otro veterinario de otra clínica no puede editar a Boby
+    clinica_ajena = Clinica(nombre="Vet Ajena", zona_horaria="America/Lima")
+    db_session.add(clinica_ajena)
+    db_session.flush()
+    vet_ajeno = Veterinario(clinica_id=clinica_ajena.id, nombre="Dr. Ajeno", email="ajeno@vet.pe", rol="VET", is_verified=True, is_active=True)
+    db_session.add(vet_ajeno)
+    db_session.commit()
+
+    token_ajeno = create_access_token({"sub": str(vet_ajeno.id), "clinica_id": clinica_ajena.id, "role": "vet", "rol": "VET"})
+    client.cookies.set("vet_token", token_ajeno)
+
+    resp_ajeno = client.put(f"/api/clinic/mascotas/{mascota.id}", json={"nombre": "Hacked"})
+    assert resp_ajeno.status_code == 404
+    assert "no encontrada en esta clínica" in resp_ajeno.json()["detail"]
+
+
+def test_actualizar_mascota_cliente_portal(client, db_session, vet_setup):
+    """
+    Verifica que el propietario de la mascota pueda editar sus datos desde el portal
+    en cualquier momento mediante PUT /api/portal/mascotas/{mascota_id}, con control IDOR.
+    """
+    clinica = vet_setup["clinica"]
+
+    cliente = Cliente(
+        clinica_id=clinica.id,
+        dni="88776655",
+        nombre_completo="Lucía Valverde",
+        telefono="944332211"
+    )
+    db_session.add(cliente)
+    db_session.flush()
+
+    mascota = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cliente.id,
+        nombre="Michi",
+        especie="Felino",
+        raza="Siamés",
+        peso=3.2
+    )
+    db_session.add(mascota)
+    db_session.commit()
+
+    token_cliente = create_access_token({"sub": str(cliente.id), "dni": cliente.dni, "role": "client"})
+    client.cookies.clear()
+    client.cookies.set("client_token", token_cliente)
+
+    # 1. El dueño edita peso, raza y rasgos de Michi
+    resp = client.put(f"/api/portal/mascotas/{mascota.id}", json={
+        "nombre": "Michi Consentido",
+        "especie": "Felino",
+        "raza": "Siamés Puro",
+        "peso": 3.8,
+        "alergias": "Polvo y humo",
+        "rasgos_distintivos": "Ojos celestes y collar azul con cascabel"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["nombre"] == "Michi Consentido"
+    assert data["peso"] == 3.8
+    assert data["alergias"] == "Polvo y humo"
+
+    # Verificar en BD
+    db_session.refresh(mascota)
+    assert mascota.nombre == "Michi Consentido"
+    assert mascota.peso == 3.8
+
+    # 2. Control IDOR: Otro cliente con diferente DNI intenta editar a Michi -> 403 Forbidden
+    cliente_ext = Cliente(clinica_id=clinica.id, dni="11223344", nombre_completo="Intruso")
+    db_session.add(cliente_ext)
+    db_session.commit()
+
+    token_ext = create_access_token({"sub": str(cliente_ext.id), "dni": cliente_ext.dni, "role": "client"})
+    client.cookies.set("client_token", token_ext)
+
+    resp_ext = client.put(f"/api/portal/mascotas/{mascota.id}", json={"nombre": "Michi Robado"})
+    assert resp_ext.status_code == 403
+
+
+def test_enviar_reporte_soporte_veterinario(client, db_session, vet_setup):
+    """
+    Verifica que el veterinario autenticado pueda enviar un ticket de soporte / reporte de error
+    mediante POST /api/clinic/soporte recibiendo enlace directo a WhatsApp y disparando email a soporte.
+    """
+    vet = vet_setup["vet"]
+    clinica = vet_setup["clinica"]
+
+    token = create_access_token({
+        "sub": str(vet.id),
+        "clinica_id": clinica.id,
+        "role": "vet",
+        "rol": "ADMIN",
+        "email": vet.email
+    })
+    client.cookies.clear()
+    client.cookies.set("vet_token", token)
+
+    resp = client.post("/api/clinic/soporte", json={
+        "tipo": "ERROR",
+        "asunto": "No carga la imagen del logo",
+        "mensaje": "Al intentar subir un logo PNG recibí error de timeout en mi conexión.",
+        "telefono_contacto": "922508449"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "ha sido enviado con éxito" in data["mensaje"]
+    assert "922508449" in data["soporte_whatsapp"]
+    assert "whatsapp_url" in data
+    assert "wa.me/51922508449" in data["whatsapp_url"]
+
+
+
 
 
 

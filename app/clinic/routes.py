@@ -59,7 +59,9 @@ from app.clinic.schemas import (
     MascotaFotoResponse,
     DiaHorarioItem,
     HorariosConfigRequest,
-    HorariosConfigResponse
+    HorariosConfigResponse,
+    MascotaUpdateRequest,
+    SoporteMensajeRequest
 )
 from app.clinic.services.reniec_service import consultar_dni_reniec
 from app.clinic.services.whatsapp_service import generar_enlace_whatsapp
@@ -1244,6 +1246,120 @@ async def upload_foto_clinica_temp(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
     return {"foto_url": foto_url}
+
+
+@router.put(
+    "/api/clinic/mascotas/{mascota_id}",
+    summary="Actualizar Datos de la Mascota (Clínica)",
+    description="Permite al veterinario actualizar los datos clínicos y de identificación de la mascota en cualquier momento."
+)
+@router.put(
+    "/api/mascotas/{mascota_id}",
+    summary="Actualizar Datos de la Mascota (Alias)",
+    description="Permite al veterinario actualizar los datos de la mascota."
+)
+def actualizar_mascota_clinica(
+    mascota_id: int,
+    payload: MascotaUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    query = db.query(Mascota).filter(Mascota.id == mascota_id, Mascota.is_deleted == False)
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(Mascota.clinica_id == current_user.clinica_id)
+    mascota = query.first()
+    if not mascota:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mascota no encontrada en esta clínica.")
+
+    if payload.nombre is not None and payload.nombre.strip():
+        mascota.nombre = payload.nombre.strip()
+    if payload.especie is not None and payload.especie.strip():
+        mascota.especie = payload.especie.strip()
+    if payload.raza is not None:
+        mascota.raza = payload.raza.strip() if payload.raza.strip() else None
+    if payload.sexo is not None:
+        mascota.sexo = payload.sexo.strip() if payload.sexo.strip() else None
+    if payload.fecha_nacimiento is not None:
+        mascota.fecha_nacimiento = payload.fecha_nacimiento
+    if payload.peso is not None:
+        mascota.peso = payload.peso
+    if payload.microchip is not None:
+        mascota.microchip = payload.microchip.strip() if payload.microchip.strip() else None
+    if payload.rasgos_distintivos is not None:
+        mascota.rasgos_distintivos = payload.rasgos_distintivos.strip() if payload.rasgos_distintivos.strip() else None
+    if payload.tiene_alergias is not None:
+        mascota.tiene_alergias = payload.tiene_alergias
+    if payload.alergias is not None:
+        mascota.alergias = payload.alergias.strip() if payload.alergias.strip() else None
+        if mascota.alergias:
+            mascota.tiene_alergias = True
+    if payload.detalle_alergias is not None:
+        mascota.detalle_alergias = payload.detalle_alergias.strip() if payload.detalle_alergias.strip() else None
+    if payload.condiciones_previas is not None:
+        mascota.condiciones_previas = payload.condiciones_previas.strip() if payload.condiciones_previas.strip() else None
+    if payload.foto_url is not None:
+        mascota.foto_url = payload.foto_url.strip() if payload.foto_url.strip() else None
+
+    db.commit()
+    db.refresh(mascota)
+
+    return {
+        "mensaje": "Datos de la mascota actualizados exitosamente.",
+        "mascota_id": mascota.id,
+        "nombre": mascota.nombre,
+        "especie": mascota.especie,
+        "raza": mascota.raza,
+        "sexo": mascota.sexo,
+        "fecha_nacimiento": mascota.fecha_nacimiento.isoformat() if mascota.fecha_nacimiento else None,
+        "peso": mascota.peso,
+        "microchip": mascota.microchip,
+        "rasgos_distintivos": mascota.rasgos_distintivos,
+        "tiene_alergias": mascota.tiene_alergias,
+        "alergias": mascota.alergias,
+        "detalle_alergias": mascota.detalle_alergias,
+        "condiciones_previas": mascota.condiciones_previas,
+        "foto_url": mascota.foto_url
+    }
+
+
+@router.post(
+    "/api/clinic/soporte",
+    summary="Enviar Reporte o Solicitud de Soporte Técnico",
+    description="Permite al veterinario enviar un reporte de error, consulta o sugerencia al equipo de soporte de SherekePet."
+)
+def enviar_reporte_soporte(
+    payload: SoporteMensajeRequest,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    clinica = db.query(Clinica).filter(Clinica.id == current_user.clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Clínica Veterinaria"
+
+    telefono_contacto = payload.telefono_contacto or current_user.telefono or (clinica.telefono if clinica else None)
+
+    from app.core.email import send_support_ticket_email
+    background_tasks.add_task(
+        send_support_ticket_email,
+        clinica_nombre=clinica_nombre,
+        clinica_id=current_user.clinica_id,
+        veterinario_nombre=current_user.nombre or current_user.username or "Veterinario",
+        veterinario_email=current_user.email,
+        tipo=payload.tipo,
+        asunto_usuario=payload.asunto or "Reporte de Plataforma",
+        mensaje=payload.mensaje,
+        telefono_contacto=telefono_contacto
+    )
+
+    whatsapp_url = f"https://wa.me/51{settings.SOPORTE_WHATSAPP}?text=Hola%20SherekePet,%20soy%20{current_user.nombre or 'Veterinario'}%20de%20la%20cl%C3%ADnica%20{clinica_nombre}.%20[{payload.tipo}]%20{payload.asunto}:%20{payload.mensaje}"
+
+    return {
+        "mensaje": "Tu reporte ha sido enviado con éxito al equipo de soporte. Te responderemos a la brevedad.",
+        "whatsapp_url": whatsapp_url,
+        "soporte_whatsapp": settings.SOPORTE_WHATSAPP,
+        "soporte_email": settings.SOPORTE_EMAIL_PUBLIC
+    }
 
 
 @router.post(

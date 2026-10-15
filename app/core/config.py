@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     YAPE_PLIN_NUMERO: str = "999 888 777"
     YAPE_PLIN_QR_URL: str = ""
     SOPORTE_EMAIL: str = "roggerjjj@gmail.com"
+    SOPORTE_EMAIL_PUBLIC: str = "soporte@sherekepet.com"
+    SOPORTE_WHATSAPP: str = "922508449"
 
     model_config = SettingsConfigDict(
         env_file=".env",

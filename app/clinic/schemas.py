@@ -291,3 +291,27 @@ class ProductoStockUpdateRequest(BaseModel):
     stock_actual: float = Field(..., ge=0)
     stock_minimo: Optional[float] = Field(default=None, ge=0)
     unidad_medida: Optional[str] = None
+
+
+class MascotaUpdateRequest(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=1, max_length=100)
+    especie: Optional[str] = Field(None, max_length=50)
+    raza: Optional[str] = Field(None, max_length=100)
+    sexo: Optional[str] = Field(None, max_length=20)
+    fecha_nacimiento: Optional[date] = None
+    peso: Optional[float] = Field(None, ge=0)
+    microchip: Optional[str] = Field(None, max_length=50)
+    rasgos_distintivos: Optional[str] = Field(None, max_length=255)
+    tiene_alergias: Optional[bool] = None
+    alergias: Optional[str] = Field(None, max_length=255)
+    detalle_alergias: Optional[str] = Field(None, max_length=255)
+    condiciones_previas: Optional[str] = None
+    foto_url: Optional[str] = None
+
+
+class SoporteMensajeRequest(BaseModel):
+    tipo: str = Field(default="ERROR", description="Tipo de reporte: ERROR, CONSULTA, SUGERENCIA")
+    asunto: Optional[str] = Field(default="Reporte de Soporte Técnico", max_length=150)
+    mensaje: str = Field(..., min_length=5, description="Descripción del error o consulta")
+    telefono_contacto: Optional[str] = Field(default=None, max_length=30)
+

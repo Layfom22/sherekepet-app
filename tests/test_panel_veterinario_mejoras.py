@@ -657,6 +657,187 @@ def test_pagina_publica_planes_y_que_ofrecemos(client):
     assert "Plan Emprendedor Veterinario" in resp_precios.text
 
 
+def test_flujo_agendar_editar_eliminar_citas_veterinario(client, db_session, vet_setup, monkeypatch):
+    """
+    Verifica el flujo completo de:
+    1. Búsqueda rápida de pacientes para agendamiento.
+    2. Agendar cita para paciente existente (con notificación por correo y WhatsApp).
+    3. Agendar cita con registro rápido de nuevo paciente (llamada/WhatsApp).
+    4. Reprogramar / editar cita (cambio de fecha y hora con correo de reprogramación).
+    5. Eliminar cita (Soft Delete con cancelación de recordatorios y correo).
+    6. Seguridad multi-tenant: otra clínica no puede editar ni borrar la cita.
+    """
+    from app.clinic.models import Cita
+    import app.core.email as email_module
+
+    clinica = vet_setup["clinica"]
+    vet = vet_setup["vet"]
+
+    correos_enviados = []
+    def fake_send_confirm(destinatario, cliente_nombre, mascota_nombre, fecha_str, hora_str, motivo, clinica_nombre):
+        correos_enviados.append({
+            "tipo": "CONFIRMACION",
+            "destinatario": destinatario,
+            "mascota": mascota_nombre,
+            "fecha": fecha_str,
+            "hora": hora_str
+        })
+        return True
+
+    def fake_send_reschedule(destinatario, cliente_nombre, mascota_nombre, fecha_anterior_str, hora_anterior_str, nueva_fecha_str, nueva_hora_str, motivo, clinica_nombre):
+        correos_enviados.append({
+            "tipo": "REPROGRAMACION",
+            "destinatario": destinatario,
+            "mascota": mascota_nombre,
+            "nueva_fecha": nueva_fecha_str,
+            "nueva_hora": nueva_hora_str
+        })
+        return True
+
+    def fake_send_cancel(destinatario, cliente_nombre, mascota_nombre, fecha_str, hora_str, motivo, clinica_nombre):
+        correos_enviados.append({
+            "tipo": "CANCELACION",
+            "destinatario": destinatario,
+            "mascota": mascota_nombre,
+            "fecha": fecha_str
+        })
+        return True
+
+    monkeypatch.setattr(email_module, "send_client_appointment_confirmation_email", fake_send_confirm)
+    monkeypatch.setattr(email_module, "send_client_appointment_reschedule_email", fake_send_reschedule)
+    monkeypatch.setattr(email_module, "send_client_appointment_cancellation_email", fake_send_cancel)
+
+    # 1. Crear cliente y mascota existente
+    cli_existente = Cliente(
+        clinica_id=clinica.id,
+        dni="44556677",
+        nombre_completo="Roberto Palacios",
+        telefono="988776655",
+        email="roberto@sherekepet.com"
+    )
+    db_session.add(cli_existente)
+    db_session.flush()
+
+    masc_existente = Mascota(
+        clinica_id=clinica.id,
+        cliente_id=cli_existente.id,
+        nombre="Chorri",
+        especie="Canino",
+        raza="Golden Retriever"
+    )
+    db_session.add(masc_existente)
+    db_session.commit()
+
+    # 2. Probar búsqueda rápida para autocompletar
+    resp_busq = client.get("/api/clinic/pacientes/buscar?q=Chorri")
+    assert resp_busq.status_code == 200
+    res_pacientes = resp_busq.json()["pacientes"]
+    assert len(res_pacientes) == 1
+    assert res_pacientes[0]["nombre"] == "Chorri"
+    assert res_pacientes[0]["cliente"]["dni"] == "44556677"
+
+    # 3. Agendar cita para mascota existente
+    fecha_manana = (date.today() + timedelta(days=1)).isoformat()
+    resp_crear1 = client.post("/api/clinic/citas", json={
+        "mascota_id": masc_existente.id,
+        "fecha": fecha_manana,
+        "hora": "15:30",
+        "motivo": "Vacunación Antirrábica",
+        "estado": "CONFIRMADA",
+        "enviar_email": True
+    })
+    assert resp_crear1.status_code == 200
+    data_c1 = resp_crear1.json()
+    assert data_c1["estado"] == "CONFIRMADA"
+    assert "whatsapp_url" in data_c1
+    assert data_c1["whatsapp_url"] is not None
+    assert "wa.me/51988776655" in data_c1["whatsapp_url"]
+
+    # Verificar que se envió correo de confirmación
+    assert len(correos_enviados) == 1
+    assert correos_enviados[0]["tipo"] == "CONFIRMACION"
+    assert correos_enviados[0]["destinatario"] == "roberto@sherekepet.com"
+
+    cita_id1 = data_c1["cita_id"]
+
+    # 4. Agendar cita para nuevo paciente (registro rápido por llamada/WhatsApp)
+    resp_crear2 = client.post("/api/clinic/citas", json={
+        "nuevo_cliente_dni": "11223344",
+        "nuevo_cliente_nombre": "Lucía Méndez",
+        "nuevo_cliente_telefono": "912345678",
+        "nuevo_cliente_email": "lucia@sherekepet.com",
+        "nuevo_mascota_nombre": "Pelusa",
+        "nuevo_mascota_especie": "Felino",
+        "fecha": fecha_manana,
+        "hora": "17:00",
+        "motivo": "Consulta Médica General",
+        "estado": "CONFIRMADA",
+        "enviar_email": True
+    })
+    assert resp_crear2.status_code == 200
+    data_c2 = resp_crear2.json()
+    assert data_c2["mascota_nombre"] == "Pelusa"
+    assert "wa.me/51912345678" in data_c2["whatsapp_url"]
+
+    # Verificar que se crearon en BD
+    nuevo_cli_db = db_session.query(Cliente).filter(Cliente.dni == "11223344", Cliente.clinica_id == clinica.id).first()
+    assert nuevo_cli_db is not None
+    assert nuevo_cli_db.nombre_completo == "Lucía Méndez"
+    nuevo_masc_db = db_session.query(Mascota).filter(Mascota.nombre == "Pelusa", Mascota.clinica_id == clinica.id).first()
+    assert nuevo_masc_db is not None
+
+    # 5. Editar / Reprogramar la primera cita (cambiar hora y fecha)
+    fecha_futura = (date.today() + timedelta(days=2)).isoformat()
+    resp_edit = client.put(f"/api/clinic/citas/{cita_id1}", json={
+        "fecha": fecha_futura,
+        "hora": "16:45",
+        "motivo": "Vacunación Antirrábica y Desparasitación",
+        "estado": "CONFIRMADA",
+        "enviar_email": True
+    })
+    assert resp_edit.status_code == 200
+    data_edit = resp_edit.json()
+    assert data_edit["reprogramada"] is True
+    assert data_edit["hora"] == "16:45"
+    assert "wa.me/51988776655" in data_edit["whatsapp_url"]
+
+    # Verificar correo de reprogramación
+    assert any(c["tipo"] == "REPROGRAMACION" and c["destinatario"] == "roberto@sherekepet.com" for c in correos_enviados)
+
+    # 6. Seguridad multi-tenant: otra clínica intenta editar o borrar la cita de clínica 1
+    clinica_b = Clinica(nombre="Vet Rival", zona_horaria="America/Lima")
+    db_session.add(clinica_b)
+    db_session.flush()
+    vet_b = Veterinario(clinica_id=clinica_b.id, nombre="Dr. Rival", email="rival@vet.pe", rol="ADMIN", is_verified=True, is_active=True)
+    db_session.add(vet_b)
+    db_session.commit()
+
+    token_b = create_access_token({"sub": str(vet_b.id), "clinica_id": clinica_b.id, "role": "vet", "rol": "ADMIN"})
+    client.cookies.set("vet_token", token_b)
+
+    resp_hack_edit = client.put(f"/api/clinic/citas/{cita_id1}", json={"motivo": "Hack"})
+    assert resp_hack_edit.status_code == 404
+
+    resp_hack_del = client.delete(f"/api/clinic/citas/{cita_id1}")
+    assert resp_hack_del.status_code == 404
+
+    # 7. Eliminar cita (Soft Delete) con la clínica propietaria
+    client.cookies.set("vet_token", create_access_token({"sub": str(vet.id), "clinica_id": clinica.id, "role": "vet", "rol": "ADMIN"}))
+    resp_del = client.delete(f"/api/clinic/citas/{cita_id1}")
+    assert resp_del.status_code == 200
+    assert resp_del.json()["mensaje"] == "Cita eliminada correctamente."
+
+    # Verificar soft-delete en BD
+    cita_borrada = db_session.query(Cita).filter(Cita.id == cita_id1).first()
+    assert cita_borrada.is_deleted is True
+    assert cita_borrada.deleted_at is not None
+    assert cita_borrada.estado == "CANCELADA"
+
+    # Verificar correo de cancelación
+    assert any(c["tipo"] == "CANCELACION" and c["destinatario"] == "roberto@sherekepet.com" for c in correos_enviados)
+
+
+
 
 
 

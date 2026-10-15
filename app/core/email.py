@@ -430,7 +430,290 @@ def send_client_appointment_confirmation_email(
         except Exception as e:
             logger.warning(f"Error enviando correo de confirmación a cliente con Resend: {e}")
 
-    return False
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[NOTIFICACIÓN CONFIRMACIÓN SIMULADA] Para: {destinatario} | Mascota: {mascota_nombre} | Fecha: {fecha_str} {hora_str}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = remitente if "<" in remitente else f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        if settings.SMTP_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.sendmail(remitente, [destinatario], msg.as_string())
+        server.quit()
+        logger.info(f"[OK] Correo de confirmación enviado a {destinatario}")
+        return True
+    except Exception as e:
+        logger.warning(f"Error enviando correo de confirmación por SMTP: {e}")
+        return False
+
+
+def send_client_appointment_reschedule_email(
+    destinatario: str,
+    cliente_nombre: str,
+    mascota_nombre: str,
+    fecha_anterior_str: str,
+    hora_anterior_str: str,
+    nueva_fecha_str: str,
+    nueva_hora_str: str,
+    motivo: str,
+    clinica_nombre: str
+) -> bool:
+    """Envía un correo al dueño avisando que su cita ha sido reprogramada con nueva fecha y hora."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    cliente_nombre = _esc(cliente_nombre)
+    mascota_nombre = _esc(mascota_nombre)
+    fecha_anterior_str = _esc(fecha_anterior_str)
+    hora_anterior_str = _esc(hora_anterior_str)
+    nueva_fecha_str = _esc(nueva_fecha_str)
+    nueva_hora_str = _esc(nueva_hora_str)
+    motivo = _esc(motivo)
+    clinica_nombre = _esc(clinica_nombre)
+
+    remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
+    asunto = f"Cita reprogramada para {mascota_nombre} ({nueva_fecha_str} a las {nueva_hora_str})"
+
+    texto_plano = (
+        f"Hola {cliente_nombre},\n\n"
+        f"Te informamos que la cita para {mascota_nombre} en {clinica_nombre} ha sido reprogramada.\n\n"
+        f"Nuevos detalles de la cita:\n"
+        f"- Nueva Fecha: {nueva_fecha_str}\n"
+        f"- Nueva Hora: {nueva_hora_str}\n"
+        f"- Motivo: {motivo}\n"
+        f"(Horario anterior: {fecha_anterior_str} {hora_anterior_str})\n\n"
+        f"Puedes verificar tu carnet y citas en:\n"
+        f"https://sherekepet.com/portal/dashboard\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cita Reprogramada</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 28px;">
+          <tr>
+            <td align="center" style="padding-bottom: 12px;">
+              <span style="display: inline-block; padding: 4px 12px; background-color: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                🗓️ Cita Reprogramada
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <h2 style="margin: 0; color: #0f172a; font-size: 18px;">¡Hola {cliente_nombre}!</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: #64748b; line-height: 1.5; padding-bottom: 16px; text-align: center;">
+              Tu cita para <strong>{mascota_nombre}</strong> en <strong>{clinica_nombre}</strong> ha sido actualizada con un nuevo horario.
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 16px;">
+              <p style="margin: 4px 0; font-size: 14px; font-weight: 800; color: #166534;">✨ Nuevo Horario:</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Fecha:</strong> {nueva_fecha_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Hora:</strong> {nueva_hora_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Motivo:</strong> {motivo}</p>
+              <p style="margin: 8px 0 0 0; font-size: 11px; color: #64748b; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+                <em>Horario anterior: {fecha_anterior_str} a las {hora_anterior_str}</em>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 20px;">
+              <a href="https://sherekepet.com/portal/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #0f766e; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
+                Ver Cita en Mi Portal
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "reply_to": "soporte@sherekepet.com",
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano,
+                "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando correo de reprogramación con Resend: {e}")
+
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[REPROGRAMACIÓN CITA SIMULADA] Para: {destinatario} | Mascota: {mascota_nombre} | Nueva Fecha: {nueva_fecha_str} {nueva_hora_str}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = remitente if "<" in remitente else f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        if settings.SMTP_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.sendmail(remitente, [destinatario], msg.as_string())
+        server.quit()
+        logger.info(f"[OK] Correo de reprogramación enviado a {destinatario}")
+        return True
+    except Exception as e:
+        logger.warning(f"Error enviando correo de reprogramación por SMTP: {e}")
+        return False
+
+
+def send_client_appointment_cancellation_email(
+    destinatario: str,
+    cliente_nombre: str,
+    mascota_nombre: str,
+    fecha_str: str,
+    hora_str: str,
+    motivo: str,
+    clinica_nombre: str
+) -> bool:
+    """Envía un correo al dueño confirmando la cancelación de su cita médica."""
+    destinatario = (destinatario or "").strip().lower()
+    if not destinatario or "@" not in destinatario:
+        return False
+
+    cliente_nombre = _esc(cliente_nombre)
+    mascota_nombre = _esc(mascota_nombre)
+    fecha_str = _esc(fecha_str)
+    hora_str = _esc(hora_str)
+    motivo = _esc(motivo)
+    clinica_nombre = _esc(clinica_nombre)
+
+    remitente = settings.SMTP_FROM or f"{clinica_nombre} <soporte@sherekepet.com>"
+    asunto = f"Cita cancelada para {mascota_nombre} ({fecha_str})"
+
+    texto_plano = (
+        f"Hola {cliente_nombre},\n\n"
+        f"Te informamos que la cita para {mascota_nombre} en {clinica_nombre} programada para el {fecha_str} a las {hora_str} ha sido cancelada.\n\n"
+        f"Motivo registrado: {motivo}\n\n"
+        f"Si deseas agendar una nueva cita o comunicarte con la veterinaria, puedes acceder a tu portal:\n"
+        f"https://sherekepet.com/portal/dashboard\n"
+    )
+
+    html_contenido = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Cita Cancelada</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; padding: 28px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 500px; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 28px;">
+          <tr>
+            <td align="center" style="padding-bottom: 12px;">
+              <span style="display: inline-block; padding: 4px 12px; background-color: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase;">
+                ❌ Cita Cancelada
+              </span>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-bottom: 8px;">
+              <h2 style="margin: 0; color: #0f172a; font-size: 18px;">¡Hola {cliente_nombre}!</h2>
+            </td>
+          </tr>
+          <tr>
+            <td style="font-size: 13px; color: #64748b; line-height: 1.5; padding-bottom: 16px; text-align: center;">
+              Tu cita programada para <strong>{mascota_nombre}</strong> en <strong>{clinica_nombre}</strong> ha sido cancelada.
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #fff1f2; border: 1px solid #ffe4e6; border-radius: 12px; padding: 16px;">
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Mascota:</strong> {mascota_nombre}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Fecha cancelada:</strong> {fecha_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Hora cancelada:</strong> {hora_str}</p>
+              <p style="margin: 4px 0; font-size: 13px;"><strong>Motivo:</strong> {motivo}</p>
+            </td>
+          </tr>
+          <tr>
+            <td align="center" style="padding-top: 20px;">
+              <a href="https://sherekepet.com/portal/dashboard" style="display: inline-block; padding: 12px 24px; background-color: #475569; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 13px;">
+                Revisar Mi Portal SherekePet
+              </a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+"""
+
+    if settings.RESEND_API_KEY:
+        try:
+            import resend
+            resend.api_key = settings.RESEND_API_KEY
+            resend.Emails.send({
+                "from": remitente,
+                "to": [destinatario],
+                "reply_to": "soporte@sherekepet.com",
+                "subject": asunto,
+                "html": html_contenido,
+                "text": texto_plano,
+                "headers": {"X-Entity-Ref-ID": str(uuid.uuid4())}
+            })
+            return True
+        except Exception as e:
+            logger.warning(f"Error enviando correo de cancelación con Resend: {e}")
+
+    if not (settings.SMTP_USER and settings.SMTP_PASS):
+        print(f"[CANCELACIÓN CITA SIMULADA] Para: {destinatario} | Mascota: {mascota_nombre} | Fecha: {fecha_str}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = asunto
+    msg["From"] = remitente if "<" in remitente else f"SherekePet <{remitente}>"
+    msg["To"] = destinatario
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html_contenido, "html", "utf-8"))
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+        if settings.SMTP_TLS:
+            server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.sendmail(remitente, [destinatario], msg.as_string())
+        server.quit()
+        logger.info(f"[OK] Correo de cancelación enviado a {destinatario}")
+        return True
+    except Exception as e:
+        logger.warning(f"Error enviando correo de cancelación por SMTP: {e}")
+        return False
 
 
 def send_medication_reminder_email(

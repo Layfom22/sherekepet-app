@@ -73,8 +73,17 @@
                 </div>
             </div>
 
-            <!-- Botón Acción Principal de la Mascota: Nueva Atención -->
+            <!-- Botones de Acción Principal de la Mascota -->
             <div class="flex items-center space-x-2.5 self-start md:self-center flex-wrap gap-y-2">
+                <a 
+                    href="/agenda?agendar_mascota_id={{ mascota.id }}"
+                    class="btn-touch px-4 py-3 text-sm font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl shadow-xs transition-all flex items-center space-x-2"
+                    title="Agendar próxima cita para esta mascota en la agenda"
+                >
+                    <i data-lucide="calendar-plus" class="w-4 h-4 text-teal-600" aria-hidden="true"></i>
+                    <span>Agendar Cita</span>
+                </a>
+
                 <button 
                     type="button" 
                     onclick="abrirModalAtencion()"

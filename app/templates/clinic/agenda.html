@@ -19,6 +19,16 @@
 
         <!-- Acciones y Selector de Fecha -->
         <div class="flex flex-wrap items-center gap-2.5">
+            <button 
+                type="button" 
+                onclick="abrirModalAgendarCita()" 
+                class="btn-touch px-3.5 py-1.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl transition-all shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                title="Agendar una nueva cita médica por llamada o WhatsApp"
+            >
+                <i data-lucide="calendar-plus" class="w-3.5 h-3.5" aria-hidden="true"></i>
+                <span>+ Agendar Cita</span>
+            </button>
+
             <a 
                 href="/configuracion#horarios" 
                 class="btn-touch px-3.5 py-1.5 text-xs font-bold text-slate-700 hover:text-teal-700 bg-slate-50 hover:bg-white border border-slate-200 rounded-xl transition-all shadow-2xs flex items-center space-x-1.5"
@@ -217,18 +227,27 @@
                         <i data-lucide="stethoscope" class="w-3.5 h-3.5" aria-hidden="true"></i>
                         <span>Atender Paciente</span>
                     </a>
+                    {% endif %}
 
+                    <!-- Botón Editar / Reprogramar -->
                     <button 
                         type="button" 
-                        id="btn-cancelar-{{ c.id }}"
-                        onclick="cambiarEstadoCita({{ c.id }}, 'cancelar')"
-                        class="btn-touch px-3 py-1.5 text-xs font-bold text-rose-700 hover:text-rose-800 hover:bg-rose-50 border border-rose-200 rounded-xl transition-all inline-flex items-center gap-1"
-                        title="Cancelar cita"
+                        onclick="abrirModalEditarCita({{ c.id }}, '{{ c.fecha.strftime('%Y-%m-%d') }}', '{{ c.hora.strftime('%H:%M') }}', '{{ c.motivo|replace('\'', '\\\'') }}', '{{ c.estado }}', '{{ c.mascota.nombre|replace('\'', '\\\'') }}', '{{ (c.cliente.nombre_completo or c.cliente.dni)|replace('\'', '\\\'') }}')"
+                        class="btn-touch p-2 text-xs font-bold text-slate-700 hover:text-teal-700 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all inline-flex items-center"
+                        title="Editar o reprogramar fecha/hora"
                     >
-                        <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
-                        <span>Cancelar</span>
+                        <i data-lucide="pencil" class="w-3.5 h-3.5 text-slate-500" aria-hidden="true"></i>
                     </button>
-                    {% endif %}
+
+                    <!-- Botón Eliminar Cita -->
+                    <button 
+                        type="button" 
+                        onclick="eliminarCita({{ c.id }}, '{{ c.mascota.nombre|replace('\'', '\\\'') }}', '{{ c.fecha.strftime('%d/%m/%Y') }}')"
+                        class="btn-touch p-2 text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-xl transition-all inline-flex items-center"
+                        title="Eliminar cita del sistema"
+                    >
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-rose-500" aria-hidden="true"></i>
+                    </button>
                     {% endif %}
                 </div>
 
@@ -313,6 +332,26 @@
                         <i data-lucide="stethoscope" class="w-3.5 h-3.5"></i>
                         <span>Atender</span>
                     </a>
+
+                    <!-- Botón Editar / Reprogramar -->
+                    <button 
+                        type="button" 
+                        onclick="abrirModalEditarCita({{ pc.id }}, '{{ pc.fecha.strftime('%Y-%m-%d') }}', '{{ pc.hora.strftime('%H:%M') }}', '{{ pc.motivo|replace('\'', '\\\'') }}', '{{ pc.estado }}', '{{ pc.mascota.nombre|replace('\'', '\\\'') }}', '{{ (pc.cliente.nombre_completo or pc.cliente.dni)|replace('\'', '\\\'') }}')"
+                        class="btn-touch p-1.5 text-slate-600 hover:text-teal-700 hover:bg-slate-100 border border-slate-200 rounded-lg transition-all inline-flex items-center"
+                        title="Editar o reprogramar cita"
+                    >
+                        <i data-lucide="pencil" class="w-3 h-3 text-slate-500"></i>
+                    </button>
+
+                    <!-- Botón Eliminar Cita -->
+                    <button 
+                        type="button" 
+                        onclick="eliminarCita({{ pc.id }}, '{{ pc.mascota.nombre|replace('\'', '\\\'') }}', '{{ pc.fecha.strftime('%d/%m/%Y') }}')"
+                        class="btn-touch p-1.5 text-rose-600 hover:text-rose-700 hover:bg-rose-50 border border-rose-200 rounded-lg transition-all inline-flex items-center"
+                        title="Eliminar cita"
+                    >
+                        <i data-lucide="trash-2" class="w-3 h-3 text-rose-500"></i>
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -325,15 +364,667 @@
     </div>
 
 </div>
+
+<!-- ============================================================== -->
+<!-- MODAL 1: AGENDAR CITA MÉDICA (VETERINARIO)                     -->
+<!-- ============================================================== -->
+<div id="modalAgendarCita" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden transition-opacity">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[92vh] overflow-y-auto transform transition-transform">
+        
+        <!-- Header Modal -->
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-teal-50 border border-teal-200 text-teal-700 flex items-center justify-center">
+                    <i data-lucide="calendar-plus" class="w-5 h-5" aria-hidden="true"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-slate-900">Agendar Cita Médica</h3>
+                    <p class="text-[11px] text-slate-500">Para llamadas o mensajes de WhatsApp</p>
+                </div>
+            </div>
+            <button type="button" onclick="cerrarModalAgendarCita()" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors">
+                <i data-lucide="x" class="w-5 h-5" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <!-- Vista del Formulario de Agendamiento -->
+        <div id="vistaFormularioAgendar" class="space-y-4">
+            <!-- Pestañas: Paciente Registrado vs Paciente Nuevo -->
+            <div class="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-2xl text-xs font-bold">
+                <button type="button" id="tabBtnRegistrado" onclick="cambiarTabAgendar('registrado')" class="py-2 px-3 rounded-xl bg-white text-teal-800 shadow-2xs transition-all flex items-center justify-center gap-1.5">
+                    <i data-lucide="paw-print" class="w-3.5 h-3.5"></i>
+                    <span>Paciente Registrado</span>
+                </button>
+                <button type="button" id="tabBtnNuevo" onclick="cambiarTabAgendar('nuevo')" class="py-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5">
+                    <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                    <span>Paciente Nuevo</span>
+                </button>
+            </div>
+
+            <!-- CONTENIDO TAB 1: PACIENTE REGISTRADO -->
+            <div id="seccionPacienteRegistrado" class="space-y-2">
+                <label class="block text-xs font-bold text-slate-700">Buscar Paciente o Dueño:</label>
+                
+                <!-- Input de búsqueda -->
+                <div class="relative">
+                    <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-3"></i>
+                    <input 
+                        type="text" 
+                        id="inputBuscarPacienteAgenda" 
+                        placeholder="Escribe DNI, nombre de mascota o dueño..." 
+                        class="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        oninput="onBuscarPacienteInput(this.value)"
+                        autocomplete="off"
+                    >
+                </div>
+
+                <!-- Resultados desplegables -->
+                <div id="resultadosBusquedaPacientes" class="hidden border border-slate-200 rounded-2xl bg-white shadow-lg max-h-48 overflow-y-auto divide-y divide-slate-100 text-xs">
+                </div>
+
+                <!-- Badge de Paciente Seleccionado -->
+                <div id="badgePacienteSeleccionado" class="hidden p-3 bg-teal-50/80 border border-teal-200 rounded-2xl flex items-center justify-between">
+                    <div class="flex items-center space-x-2.5 min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0">
+                            <i data-lucide="paw-print" class="w-4 h-4"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <p id="previewMascotaNombre" class="font-black text-slate-900 text-xs truncate"></p>
+                            <p id="previewDuenoDetalle" class="text-[11px] text-slate-600 truncate"></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="deseleccionarPaciente()" class="p-1 text-teal-800 hover:text-rose-600 rounded-lg hover:bg-white/80 transition-colors" title="Cambiar paciente">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <input type="hidden" id="agendarMascotaId" value="">
+            </div>
+
+            <!-- CONTENIDO TAB 2: PACIENTE NUEVO -->
+            <div id="seccionPacienteNuevo" class="space-y-3 hidden">
+                <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl text-[11px] text-amber-900 flex items-start gap-2">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                    <span>Registraremos al cliente y a su mascota de forma rápida para asegurar el turno sin perder la llamada.</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">DNI del Dueño (Opcional):</label>
+                        <input type="text" id="nuevoDni" placeholder="Ej. 72345678" maxlength="12" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Nombre del Dueño *:</label>
+                        <input type="text" id="nuevoNombreDueno" placeholder="Ej. Carlos Mendoza" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Teléfono / WhatsApp *:</label>
+                        <input type="tel" id="nuevoTelefono" placeholder="Ej. 987654321" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Correo Electrónico:</label>
+                        <input type="email" id="nuevoEmail" placeholder="ejemplo@correo.com" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Nombre de la Mascota *:</label>
+                        <input type="text" id="nuevoNombreMascota" placeholder="Ej. Firulais" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-bold text-slate-700 mb-1">Especie:</label>
+                        <select id="nuevoEspecie" class="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                            <option value="Canino">Canino (Perro)</option>
+                            <option value="Felino">Felino (Gato)</option>
+                            <option value="Conejo">Conejo</option>
+                            <option value="Ave">Ave</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FECHA Y HORA -->
+            <div class="space-y-1.5 pt-1 border-t border-slate-100">
+                <div class="flex items-center justify-between">
+                    <label class="block text-xs font-bold text-slate-700">Fecha de la Cita *:</label>
+                    <div class="flex items-center gap-1 text-[11px]">
+                        <button type="button" onclick="setFechaRapida(0)" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-teal-50 hover:text-teal-700 font-bold text-slate-600 transition-colors">Hoy</button>
+                        <button type="button" onclick="setFechaRapida(1)" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-teal-50 hover:text-teal-700 font-bold text-slate-600 transition-colors">Mañana</button>
+                        <button type="button" onclick="setFechaRapida(3)" class="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-teal-50 hover:text-teal-700 font-bold text-slate-600 transition-colors">En 3 días</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2.5">
+                    <input type="date" id="agendarFecha" class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                    <input type="time" id="agendarHora" value="09:00" class="w-full px-3 py-2 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+                </div>
+            </div>
+
+            <!-- MOTIVO DE LA CITA -->
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold text-slate-700">Motivo de la Cita *:</label>
+                <!-- Chips de Motivos Comunes -->
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" onclick="setMotivoRapido('Consulta Médica General')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-100 hover:text-teal-800 text-[11px] font-bold text-slate-600 transition-colors">Consulta General</button>
+                    <button type="button" onclick="setMotivoRapido('Vacunación y Desparasitación')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-100 hover:text-teal-800 text-[11px] font-bold text-slate-600 transition-colors">Vacuna / Desparasitación</button>
+                    <button type="button" onclick="setMotivoRapido('Baño y Grooming')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-100 hover:text-teal-800 text-[11px] font-bold text-slate-600 transition-colors">Baño y Peluquería</button>
+                    <button type="button" onclick="setMotivoRapido('Control Post-operatorio')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-100 hover:text-teal-800 text-[11px] font-bold text-slate-600 transition-colors">Control / Revisión</button>
+                    <button type="button" onclick="setMotivoRapido('Cirugía / Procedimiento')" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-teal-100 hover:text-teal-800 text-[11px] font-bold text-slate-600 transition-colors">Cirugía</button>
+                    <button type="button" onclick="setMotivoRapido('Urgencia / Chequeo Prioritario')" class="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition-colors">Urgencia</button>
+                </div>
+                <input 
+                    type="text" 
+                    id="agendarMotivo" 
+                    placeholder="Escribe o selecciona el motivo..." 
+                    class="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500"
+                >
+            </div>
+
+            <!-- NOTIFICACIONES Y CORREO -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="mail" class="w-4 h-4 text-teal-600"></i>
+                    <span class="font-bold text-slate-700">Enviar confirmación por correo:</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="agendarEnviarEmail" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
+                </label>
+            </div>
+
+            <!-- Botones Guardar -->
+            <div class="pt-2 flex items-center justify-end gap-2">
+                <button type="button" onclick="cerrarModalAgendarCita()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                    Cancelar
+                </button>
+                <button 
+                    type="button" 
+                    id="btnGuardarCita" 
+                    onclick="guardarNuevaCita()" 
+                    class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+                >
+                    <i data-lucide="check" class="w-4 h-4"></i>
+                    <span>Confirmar y Agendar</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Vista de Éxito con Botón WhatsApp -->
+        <div id="vistaExitoAgendar" class="hidden text-center py-6 space-y-4">
+            <div class="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-xs animate-bounce">
+                <i data-lucide="check-check" class="w-8 h-8"></i>
+            </div>
+            <div>
+                <h4 class="text-base font-black text-slate-900">¡Cita Agendada Exitosamente!</h4>
+                <p id="exitoDetalleCita" class="text-xs text-slate-500 mt-1"></p>
+            </div>
+
+            <div id="contenedorBotonWhatsApp" class="hidden pt-2">
+                <a 
+                    id="linkWhatsAppConfirmacion" 
+                    href="#" 
+                    target="_blank" 
+                    class="btn-touch w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl shadow-sm transition-all"
+                >
+                    <i data-lucide="message-circle" class="w-4 h-4"></i>
+                    <span>Enviar Confirmación por WhatsApp</span>
+                </a>
+                <p class="text-[11px] text-slate-400 mt-1.5">Abre WhatsApp con el mensaje pre-redactado listo para enviar.</p>
+            </div>
+
+            <button type="button" onclick="finalizarAgendamiento()" class="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors">
+                Cerrar y Actualizar Agenda
+            </button>
+        </div>
+
+    </div>
+</div>
+
+
+<!-- ============================================================== -->
+<!-- MODAL 2: EDITAR / REPROGRAMAR CITA                             -->
+<!-- ============================================================== -->
+<div id="modalEditarCita" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 hidden transition-opacity">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 space-y-4">
+        
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center">
+                    <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-slate-900">Editar / Reprogramar Cita</h3>
+                    <p id="editSubtituloPaciente" class="text-[11px] text-slate-500"></p>
+                </div>
+            </div>
+            <button type="button" onclick="cerrarModalEditarCita()" class="p-1.5 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-100 transition-colors">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <input type="hidden" id="editCitaId" value="">
+
+        <div class="space-y-3 text-xs">
+            <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nueva Fecha *:</label>
+                    <input type="date" id="editFecha" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold">
+                </div>
+                <div>
+                    <label class="block font-bold text-slate-700 mb-1">Nueva Hora *:</label>
+                    <input type="time" id="editHora" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-semibold">
+                </div>
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Motivo de la Cita *:</label>
+                <input type="text" id="editMotivo" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500">
+            </div>
+
+            <div>
+                <label class="block font-bold text-slate-700 mb-1">Estado de la Cita:</label>
+                <select id="editEstado" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-teal-500 font-bold">
+                    <option value="CONFIRMADA">CONFIRMADA</option>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="ATENDIDA">ATENDIDA</option>
+                    <option value="CANCELADA">CANCELADA</option>
+                </select>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between text-xs">
+                <span class="font-bold text-slate-700">Notificar reprogramación por correo:</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="editEnviarEmail" class="sr-only peer" checked>
+                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600"></div>
+                </label>
+            </div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+            <button type="button" onclick="cerrarModalEditarCita()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                Cancelar
+            </button>
+            <button 
+                type="button" 
+                id="btnGuardarEdicion" 
+                onclick="guardarEdicionCita()" 
+                class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs transition-all flex items-center gap-1.5"
+            >
+                <i data-lucide="save" class="w-4 h-4"></i>
+                <span>Guardar Cambios</span>
+            </button>
+        </div>
+
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
+let busquedaTimeout = null;
+let tabActual = 'registrado';
+
 function cambiarFechaAgenda(fecha) {
     if (!fecha) return;
     window.location.href = `/agenda?fecha=${fecha}`;
 }
 
+// -------------------------------------------------------------
+// CONTROL DEL MODAL AGENDAR CITA
+// -------------------------------------------------------------
+function abrirModalAgendarCita(preselectedMascotaId = null) {
+    const modal = document.getElementById('modalAgendarCita');
+    const vistaForm = document.getElementById('vistaFormularioAgendar');
+    const vistaExito = document.getElementById('vistaExitoAgendar');
+    
+    if (vistaForm) vistaForm.classList.remove('hidden');
+    if (vistaExito) vistaExito.classList.add('hidden');
+    
+    // Configurar fecha por defecto: hoy
+    const inputFecha = document.getElementById('agendarFecha');
+    if (inputFecha && !inputFecha.value) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        inputFecha.value = todayStr;
+    }
+
+    modal.classList.remove('hidden');
+    lucide.createIcons();
+
+    if (preselectedMascotaId) {
+        cargarPacientePreseleccionado(preselectedMascotaId);
+    }
+}
+
+function cerrarModalAgendarCita() {
+    const modal = document.getElementById('modalAgendarCita');
+    modal.classList.add('hidden');
+}
+
+function cambiarTabAgendar(tab) {
+    tabActual = tab;
+    const btnReg = document.getElementById('tabBtnRegistrado');
+    const btnNue = document.getElementById('tabBtnNuevo');
+    const secReg = document.getElementById('seccionPacienteRegistrado');
+    const secNue = document.getElementById('seccionPacienteNuevo');
+
+    if (tab === 'registrado') {
+        btnReg.className = "py-2 px-3 rounded-xl bg-white text-teal-800 shadow-2xs transition-all flex items-center justify-center gap-1.5 font-bold";
+        btnNue.className = "py-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-bold";
+        secReg.classList.remove('hidden');
+        secNue.classList.add('hidden');
+    } else {
+        btnNue.className = "py-2 px-3 rounded-xl bg-white text-teal-800 shadow-2xs transition-all flex items-center justify-center gap-1.5 font-bold";
+        btnReg.className = "py-2 px-3 rounded-xl text-slate-600 hover:text-slate-900 transition-all flex items-center justify-center gap-1.5 font-bold";
+        secNue.classList.remove('hidden');
+        secReg.classList.add('hidden');
+    }
+    lucide.createIcons();
+}
+
+function setFechaRapida(diasOffset) {
+    const target = new Date();
+    target.setDate(target.getDate() + diasOffset);
+    const yyyy = target.getFullYear();
+    const mm = String(target.getMonth() + 1).padStart(2, '0');
+    const dd = String(target.getDate()).padStart(2, '0');
+    document.getElementById('agendarFecha').value = `${yyyy}-${mm}-${dd}`;
+}
+
+function setMotivoRapido(motivo) {
+    document.getElementById('agendarMotivo').value = motivo;
+}
+
+// Búsqueda interactiva de pacientes
+function onBuscarPacienteInput(valor) {
+    clearTimeout(busquedaTimeout);
+    const contenedor = document.getElementById('resultadosBusquedaPacientes');
+    if (!valor || valor.trim().length < 2) {
+        contenedor.classList.add('hidden');
+        contenedor.innerHTML = '';
+        return;
+    }
+
+    busquedaTimeout = setTimeout(async () => {
+        try {
+            const resp = await fetch(`/api/clinic/pacientes/buscar?q=${encodeURIComponent(valor.trim())}`);
+            if (resp.ok) {
+                const data = await resp.json();
+                renderizarResultadosBusqueda(data.pacientes || []);
+            }
+        } catch (e) {
+            console.error("Error buscando pacientes:", e);
+        }
+    }, 250);
+}
+
+function renderizarResultadosBusqueda(pacientes) {
+    const contenedor = document.getElementById('resultadosBusquedaPacientes');
+    contenedor.innerHTML = '';
+
+    if (!pacientes.length) {
+        contenedor.innerHTML = `
+            <div class="p-3 text-center text-slate-400">
+                No se encontraron pacientes. Puedes usar la pestaña "Paciente Nuevo".
+            </div>
+        `;
+        contenedor.classList.remove('hidden');
+        return;
+    }
+
+    pacientes.forEach(p => {
+        const item = document.createElement('div');
+        item.className = "p-2.5 hover:bg-teal-50/70 cursor-pointer flex items-center justify-between gap-2 transition-colors";
+        item.onclick = () => seleccionarPaciente(p);
+        item.innerHTML = `
+            <div class="min-w-0">
+                <p class="font-black text-slate-900">${p.nombre} <span class="text-[10px] font-normal text-slate-500">(${p.especie})</span></p>
+                <p class="text-[11px] text-slate-600">Dueño: ${p.cliente.nombre_completo || 'Sin nombre'} &bull; DNI: ${p.cliente.dni || 'S/D'}</p>
+            </div>
+            <span class="text-[11px] font-bold text-teal-700 shrink-0">Seleccionar &rarr;</span>
+        `;
+        contenedor.appendChild(item);
+    });
+
+    contenedor.classList.remove('hidden');
+}
+
+function seleccionarPaciente(p) {
+    document.getElementById('agendarMascotaId').value = p.id;
+    document.getElementById('previewMascotaNombre').textContent = `${p.nombre} (${p.especie} - ${p.raza || 'Mestizo'})`;
+    document.getElementById('previewDuenoDetalle').textContent = `Dueño: ${p.cliente.nombre_completo || 'S/N'} • Tel: ${p.cliente.telefono || 'Sin tel'} • DNI: ${p.cliente.dni || ''}`;
+
+    document.getElementById('badgePacienteSeleccionado').classList.remove('hidden');
+    document.getElementById('resultadosBusquedaPacientes').classList.add('hidden');
+    document.getElementById('inputBuscarPacienteAgenda').value = '';
+    lucide.createIcons();
+}
+
+function deseleccionarPaciente() {
+    document.getElementById('agendarMascotaId').value = '';
+    document.getElementById('badgePacienteSeleccionado').classList.add('hidden');
+}
+
+async function cargarPacientePreseleccionado(mascotaId) {
+    try {
+        const resp = await fetch(`/api/clinic/pacientes/buscar?q=`);
+        // Si viene con ID, abrimos el modal listo
+        document.getElementById('agendarMascotaId').value = mascotaId;
+    } catch(e) {}
+}
+
+// Guardar nueva cita
+async function guardarNuevaCita() {
+    const btn = document.getElementById('btnGuardarCita');
+    const fecha = document.getElementById('agendarFecha').value;
+    const hora = document.getElementById('agendarHora').value;
+    const motivo = document.getElementById('agendarMotivo').value.trim();
+    const enviarEmail = document.getElementById('agendarEnviarEmail').checked;
+
+    if (!fecha || !hora) {
+        alert("Por favor selecciona una fecha y una hora.");
+        return;
+    }
+    if (!motivo) {
+        alert("Por favor ingresa el motivo de la cita médica.");
+        return;
+    }
+
+    const payload = {
+        fecha: fecha,
+        hora: hora,
+        motivo: motivo,
+        estado: "CONFIRMADA",
+        enviar_email: enviarEmail
+    };
+
+    if (tabActual === 'registrado') {
+        const mascotaId = document.getElementById('agendarMascotaId').value;
+        if (!mascotaId) {
+            alert("Por favor busca y selecciona un paciente registrado o cambia a 'Paciente Nuevo'.");
+            return;
+        }
+        payload.mascota_id = parseInt(mascotaId);
+    } else {
+        const nombreDueno = document.getElementById('nuevoNombreDueno').value.trim();
+        const telefono = document.getElementById('nuevoTelefono').value.trim();
+        const nombreMascota = document.getElementById('nuevoNombreMascota').value.trim();
+
+        if (!nombreDueno || !telefono || !nombreMascota) {
+            alert("Por favor completa los campos obligatorios del nuevo paciente (Dueño, Teléfono y Mascota).");
+            return;
+        }
+
+        payload.nuevo_cliente_dni = document.getElementById('nuevoDni').value.trim();
+        payload.nuevo_cliente_nombre = nombreDueno;
+        payload.nuevo_cliente_telefono = telefono;
+        payload.nuevo_cliente_email = document.getElementById('nuevoEmail').value.trim();
+        payload.nuevo_mascota_nombre = nombreMascota;
+        payload.nuevo_mascota_especie = document.getElementById('nuevoEspecie').value;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = `<span>Guardando...</span>`;
+
+    try {
+        const resp = await fetch('/api/clinic/citas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            document.getElementById('vistaFormularioAgendar').classList.add('hidden');
+            document.getElementById('vistaExitoAgendar').classList.remove('hidden');
+
+            document.getElementById('exitoDetalleCita').textContent = 
+                `Cita agendada para ${data.mascota_nombre || 'la mascota'} el ${data.fecha} a las ${data.hora}.`;
+
+            if (data.whatsapp_url) {
+                const linkWa = document.getElementById('linkWhatsAppConfirmacion');
+                linkWa.href = data.whatsapp_url;
+                document.getElementById('contenedorBotonWhatsApp').classList.remove('hidden');
+            } else {
+                document.getElementById('contenedorBotonWhatsApp').classList.add('hidden');
+            }
+            lucide.createIcons();
+        } else {
+            const err = await resp.json();
+            alert("Error al agendar cita: " + (err.detail || "Verifica los datos ingresados."));
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>Confirmar y Agendar</span>`;
+            lucide.createIcons();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al agendar cita.");
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="check" class="w-4 h-4"></i><span>Confirmar y Agendar</span>`;
+        lucide.createIcons();
+    }
+}
+
+function finalizarAgendamiento() {
+    const fecha = document.getElementById('agendarFecha').value;
+    window.location.href = `/agenda?fecha=${fecha}`;
+}
+
+// -------------------------------------------------------------
+// CONTROL DEL MODAL EDITAR / REPROGRAMAR CITA
+// -------------------------------------------------------------
+function abrirModalEditarCita(id, fecha, hora, motivo, estado, mascota, cliente) {
+    document.getElementById('editCitaId').value = id;
+    document.getElementById('editFecha').value = fecha;
+    document.getElementById('editHora').value = hora;
+    document.getElementById('editMotivo').value = motivo;
+    document.getElementById('editEstado').value = (estado || 'CONFIRMADA').toUpperCase();
+    document.getElementById('editSubtituloPaciente').textContent = `Paciente: ${mascota} • Dueño: ${cliente}`;
+
+    document.getElementById('modalEditarCita').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function cerrarModalEditarCita() {
+    document.getElementById('modalEditarCita').classList.add('hidden');
+}
+
+async function guardarEdicionCita() {
+    const citaId = document.getElementById('editCitaId').value;
+    const fecha = document.getElementById('editFecha').value;
+    const hora = document.getElementById('editHora').value;
+    const motivo = document.getElementById('editMotivo').value.trim();
+    const estado = document.getElementById('editEstado').value;
+    const enviarEmail = document.getElementById('editEnviarEmail').checked;
+
+    if (!fecha || !hora || !motivo) {
+        alert("Fecha, hora y motivo son obligatorios.");
+        return;
+    }
+
+    const btn = document.getElementById('btnGuardarEdicion');
+    btn.disabled = true;
+    btn.innerHTML = `<span>Actualizando...</span>`;
+
+    try {
+        const resp = await fetch(`/api/clinic/citas/${citaId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fecha: fecha,
+                hora: hora,
+                motivo: motivo,
+                estado: estado,
+                enviar_email: enviarEmail
+            })
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.whatsapp_url && confirm("¿Deseas enviar el aviso de actualización/reprogramación al WhatsApp del cliente?")) {
+                window.open(data.whatsapp_url, '_blank');
+            }
+            window.location.reload();
+        } else {
+            const err = await resp.json();
+            alert("Error al actualizar cita: " + (err.detail || "Verifica los datos."));
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i><span>Guardar Cambios</span>`;
+            lucide.createIcons();
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al actualizar cita.");
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i><span>Guardar Cambios</span>`;
+        lucide.createIcons();
+    }
+}
+
+// -------------------------------------------------------------
+// ELIMINAR CITA (SOFT DELETE)
+// -------------------------------------------------------------
+async function eliminarCita(citaId, mascotaNombre, fechaStr) {
+    if (!confirm(`¿Estás seguro de ELIMINAR la cita de ${mascotaNombre} del ${fechaStr}?\n\nEsta acción anulará el turno y cancelará los recordatorios vinculados.`)) {
+        return;
+    }
+
+    try {
+        const resp = await fetch(`/api/clinic/citas/${citaId}`, {
+            method: 'DELETE'
+        });
+
+        if (resp.ok) {
+            const data = await resp.json();
+            const fila = document.getElementById(`cita-row-${citaId}`);
+            if (fila) {
+                fila.style.opacity = '0';
+                fila.style.transform = 'scale(0.95)';
+                setTimeout(() => fila.remove(), 250);
+            }
+            if (data.whatsapp_url && confirm("Cita eliminada. ¿Deseas enviar un mensaje de cancelación por WhatsApp al dueño?")) {
+                window.open(data.whatsapp_url, '_blank');
+            } else {
+                alert("Cita eliminada correctamente.");
+            }
+        } else {
+            const err = await resp.json();
+            alert("Error al eliminar cita: " + (err.detail || "No se pudo procesar."));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al eliminar la cita.");
+    }
+}
+
+// -------------------------------------------------------------
+// CAMBIAR ESTADO DE CITA (CONFIRMAR O CANCELAR)
+// -------------------------------------------------------------
 async function cambiarEstadoCita(citaId, accion) {
     const confirmacion = accion === 'confirmar' 
         ? "¿Deseas marcar esta cita como CONFIRMADA?" 
@@ -384,5 +1075,14 @@ async function cambiarEstadoCita(citaId, accion) {
         alert("Error de conexión al actualizar la cita.");
     }
 }
+
+// Auto apertura si viene parámetro por URL (ej. desde ficha de mascota)
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const mascotaId = params.get('agendar_mascota_id');
+    if (mascotaId) {
+        abrirModalAgendarCita(mascotaId);
+    }
+});
 </script>
 {% endblock %}

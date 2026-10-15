@@ -1,6 +1,6 @@
 import base64
 import urllib.parse
-from datetime import date, time, timedelta
+from datetime import date, time, timedelta, datetime
 import json
 from typing import List, Optional
 from pydantic import BaseModel
@@ -3477,14 +3477,136 @@ def cancelar_cita_veterinario(
     }
 
 
+def _resolver_email_cliente(db: Session, cliente: Optional[Cliente]) -> Optional[str]:
+    """Obtiene el correo más confiable del cliente o de registros duplicados por DNI."""
+    if not cliente:
+        return None
+    if cliente.email and cliente.email.strip():
+        return cliente.email.strip()
+    if cliente.dni and cliente.dni.strip():
+        otro = db.query(Cliente).filter(
+            Cliente.dni == cliente.dni.strip(),
+            Cliente.email.isnot(None),
+            Cliente.email != "",
+            Cliente.is_deleted == False
+        ).first()
+        if otro and otro.email and otro.email.strip():
+            return otro.email.strip()
+    return None
+
+
+def _construir_enlace_whatsapp_cita(
+    telefono: str,
+    cliente_nombre: Optional[str],
+    mascota_nombre: str,
+    fecha_str: str,
+    hora_str: str,
+    motivo: str,
+    clinica_nombre: str,
+    tipo_mensaje: str = "CONFIRMACION"
+) -> str:
+    """Construye un enlace directo a WhatsApp (wa.me) con el mensaje de cita pre-redactado."""
+    tel_digits = "".join(filter(str.isdigit, str(telefono or "")))
+    if not tel_digits:
+        return ""
+    if len(tel_digits) == 9:
+        num = f"51{tel_digits}"
+    elif len(tel_digits) == 11 and tel_digits.startswith("51"):
+        num = tel_digits
+    else:
+        num = tel_digits
+
+    nom = cliente_nombre or "Estimado(a) cliente"
+    if tipo_mensaje == "REPROGRAMACION":
+        msg = (
+            f"Hola {nom}, te informamos de {clinica_nombre} que tu cita para {mascota_nombre} "
+            f"ha sido reprogramada para el {fecha_str} a las {hora_str}. "
+            f"Motivo: {motivo}. ¡Gracias por tu confianza!"
+        )
+    elif tipo_mensaje == "CANCELACION":
+        msg = (
+            f"Hola {nom}, te saludamos de {clinica_nombre}. La cita de {mascota_nombre} "
+            f"del {fecha_str} a las {hora_str} ha sido cancelada. Si deseas agendar una nueva fecha, puedes responder a este mensaje."
+        )
+    else:
+        msg = (
+            f"Hola {nom}, te confirmamos tu cita para {mascota_nombre} en {clinica_nombre} "
+            f"programada para el {fecha_str} a las {hora_str}. Motivo: {motivo}. ¡Te esperamos!"
+        )
+    return f"https://wa.me/{num}?text={urllib.parse.quote(msg)}"
+
+
+@router.get(
+    "/api/clinic/pacientes/buscar",
+    summary="Búsqueda Rápida de Pacientes para Agendamiento",
+    description="Busca pacientes y dueños de la clínica por nombre de mascota, nombre de dueño o DNI."
+)
+def buscar_pacientes_clinica(
+    q: str = "",
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    target_clinica_id = current_user.clinica_id
+    q_clean = (q or "").strip()
+    if not q_clean or len(q_clean) < 2:
+        return {"pacientes": []}
+
+    patron = f"%{q_clean}%"
+    mascotas = db.query(Mascota).join(Cliente, Mascota.cliente_id == Cliente.id).filter(
+        Mascota.clinica_id == target_clinica_id,
+        Mascota.is_deleted == False,
+        Cliente.is_deleted == False,
+        or_(
+            Mascota.nombre.ilike(patron),
+            Cliente.nombre_completo.ilike(patron),
+            Cliente.dni.ilike(patron),
+            Cliente.telefono.ilike(patron)
+        )
+    ).order_by(Mascota.nombre.asc()).limit(20).all()
+
+    resultados = []
+    for m in mascotas:
+        resultados.append({
+            "id": m.id,
+            "nombre": m.nombre,
+            "especie": m.especie,
+            "raza": m.raza or "Mestizo",
+            "foto_url": m.foto_url,
+            "cliente": {
+                "id": m.cliente.id if m.cliente else None,
+                "dni": m.cliente.dni if m.cliente else "",
+                "nombre_completo": m.cliente.nombre_completo if m.cliente else "",
+                "telefono": m.cliente.telefono if m.cliente else "",
+                "email": m.cliente.email if m.cliente else ""
+            }
+        })
+
+    return {"pacientes": resultados}
+
+
 class CitaCreateVetRequest(BaseModel):
     clinica_id: Optional[int] = None
     cliente_id: Optional[int] = None
-    mascota_id: int
+    mascota_id: Optional[int] = None
+    nuevo_cliente_dni: Optional[str] = None
+    nuevo_cliente_nombre: Optional[str] = None
+    nuevo_cliente_telefono: Optional[str] = None
+    nuevo_cliente_email: Optional[str] = None
+    nuevo_mascota_nombre: Optional[str] = None
+    nuevo_mascota_especie: Optional[str] = None
     fecha: date
     hora: str
-    motivo: str = "Próximo Baño y Grooming (Recurrencia)"
+    motivo: str = "Consulta Médica General"
     estado: str = "CONFIRMADA"
+    enviar_email: bool = True
+
+
+class CitaUpdateVetRequest(BaseModel):
+    fecha: Optional[date] = None
+    hora: Optional[str] = None
+    motivo: Optional[str] = None
+    estado: Optional[str] = None
+    enviar_email: bool = True
 
 
 @router.post(
@@ -3500,18 +3622,72 @@ def crear_cita_veterinario(
 ):
     target_clinica_id = (payload.clinica_id or current_user.clinica_id) if getattr(current_user, "is_superadmin", False) else current_user.clinica_id
 
-    mascota = db.query(Mascota).filter(
-        Mascota.id == payload.mascota_id,
-        Mascota.clinica_id == target_clinica_id,
-        Mascota.is_deleted == False
-    ).first()
-    if not mascota:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Mascota no encontrada en esta clínica."
-        )
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
 
-    resolved_cliente_id = payload.cliente_id or mascota.cliente_id
+    mascota = None
+    cliente = None
+    resolved_cliente_id = None
+
+    if payload.mascota_id:
+        mascota = db.query(Mascota).filter(
+            Mascota.id == payload.mascota_id,
+            Mascota.clinica_id == target_clinica_id,
+            Mascota.is_deleted == False
+        ).first()
+        if not mascota:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Mascota no encontrada en esta clínica."
+            )
+        resolved_cliente_id = payload.cliente_id or mascota.cliente_id
+        cliente = mascota.cliente
+    elif payload.nuevo_mascota_nombre and payload.nuevo_mascota_nombre.strip():
+        # Registro rápido de nuevo cliente / mascota
+        dni_limpio = (payload.nuevo_cliente_dni or "").strip()
+        nom_cliente = (payload.nuevo_cliente_nombre or "").strip() or "Propietario"
+        tel_cliente = (payload.nuevo_cliente_telefono or "").strip()
+        email_cliente = (payload.nuevo_cliente_email or "").strip().lower()
+
+        if dni_limpio:
+            cliente = db.query(Cliente).filter(
+                Cliente.dni == dni_limpio,
+                Cliente.clinica_id == target_clinica_id,
+                Cliente.is_deleted == False
+            ).first()
+
+        if not cliente:
+            cliente = Cliente(
+                clinica_id=target_clinica_id,
+                dni=dni_limpio or f"CLI-{uuid.uuid4().hex[:6].upper()}",
+                nombre_completo=nom_cliente,
+                telefono=tel_cliente,
+                email=email_cliente or None
+            )
+            db.add(cliente)
+            db.flush()
+        else:
+            if tel_cliente and not cliente.telefono:
+                cliente.telefono = tel_cliente
+            if email_cliente and not cliente.email:
+                cliente.email = email_cliente
+
+        resolved_cliente_id = cliente.id
+
+        mascota = Mascota(
+            clinica_id=target_clinica_id,
+            cliente_id=resolved_cliente_id,
+            nombre=payload.nuevo_mascota_nombre.strip(),
+            especie=(payload.nuevo_mascota_especie or "Canino").strip(),
+            raza="Mestizo"
+        )
+        db.add(mascota)
+        db.flush()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe seleccionar una mascota existente o ingresar los datos de un nuevo paciente."
+        )
 
     # Parse hora "HH:MM"
     partes = payload.hora.strip().split(":")
@@ -3520,16 +3696,16 @@ def crear_cita_veterinario(
     cita = Cita(
         clinica_id=target_clinica_id,
         cliente_id=resolved_cliente_id,
-        mascota_id=payload.mascota_id,
+        mascota_id=mascota.id,
         fecha=payload.fecha,
         hora=hora_obj,
         motivo=payload.motivo,
-        estado=payload.estado
+        estado=payload.estado or "CONFIRMADA"
     )
     db.add(cita)
 
-    if (payload.estado or "").upper() == "SUGERIDA":
-        dueno_nom = (mascota.cliente.nombre_completo if mascota.cliente else None) or "Estimado(a) cliente"
+    if (cita.estado or "").upper() == "SUGERIDA":
+        dueno_nom = (cliente.nombre_completo if cliente else None) or "Estimado(a) cliente"
         fecha_bano_str = payload.fecha.strftime("%d/%m/%Y")
         msg_bano = (
             f"Hola {dueno_nom}, te saludamos de tu veterinaria. "
@@ -3550,7 +3726,22 @@ def crear_cita_veterinario(
     db.commit()
     db.refresh(cita)
 
-    if (payload.estado or "").upper() == "SUGERIDA":
+    # Email notification
+    if payload.enviar_email and (cita.estado or "").upper() != "SUGERIDA":
+        destinatario_email = _resolver_email_cliente(db, cliente)
+        if destinatario_email:
+            from app.core.email import send_client_appointment_confirmation_email
+            background_tasks.add_task(
+                send_client_appointment_confirmation_email,
+                destinatario=destinatario_email,
+                cliente_nombre=cliente.nombre_completo if cliente else "Estimado(a) Propietario(a)",
+                mascota_nombre=mascota.nombre,
+                fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                hora_str=cita.hora.strftime("%I:%M %p"),
+                motivo=cita.motivo,
+                clinica_nombre=clinica_nombre
+            )
+    elif (cita.estado or "").upper() == "SUGERIDA":
         _notificar_sugerencia_bano_dueno(
             db=db,
             background_tasks=background_tasks,
@@ -3560,13 +3751,220 @@ def crear_cita_veterinario(
             hora_obj=hora_obj
         )
 
+    # WhatsApp URL
+    whatsapp_url = None
+    if cliente and cliente.telefono:
+        whatsapp_url = _construir_enlace_whatsapp_cita(
+            telefono=cliente.telefono,
+            cliente_nombre=cliente.nombre_completo,
+            mascota_nombre=mascota.nombre,
+            fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+            hora_str=cita.hora.strftime("%I:%M %p"),
+            motivo=cita.motivo,
+            clinica_nombre=clinica_nombre,
+            tipo_mensaje="CONFIRMACION"
+        )
+
     return {
         "mensaje": "Cita agendada exitosamente.",
         "cita_id": cita.id,
+        "id": cita.id,
         "fecha": str(cita.fecha),
         "hora": cita.hora.strftime("%H:%M"),
-        "estado": cita.estado
+        "estado": cita.estado,
+        "motivo": cita.motivo,
+        "mascota_id": cita.mascota_id,
+        "mascota_nombre": mascota.nombre,
+        "cliente_nombre": cliente.nombre_completo if cliente else None,
+        "whatsapp_url": whatsapp_url
     }
+
+
+@router.put(
+    "/api/clinic/citas/{cita_id}",
+    summary="Actualizar / Reprogramar Cita",
+    description="Permite al veterinario cambiar la fecha, hora, motivo o estado de una cita existente."
+)
+def actualizar_cita_veterinario(
+    cita_id: int,
+    payload: CitaUpdateVetRequest,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    target_clinica_id = current_user.clinica_id
+
+    query = db.query(Cita).filter(
+        Cita.id == cita_id,
+        Cita.is_deleted == False
+    )
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(Cita.clinica_id == target_clinica_id)
+
+    cita = query.first()
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    fecha_anterior = cita.fecha
+    hora_anterior = cita.hora
+    reprogramada = False
+
+    if payload.fecha and payload.fecha != cita.fecha:
+        cita.fecha = payload.fecha
+        reprogramada = True
+
+    if payload.hora:
+        partes = payload.hora.strip().split(":")
+        nueva_hora = time(int(partes[0]), int(partes[1]))
+        if nueva_hora != cita.hora:
+            cita.hora = nueva_hora
+            reprogramada = True
+
+    if payload.motivo is not None and payload.motivo.strip():
+        cita.motivo = payload.motivo.strip()
+
+    if payload.estado is not None and payload.estado.strip():
+        cita.estado = payload.estado.strip()
+
+    db.commit()
+    db.refresh(cita)
+
+    clinica = db.query(Clinica).filter(Clinica.id == cita.clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+    mascota = cita.mascota
+    cliente = cita.cliente
+
+    # Enviar correo de reprogramación si hubo cambio en fecha u hora
+    if reprogramada and payload.enviar_email:
+        destinatario_email = _resolver_email_cliente(db, cliente)
+        if destinatario_email and mascota:
+            from app.core.email import send_client_appointment_reschedule_email
+            background_tasks.add_task(
+                send_client_appointment_reschedule_email,
+                destinatario=destinatario_email,
+                cliente_nombre=cliente.nombre_completo if cliente else "Estimado(a) Propietario(a)",
+                mascota_nombre=mascota.nombre,
+                fecha_anterior_str=fecha_anterior.strftime("%d/%m/%Y"),
+                hora_anterior_str=hora_anterior.strftime("%I:%M %p"),
+                nueva_fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+                nueva_hora_str=cita.hora.strftime("%I:%M %p"),
+                motivo=cita.motivo,
+                clinica_nombre=clinica_nombre
+            )
+
+    whatsapp_url = None
+    if cliente and cliente.telefono and mascota:
+        tipo_msg = "REPROGRAMACION" if reprogramada else "CONFIRMACION"
+        whatsapp_url = _construir_enlace_whatsapp_cita(
+            telefono=cliente.telefono,
+            cliente_nombre=cliente.nombre_completo,
+            mascota_nombre=mascota.nombre,
+            fecha_str=cita.fecha.strftime("%d/%m/%Y"),
+            hora_str=cita.hora.strftime("%I:%M %p"),
+            motivo=cita.motivo,
+            clinica_nombre=clinica_nombre,
+            tipo_mensaje=tipo_msg
+        )
+
+    return {
+        "mensaje": "Cita actualizada correctamente.",
+        "cita_id": cita.id,
+        "id": cita.id,
+        "fecha": str(cita.fecha),
+        "hora": cita.hora.strftime("%H:%M"),
+        "motivo": cita.motivo,
+        "estado": cita.estado,
+        "reprogramada": reprogramada,
+        "whatsapp_url": whatsapp_url
+    }
+
+
+@router.delete(
+    "/api/clinic/citas/{cita_id}",
+    summary="Eliminar Cita (Soft Delete)",
+    description="Elimina lógicamente una cita del sistema y notifica al cliente si corresponde."
+)
+def eliminar_cita_veterinario(
+    cita_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    enviar_email: bool = True,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    target_clinica_id = current_user.clinica_id
+
+    query = db.query(Cita).filter(
+        Cita.id == cita_id,
+        Cita.is_deleted == False
+    )
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(Cita.clinica_id == target_clinica_id)
+
+    cita = query.first()
+    if not cita:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
+
+    fecha_cancelada = cita.fecha
+    hora_cancelada = cita.hora
+    motivo_cancelado = cita.motivo
+    mascota = cita.mascota
+    cliente = cita.cliente
+
+    # Soft Delete
+    cita.is_deleted = True
+    cita.deleted_at = datetime.utcnow()
+    cita.estado = "CANCELADA"
+
+    # Cancelar notificaciones de seguimiento pendientes vinculadas
+    db.query(SeguimientoNotificacion).filter(
+        SeguimientoNotificacion.mascota_id == cita.mascota_id,
+        SeguimientoNotificacion.clinica_id == cita.clinica_id,
+        SeguimientoNotificacion.estado == "PENDIENTE",
+        SeguimientoNotificacion.fecha_programada == cita.fecha
+    ).update({"estado": "CANCELADO", "is_deleted": True, "deleted_at": datetime.utcnow()}, synchronize_session=False)
+
+    db.commit()
+
+    clinica = db.query(Clinica).filter(Clinica.id == target_clinica_id).first()
+    clinica_nombre = (clinica.nombre_comercial or clinica.nombre) if clinica else "Veterinaria SherekePet"
+
+    # Enviar correo de cancelación si se solicita
+    if enviar_email and cliente and mascota:
+        destinatario_email = _resolver_email_cliente(db, cliente)
+        if destinatario_email:
+            from app.core.email import send_client_appointment_cancellation_email
+            background_tasks.add_task(
+                send_client_appointment_cancellation_email,
+                destinatario=destinatario_email,
+                cliente_nombre=cliente.nombre_completo if cliente else "Estimado(a) Propietario(a)",
+                mascota_nombre=mascota.nombre,
+                fecha_str=fecha_cancelada.strftime("%d/%m/%Y"),
+                hora_str=hora_cancelada.strftime("%I:%M %p"),
+                motivo=motivo_cancelado,
+                clinica_nombre=clinica_nombre
+            )
+
+    whatsapp_url = None
+    if cliente and cliente.telefono and mascota:
+        whatsapp_url = _construir_enlace_whatsapp_cita(
+            telefono=cliente.telefono,
+            cliente_nombre=cliente.nombre_completo,
+            mascota_nombre=mascota.nombre,
+            fecha_str=fecha_cancelada.strftime("%d/%m/%Y"),
+            hora_str=hora_cancelada.strftime("%I:%M %p"),
+            motivo=motivo_cancelado,
+            clinica_nombre=clinica_nombre,
+            tipo_mensaje="CANCELACION"
+        )
+
+    return {
+        "mensaje": "Cita eliminada correctamente.",
+        "cita_id": cita_id,
+        "whatsapp_url": whatsapp_url
+    }
+
 
 
 

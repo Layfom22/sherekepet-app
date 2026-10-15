@@ -288,6 +288,15 @@ class ServicioBanoCreateRequest(BaseModel):
     activo: bool = True
 
 
+class ServicioBanoUpdateRequest(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=2, max_length=100)
+    precio: Optional[float] = Field(None, ge=0)
+    producto_id: Optional[int] = None
+    cantidad_consumo: Optional[float] = Field(None, ge=0)
+    activo: Optional[bool] = None
+
+
+
 class ProductoStockUpdateRequest(BaseModel):
     stock_actual: float = Field(..., ge=0)
     stock_minimo: Optional[float] = Field(default=None, ge=0)

@@ -152,6 +152,23 @@ def run_auto_migrations(target_engine) -> None:
                 if "visible_en_carnet" not in cols:
                     conn.execute(text("ALTER TABLE sp_atenciones ADD COLUMN visible_en_carnet BOOLEAN DEFAULT TRUE;"))
 
+        # sp_horarios_atencion: Limpieza de registros duplicados históricos por clínica y día
+        if "sp_horarios_atencion" in tables:
+            try:
+                with target_engine.begin() as conn:
+                    conn.execute(text("""
+                        UPDATE sp_horarios_atencion
+                        SET is_deleted = TRUE
+                        WHERE id NOT IN (
+                            SELECT MAX(id)
+                            FROM sp_horarios_atencion
+                            WHERE is_deleted = FALSE
+                            GROUP BY clinica_id, dia_semana
+                        ) AND is_deleted = FALSE;
+                    """))
+            except Exception as e:
+                logger.warning(f"No se pudo ejecutar limpieza de horarios duplicados: {e}")
+
         # sp_clientes
         if "sp_clientes" in tables:
             cols = {c["name"] for c in inspector.get_columns("sp_clientes")}

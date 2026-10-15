@@ -51,97 +51,268 @@
         </div>
     </div>
 
-    <!-- Alerta Dinámica de Operación -->
-    <div id="alertaProductos" class="hidden p-4 rounded-2xl border text-xs font-bold flex items-center justify-between">
-        <div class="flex items-center gap-2">
-            <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
-            <span id="alertaProductosTexto"></span>
-        </div>
-        <button type="button" onclick="document.getElementById('alertaProductos').classList.add('hidden')" class="opacity-70 hover:opacity-100">
-            <i data-lucide="x" class="w-4 h-4"></i>
+    <!-- Selector de Submódulos: Productos vs Baños -->
+    <div class="flex items-center space-x-2 border-b border-slate-200/80 pb-3">
+        <button 
+            type="button" 
+            id="tabBtnProductos"
+            onclick="cambiarTabModulo('productos')"
+            class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs border border-slate-200/80 inline-flex items-center space-x-2"
+        >
+            <i data-lucide="package" class="w-4 h-4 text-teal-600"></i>
+            <span>Catálogo de Productos e Insumos</span>
+        </button>
+        <button 
+            type="button" 
+            id="tabBtnBanos"
+            onclick="cambiarTabModulo('banos')"
+            class="btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center space-x-2"
+        >
+            <i data-lucide="bath" class="w-4 h-4 text-teal-600"></i>
+            <span>Servicios de Baño e Higiene</span>
         </button>
     </div>
 
-    <!-- Tarjetas de Resumen Rápido (KPIs) -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-            <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Productos</span>
-                <span id="kpiTotalProductos" class="text-2xl font-black text-slate-900 font-mono">0</span>
+    <!-- ======================================================== -->
+    <!-- SUB-TAB 1: PRODUCTOS E INSUMOS                           -->
+    <!-- ======================================================== -->
+    <div id="tabContentProductos" class="space-y-6">
+
+        <!-- Alerta Dinámica de Operación -->
+        <div id="alertaProductos" class="hidden p-4 rounded-2xl border text-xs font-bold flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+                <span id="alertaProductosTexto"></span>
             </div>
-            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
-                <i data-lucide="boxes" class="w-5 h-5"></i>
+            <button type="button" onclick="document.getElementById('alertaProductos').classList.add('hidden')" class="opacity-70 hover:opacity-100">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+
+        <!-- Tarjetas de Resumen Rápido (KPIs) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block">Total Productos</span>
+                    <span id="kpiTotalProductos" class="text-2xl font-black text-slate-900 font-mono">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <i data-lucide="boxes" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-teal-600 block">Mis Vacunas</span>
+                    <span id="kpiTotalVacunas" class="text-2xl font-black text-teal-700 font-mono">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                    <i data-lucide="syringe" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 block">Medicinas / Pastillas</span>
+                    <span id="kpiTotalMedicinas" class="text-2xl font-black text-indigo-700 font-mono">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <i data-lucide="pill" class="w-5 h-5"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 block">Stock Bajo / Alerta</span>
+                    <span id="kpiTotalBajoStock" class="text-2xl font-black text-rose-600 font-mono">0</span>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                    <i data-lucide="triangle-alert" class="w-5 h-5"></i>
+                </div>
             </div>
         </div>
 
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-            <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-teal-600 block">Mis Vacunas</span>
-                <span id="kpiTotalVacunas" class="text-2xl font-black text-teal-700 font-mono">0</span>
+        <!-- Filtros por Categoría -->
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div class="flex items-center gap-1.5 bg-slate-200/70 p-1.5 rounded-2xl flex-wrap">
+                <button type="button" onclick="seleccionarCategoriaFiltro('TODOS')" id="btnFiltro_TODOS" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs">
+                    Todos
+                </button>
+                <button type="button" onclick="seleccionarCategoriaFiltro('Vacuna')" id="btnFiltro_Vacuna" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                    <i data-lucide="syringe" class="w-3.5 h-3.5"></i>
+                    <span>Vacunas</span>
+                </button>
+                <button type="button" onclick="seleccionarCategoriaFiltro('Medicina')" id="btnFiltro_Medicina" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                    <i data-lucide="pill" class="w-3.5 h-3.5"></i>
+                    <span>Medicinas</span>
+                </button>
+                <button type="button" onclick="seleccionarCategoriaFiltro('Desparasitante')" id="btnFiltro_Desparasitante" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                    <i data-lucide="shield-plus" class="w-3.5 h-3.5"></i>
+                    <span>Desparasitantes</span>
+                </button>
+                <button type="button" onclick="seleccionarCategoriaFiltro('Champú')" id="btnFiltro_Champú" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
+                    <i data-lucide="droplets" class="w-3.5 h-3.5"></i>
+                    <span>Champús / Insumos</span>
+                </button>
             </div>
-            <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                <i data-lucide="syringe" class="w-5 h-5"></i>
+
+            <span class="text-[11px] text-slate-400 font-medium">
+                💡 Tus vacunas y medicinas registradas aquí aparecerán al registrar una atención médica.
+            </span>
+        </div>
+
+        <!-- Grid de Productos -->
+        <div id="contenedorProductosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="col-span-full bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400 text-xs">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600"></i>
+                Cargando tu catálogo de productos...
             </div>
         </div>
 
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-            <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 block">Medicinas / Pastillas</span>
-                <span id="kpiTotalMedicinas" class="text-2xl font-black text-indigo-700 font-mono">0</span>
-            </div>
-            <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <i data-lucide="pill" class="w-5 h-5"></i>
-            </div>
-        </div>
+    </div>
 
-        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
-            <div>
-                <span class="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 block">Stock Bajo / Alerta</span>
-                <span id="kpiTotalBajoStock" class="text-2xl font-black text-rose-600 font-mono">0</span>
+    <!-- ======================================================== -->
+    <!-- SUB-TAB 2: SERVICIOS DE BAÑO E HIGIENE                   -->
+    <!-- ======================================================== -->
+    <div id="tabContentBanos" class="hidden space-y-6">
+        <div class="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div class="border-b border-slate-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="bath" class="w-5 h-5 text-teal-600" aria-hidden="true"></i>
+                        <span>Servicios de Baño y Descuento de Insumos</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Configura los tipos de baño que ofreces, su tarifa y el consumo automatizado de champú por cada atención.
+                    </p>
+                </div>
+                <button 
+                    type="button" 
+                    onclick="abrirModalNuevoBano()"
+                    class="btn-touch px-4 py-2.5 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 active:bg-teal-800 rounded-xl shadow-xs inline-flex items-center gap-1.5 shrink-0"
+                >
+                    <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                    <span>Nuevo Tipo de Baño</span>
+                </button>
             </div>
-            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-                <i data-lucide="triangle-alert" class="w-5 h-5"></i>
+
+            <!-- Tabla de Tipos de Baño -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider">
+                            <th class="py-3 px-3">Servicio de Baño</th>
+                            <th class="py-3 px-3">Precio Estándar</th>
+                            <th class="py-3 px-3">Insumo Asociado</th>
+                            <th class="py-3 px-3">Consumo / Baño</th>
+                            <th class="py-3 px-3">Stock Disponible</th>
+                            <th class="py-3 px-3">Estado</th>
+                            <th class="py-3 px-3 text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaServiciosBanoTbody" class="divide-y divide-slate-100">
+                        <tr>
+                            <td colspan="7" class="py-8 text-center text-slate-400">
+                                <i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto mb-2 text-teal-600"></i>
+                                Cargando catálogo de baños...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Nivel de Stock de Insumos (Shampoos y Lociones) -->
+            <div class="pt-6 border-t border-slate-100 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="boxes" class="w-4 h-4 text-teal-600"></i>
+                        <span>Niveles de Stock de Insumos de Baño (Champús y Lociones)</span>
+                    </h3>
+                    <span class="text-[11px] text-slate-400">Se descuenta automáticamente al registrar atenciones de Baño</span>
+                </div>
+                <div id="gridProductosStockBanos" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <!-- Cards dinámicas de productos generadas por JS -->
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Filtros por Categoría -->
-    <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-1.5 bg-slate-200/70 p-1.5 rounded-2xl flex-wrap">
-            <button type="button" onclick="seleccionarCategoriaFiltro('TODOS')" id="btnFiltro_TODOS" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs">
-                Todos
-            </button>
-            <button type="button" onclick="seleccionarCategoriaFiltro('Vacuna')" id="btnFiltro_Vacuna" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
-                <i data-lucide="syringe" class="w-3.5 h-3.5"></i>
-                <span>Vacunas</span>
-            </button>
-            <button type="button" onclick="seleccionarCategoriaFiltro('Medicina')" id="btnFiltro_Medicina" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
-                <i data-lucide="pill" class="w-3.5 h-3.5"></i>
-                <span>Medicinas</span>
-            </button>
-            <button type="button" onclick="seleccionarCategoriaFiltro('Desparasitante')" id="btnFiltro_Desparasitante" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
-                <i data-lucide="shield-plus" class="w-3.5 h-3.5"></i>
-                <span>Desparasitantes</span>
-            </button>
-            <button type="button" onclick="seleccionarCategoriaFiltro('Champú')" id="btnFiltro_Champú" class="btn-touch px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center gap-1.5">
-                <i data-lucide="droplets" class="w-3.5 h-3.5"></i>
-                <span>Champús / Baño</span>
+</div>
+
+<!-- Modal: Nuevo / Editar Tipo de Baño -->
+<div id="modalBano" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-5 border border-slate-100">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 id="modalBanoTitulo" class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="bath" class="w-5 h-5 text-teal-600"></i>
+                <span>Nuevo Tipo de Baño</span>
+            </h3>
+            <button type="button" onclick="cerrarModalBano()" class="btn-touch p-1 text-slate-400 hover:text-slate-700">
+                <i data-lucide="x" class="w-5 h-5"></i>
             </button>
         </div>
-
-        <span class="text-[11px] text-slate-400 font-medium">
-            💡 Tus vacunas y medicinas registradas aquí aparecerán al registrar una atención médica.
-        </span>
+        <form id="formBano" onsubmit="guardarServicioBano(event)" class="space-y-4 text-xs">
+            <input type="hidden" id="banoId" value="">
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Nombre del Servicio *</label>
+                <input type="text" id="banoNombre" placeholder="Ej: Baño Antipulgas Forte" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white text-xs font-bold text-slate-900">
+            </div>
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Precio (S/.) *</label>
+                <input type="number" step="0.5" min="0" id="banoPrecio" placeholder="Ej: 45.00" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white text-xs font-mono font-bold">
+            </div>
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Insumo a Descontar *</label>
+                <select id="banoProductoId" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white text-xs font-semibold">
+                    <option value="">-- Seleccionar Shampoo / Insumo --</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold text-slate-700 mb-1">Cantidad a consumir por baño (ml) *</label>
+                <input type="number" step="1" min="1" id="banoConsumo" value="50" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-teal-500 focus:bg-white text-xs font-mono">
+            </div>
+            <div class="flex items-center gap-2">
+                <input type="checkbox" id="banoActivo" checked class="w-4 h-4 text-teal-600 rounded-md focus:ring-teal-500 border-slate-300">
+                <label for="banoActivo" class="font-semibold text-slate-700 text-xs">Servicio activo (disponible en atenciones)</label>
+            </div>
+            <div class="pt-2 flex justify-end gap-2">
+                <button type="button" onclick="cerrarModalBano()" class="btn-touch px-4 py-2 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btnGuardarBano" class="btn-touch px-5 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl">Guardar Servicio</button>
+            </div>
+        </form>
     </div>
+</div>
 
-    <!-- Grid de Productos -->
-    <div id="contenedorProductosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div class="col-span-full bg-white p-12 rounded-3xl border border-slate-200 text-center text-slate-400 text-xs">
-            <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600"></i>
-            Cargando tu catálogo de productos...
+<!-- Modal: Reabastecer Stock de Insumo -->
+<div id="modalReabastecerStock" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4 border border-slate-100">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                <i data-lucide="package-plus" class="w-4 h-4 text-teal-600"></i>
+                <span>Ajustar Stock de Insumo</span>
+            </h3>
+            <button type="button" onclick="cerrarModalReabastecer()" class="btn-touch p-1 text-slate-400 hover:text-slate-700">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
         </div>
+        <form id="formReabastecerStock" onsubmit="guardarReabastecimiento(event)" class="space-y-3 text-xs">
+            <input type="hidden" id="reabastecerProductoId">
+            <p id="reabastecerProductoNombre" class="font-bold text-slate-800 text-sm"></p>
+            <div>
+                <label class="block font-semibold text-slate-600 mb-1">Nuevo Stock Total (<span id="reabastecerUnidad">ml</span>):</label>
+                <input type="number" step="10" min="0" id="reabastecerCantidad" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono font-bold">
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button type="button" onclick="sumarStock(500)" class="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg">+500 ml</button>
+                <button type="button" onclick="sumarStock(1000)" class="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg">+1000 ml</button>
+                <button type="button" onclick="sumarStock(2000)" class="flex-1 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg">+2000 ml</button>
+            </div>
+            <div class="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                <button type="button" onclick="cerrarModalReabastecer()" class="btn-touch px-3 py-1.5 font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button type="submit" id="btnGuardarStock" class="btn-touch px-4 py-1.5 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl">Actualizar Stock</button>
+            </div>
+        </form>
     </div>
-
 </div>
 
 <!-- ========================================================== -->
@@ -313,10 +484,49 @@
 {% block scripts %}
 <script>
 let listaProductosGlobal = [];
+let listaServiciosBanoGlobal = [];
 let categoriaFiltroActual = "TODOS";
+
+function cambiarTabModulo(tab) {
+    const btnProd = document.getElementById("tabBtnProductos");
+    const btnBanos = document.getElementById("tabBtnBanos");
+    const contentProd = document.getElementById("tabContentProductos");
+    const contentBanos = document.getElementById("tabContentBanos");
+
+    const inactiveClass = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all text-slate-600 hover:text-slate-900 inline-flex items-center space-x-2";
+    const activeClass = "btn-touch px-4 py-2 text-xs font-bold rounded-xl transition-all bg-white text-teal-700 shadow-xs border border-slate-200/80 inline-flex items-center space-x-2";
+
+    if (tab === "banos") {
+        if (contentProd) contentProd.classList.add("hidden");
+        if (contentBanos) contentBanos.classList.remove("hidden");
+        if (btnProd) btnProd.className = inactiveClass;
+        if (btnBanos) btnBanos.className = activeClass;
+        window.location.hash = "banos";
+        cargarServiciosBano();
+    } else {
+        if (contentBanos) contentBanos.classList.add("hidden");
+        if (contentProd) contentProd.classList.remove("hidden");
+        if (btnBanos) btnBanos.className = inactiveClass;
+        if (btnProd) btnProd.className = activeClass;
+        window.location.hash = "productos";
+    }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     cargarProductosCatalogo();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("tab") === "banos" || window.location.hash === "#banos") {
+        cambiarTabModulo("banos");
+    }
+});
+
+window.addEventListener("hashchange", () => {
+    if (window.location.hash === "#banos") {
+        cambiarTabModulo("banos");
+    } else if (window.location.hash === "#productos") {
+        cambiarTabModulo("productos");
+    }
 });
 
 function toggleCamposStockModal(activo) {
@@ -678,6 +888,290 @@ async function eliminarProducto(id) {
         }
     } catch (e) {
         console.error(e);
+    }
+}
+
+// ==========================================
+// FUNCIONES DE SERVICIOS DE BAÑO E HIGIENE
+// ==========================================
+
+async function cargarServiciosBano() {
+    const tbody = document.getElementById("listaServiciosBanoTbody");
+    const gridStock = document.getElementById("gridProductosStockBanos");
+
+    try {
+        const [respServicios, respProductos] = await Promise.all([
+            fetch("/api/clinic/servicios-bano"),
+            fetch("/api/clinic/productos")
+        ]);
+
+        if (respServicios.ok && respProductos.ok) {
+            const servicios = await respServicios.json();
+            const productos = await respProductos.json();
+            listaServiciosBanoGlobal = servicios;
+
+            renderizarServiciosBano(servicios);
+            renderizarProductosStockBanos(productos);
+            actualizarSelectProductosBanos(productos);
+        } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-rose-500 font-semibold">Error al cargar servicios de baño.</td></tr>';
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = '<tr><td colspan="7" class="p-6 text-center text-rose-500 font-semibold">Error de conexión al cargar datos de baños.</td></tr>';
+    }
+}
+
+function renderizarServiciosBano(servicios) {
+    const tbody = document.getElementById("listaServiciosBanoTbody");
+    if (!servicios || servicios.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-slate-400">No hay servicios de baño configurados. Usa el botón superior para agregar uno.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = servicios.map(s => {
+        const stockActual = s.stock_actual !== null ? s.stock_actual : '--';
+        const unidad = s.unidad_medida || 'ml';
+        const stockBajo = s.stock_actual !== null && s.stock_actual < 300;
+
+        return `
+            <tr class="hover:bg-slate-50 transition-colors">
+                <td class="py-3.5 px-3">
+                    <span class="font-bold text-slate-900 block text-xs">${s.nombre}</span>
+                    <span class="text-[11px] text-slate-400">${s.descripcion || 'Servicio de higiene canina/felina'}</span>
+                </td>
+                <td class="py-3.5 px-3 font-mono font-bold text-slate-800">
+                    S/ ${parseFloat(s.precio).toFixed(2)}
+                </td>
+                <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 font-bold border border-teal-200">
+                        ${s.producto_nombre || 'Sin insumo'}
+                    </span>
+                </td>
+                <td class="py-3.5 px-3 font-mono text-slate-600">
+                    -${s.cantidad_consumo} ${unidad}
+                </td>
+                <td class="py-3.5 px-3 font-mono">
+                    <span class="${stockBajo ? 'text-rose-600 font-bold' : 'text-slate-800 font-semibold'}">
+                        ${stockActual} ${unidad}
+                    </span>
+                    ${stockBajo ? '<span class="ml-1 text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">¡Bajo!</span>' : ''}
+                </td>
+                <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${s.activo ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'}">
+                        ${s.activo ? 'ACTIVO' : 'INACTIVO'}
+                    </span>
+                </td>
+                <td class="py-3.5 px-3 text-right">
+                    <div class="flex items-center justify-end gap-1">
+                        <button type="button" onclick="editarServicioBano(${s.id})" class="p-1.5 text-slate-400 hover:text-teal-600 hover:bg-slate-100 rounded-lg transition-colors" title="Editar servicio">
+                            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                        </button>
+                        <button type="button" onclick="eliminarServicioBano(${s.id})" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Eliminar servicio">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+    window.initLucideIcons?.();
+}
+
+function renderizarProductosStockBanos(productos) {
+    const gridStock = document.getElementById("gridProductosStockBanos");
+    if (!productos || productos.length === 0) {
+        gridStock.innerHTML = '<p class="text-xs text-slate-400 col-span-3">No hay insumos registrados.</p>';
+        return;
+    }
+
+    // Filtrar preferentemente insumos de baño/champús o mostrar todos
+    const insumosBano = productos.filter(p => {
+        const t = (p.tipo || "").toLowerCase();
+        return t === "champú" || t === "champu" || p.unidad_medida === "ml";
+    });
+    const listaAMostrar = insumosBano.length > 0 ? insumosBano : productos.slice(0, 6);
+
+    gridStock.innerHTML = listaAMostrar.map(p => {
+        const esBajo = p.stock_actual <= p.stock_minimo;
+        return `
+            <div class="p-4 rounded-2xl border ${esBajo ? 'bg-rose-50/60 border-rose-200' : 'bg-slate-50 border-slate-200'} flex flex-col justify-between gap-3">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-slate-800 text-xs">${p.nombre}</span>
+                        ${esBajo ? '<span class="text-[10px] font-black uppercase text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded-md">Bajo Stock</span>' : ''}
+                    </div>
+                    <div class="mt-2 flex items-baseline gap-1">
+                        <span class="text-2xl font-black font-mono ${esBajo ? 'text-rose-700' : 'text-slate-900'}">${Math.round(p.stock_actual)}</span>
+                        <span class="text-xs font-bold text-slate-500">${p.unidad_medida}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-1">Mínimo sugerido: ${p.stock_minimo} ${p.unidad_medida}</p>
+                </div>
+                <button 
+                    type="button" 
+                    onclick="abrirModalReabastecer(${p.id}, '${p.nombre.replace(/'/g, "\\'")}', ${p.stock_actual}, '${p.unidad_medida}')"
+                    class="btn-touch w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-1.5"
+                >
+                    <i data-lucide="package-plus" class="w-3.5 h-3.5 text-teal-600"></i>
+                    <span>Ajustar Stock</span>
+                </button>
+            </div>
+        `;
+    }).join("");
+    window.initLucideIcons?.();
+}
+
+function actualizarSelectProductosBanos(productos) {
+    const sel = document.getElementById("banoProductoId");
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Seleccionar Shampoo / Insumo --</option>' + 
+        productos.map(p => `<option value="${p.id}">${p.nombre} (Stock: ${p.stock_actual} ${p.unidad_medida})</option>`).join("");
+}
+
+function abrirModalNuevoBano() {
+    document.getElementById("banoId").value = "";
+    document.getElementById("formBano")?.reset();
+    document.getElementById("banoActivo").checked = true;
+    document.getElementById("banoConsumo").value = "50";
+    document.getElementById("modalBanoTitulo").innerHTML = '<i data-lucide="bath" class="w-5 h-5 text-teal-600"></i><span>Nuevo Tipo de Baño</span>';
+    document.getElementById("btnGuardarBano").textContent = "Crear Servicio";
+    document.getElementById("modalBano").classList.remove("hidden");
+    actualizarSelectProductosBanos(listaProductosGlobal);
+    window.initLucideIcons?.();
+}
+
+function editarServicioBano(id) {
+    const s = listaServiciosBanoGlobal.find(item => item.id === id);
+    if (!s) return;
+
+    document.getElementById("banoId").value = s.id;
+    document.getElementById("banoNombre").value = s.nombre || "";
+    document.getElementById("banoPrecio").value = s.precio || 0;
+    actualizarSelectProductosBanos(listaProductosGlobal);
+    document.getElementById("banoProductoId").value = s.producto_id || "";
+    document.getElementById("banoConsumo").value = s.cantidad_consumo || 50;
+    document.getElementById("banoActivo").checked = Boolean(s.activo);
+    document.getElementById("modalBanoTitulo").innerHTML = '<i data-lucide="pencil" class="w-5 h-5 text-teal-600"></i><span>Editar Tipo de Baño</span>';
+    document.getElementById("btnGuardarBano").textContent = "Guardar Cambios";
+    document.getElementById("modalBano").classList.remove("hidden");
+    window.initLucideIcons?.();
+}
+
+function cerrarModalBano() {
+    document.getElementById("modalBano").classList.add("hidden");
+    document.getElementById("formBano")?.reset();
+}
+
+async function guardarServicioBano(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnGuardarBano");
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    const banoId = document.getElementById("banoId").value;
+    const payload = {
+        clinica_id: parseInt("{{ clinica.id }}") || 1,
+        nombre: document.getElementById("banoNombre").value.trim(),
+        precio: parseFloat(document.getElementById("banoPrecio").value),
+        producto_id: parseInt(document.getElementById("banoProductoId").value) || null,
+        cantidad_consumo: parseFloat(document.getElementById("banoConsumo").value) || 50.0,
+        activo: document.getElementById("banoActivo").checked
+    };
+
+    try {
+        const url = banoId ? `/api/clinic/servicios-bano/${banoId}` : "/api/clinic/servicios-bano";
+        const method = banoId ? "PUT" : "POST";
+
+        const resp = await fetch(url, {
+            method: method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        if (resp.ok) {
+            cerrarModalBano();
+            mostrarMensajeProductos(banoId ? "¡Servicio de baño actualizado!" : "¡Nuevo tipo de baño creado!");
+            await cargarServiciosBano();
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error: " + (err.detail || "No se pudo guardar el servicio"));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión con el servidor.");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = banoId ? "Guardar Cambios" : "Guardar Servicio";
+    }
+}
+
+async function eliminarServicioBano(id) {
+    const s = listaServiciosBanoGlobal.find(item => item.id === id);
+    if (!s) return;
+    if (!confirm(`¿Estás seguro de eliminar el servicio de baño "${s.nombre}"?`)) return;
+
+    try {
+        const resp = await fetch(`/api/clinic/servicios-bano/${id}`, { method: "DELETE" });
+        if (resp.ok) {
+            mostrarMensajeProductos(`Servicio "${s.nombre}" eliminado.`);
+            await cargarServiciosBano();
+        } else {
+            alert("No se pudo eliminar el servicio.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Error de conexión al eliminar servicio.");
+    }
+}
+
+function abrirModalReabastecer(id, nombre, stock, unidad) {
+    document.getElementById("reabastecerProductoId").value = id;
+    document.getElementById("reabastecerProductoNombre").textContent = nombre;
+    document.getElementById("reabastecerCantidad").value = stock;
+    document.getElementById("reabastecerUnidad").textContent = unidad;
+    document.getElementById("modalReabastecerStock").classList.remove("hidden");
+}
+
+function cerrarModalReabastecer() {
+    document.getElementById("modalReabastecerStock").classList.add("hidden");
+}
+
+function sumarStock(cantidad) {
+    const input = document.getElementById("reabastecerCantidad");
+    const val = parseFloat(input.value) || 0;
+    input.value = Math.max(0, val + cantidad);
+}
+
+async function guardarReabastecimiento(e) {
+    e.preventDefault();
+    const btn = document.getElementById("btnGuardarStock");
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    const prodId = document.getElementById("reabastecerProductoId").value;
+    const nuevoStock = parseFloat(document.getElementById("reabastecerCantidad").value);
+
+    try {
+        const resp = await fetch(`/api/clinic/productos/${prodId}/stock`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ stock_actual: nuevoStock })
+        });
+
+        if (resp.ok) {
+            cerrarModalReabastecer();
+            mostrarMensajeProductos("¡Stock de insumo actualizado correctamente!");
+            await Promise.all([cargarServiciosBano(), cargarProductosCatalogo()]);
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            alert("Error: " + (err.detail || "No se pudo actualizar el stock"));
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Error de conexión al actualizar stock.");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Actualizar Stock";
     }
 }
 </script>

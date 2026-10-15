@@ -53,6 +53,7 @@ from app.clinic.schemas import (
     ProductoUpdateRequest,
     ServicioBanoItem,
     ServicioBanoCreateRequest,
+    ServicioBanoUpdateRequest,
     ProductoStockUpdateRequest,
     SeguimientoUpdateResponse,
     LogoUploadResponse,
@@ -327,45 +328,56 @@ DIAS_SEMANA_NOMBRES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "S�
 
 def obtener_o_inicializar_horarios(clinica_id: int, db: Session) -> List[HorarioAtencion]:
     """
-    Retorna los 7 registros de horarios de atención (Lunes a Domingo) para la clínica.
-    Si la clínica no tiene horarios configurados aún, inicializa la plantilla por defecto:
-    - Lun - Vie: 09:00 - 13:00 y 15:00 - 18:00 (activo=True)
-    - Sáb: 09:00 - 13:00 (activo=True)
-    - Dom: Inactivo (activo=False)
+    Retorna exactamente los 7 registros de horarios de atención (Lunes a Domingo) para la clínica,
+    garantizando que NUNCA existan días duplicados para una misma clínica.
+    Si existen registros duplicados históricos, conserva el más reciente y elimina los sobrantes.
     """
-    horarios = db.query(HorarioAtencion).filter(
+    todos_horarios = db.query(HorarioAtencion).filter(
         HorarioAtencion.clinica_id == clinica_id,
         HorarioAtencion.is_deleted == False
-    ).order_by(HorarioAtencion.dia_semana.asc()).all()
+    ).order_by(
+        HorarioAtencion.dia_semana.asc(),
+        HorarioAtencion.updated_at.desc(),
+        HorarioAtencion.id.desc()
+    ).all()
 
-    if len(horarios) == 7:
-        return horarios
+    dias_map: dict[int, HorarioAtencion] = {}
+    duplicados_a_eliminar = []
 
-    dias_existentes = {h.dia_semana: h for h in horarios}
+    for h in todos_horarios:
+        if h.dia_semana not in dias_map:
+            dias_map[h.dia_semana] = h
+        else:
+            duplicados_a_eliminar.append(h)
+
+    # Si encontramos registros duplicados, eliminarlos de la BD
+    if duplicados_a_eliminar:
+        for dup in duplicados_a_eliminar:
+            dup.soft_delete()
+        db.commit()
+
+    # Si faltan días de la semana (0 a 6), inicializarlos por defecto
     horarios_nuevos = []
     for d in range(7):
-        if d in dias_existentes:
-            continue
-        h = HorarioAtencion(
-            clinica_id=clinica_id,
-            dia_semana=d,
-            activo=True,
-            hora_inicio_1=time(8, 30),
-            hora_fin_1=time(13, 0),
-            hora_inicio_2=time(14, 0) if d < 6 else None,
-            hora_fin_2=time(18, 0) if d < 6 else None,
-            intervalo_minutos=30
-        )
-        db.add(h)
-        horarios_nuevos.append(h)
+        if d not in dias_map:
+            h = HorarioAtencion(
+                clinica_id=clinica_id,
+                dia_semana=d,
+                activo=True,
+                hora_inicio_1=time(8, 30),
+                hora_fin_1=time(13, 0),
+                hora_inicio_2=time(14, 0) if d < 6 else None,
+                hora_fin_2=time(18, 0) if d < 6 else None,
+                intervalo_minutos=30
+            )
+            db.add(h)
+            horarios_nuevos.append(h)
+            dias_map[d] = h
 
     if horarios_nuevos:
         db.commit()
 
-    return db.query(HorarioAtencion).filter(
-        HorarioAtencion.clinica_id == clinica_id,
-        HorarioAtencion.is_deleted == False
-    ).order_by(HorarioAtencion.dia_semana.asc()).all()
+    return [dias_map[d] for d in range(7)]
 
 
 @router.get(
@@ -644,6 +656,88 @@ def create_servicio_bano(
         stock_actual=sb.producto.stock_actual if sb.producto else None,
         unidad_medida=sb.producto.unidad_medida if sb.producto else None
     )
+
+
+@router.put(
+    "/api/clinic/servicios-bano/{servicio_id}",
+    response_model=ServicioBanoItem,
+    summary="Actualizar Servicio de Baño"
+)
+def update_servicio_bano(
+    servicio_id: int,
+    payload: ServicioBanoUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    target_clinica_id = current_user.clinica_id
+    query = db.query(ServicioBano).filter(
+        ServicioBano.id == servicio_id,
+        ServicioBano.is_deleted == False
+    )
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(ServicioBano.clinica_id == target_clinica_id)
+
+    sb = query.first()
+    if not sb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio de baño no encontrado")
+
+    if payload.nombre is not None:
+        sb.nombre = payload.nombre.strip()
+    if payload.precio is not None:
+        sb.precio = payload.precio
+    if payload.producto_id is not None:
+        sb.producto_id = payload.producto_id if payload.producto_id > 0 else None
+    if payload.cantidad_consumo is not None:
+        sb.cantidad_consumo = payload.cantidad_consumo
+    if payload.activo is not None:
+        sb.activo = payload.activo
+
+    db.commit()
+    db.refresh(sb)
+
+    return ServicioBanoItem(
+        id=sb.id,
+        clinica_id=sb.clinica_id,
+        nombre=sb.nombre,
+        precio=sb.precio,
+        producto_id=sb.producto_id,
+        cantidad_consumo=sb.cantidad_consumo,
+        activo=sb.activo,
+        producto_nombre=sb.producto.nombre if sb.producto else None,
+        stock_actual=sb.producto.stock_actual if sb.producto else None,
+        unidad_medida=sb.producto.unidad_medida if sb.producto else None
+    )
+
+
+@router.delete(
+    "/api/clinic/servicios-bano/{servicio_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Eliminar Servicio de Baño"
+)
+def delete_servicio_bano(
+    servicio_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Veterinario = Depends(require_current_vet)
+):
+    target_clinica_id = current_user.clinica_id
+    query = db.query(ServicioBano).filter(
+        ServicioBano.id == servicio_id,
+        ServicioBano.is_deleted == False
+    )
+    if not getattr(current_user, "is_superadmin", False):
+        query = query.filter(ServicioBano.clinica_id == target_clinica_id)
+
+    sb = query.first()
+    if not sb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servicio de baño no encontrado")
+
+    sb.is_deleted = True
+    sb.deleted_at = get_lima_now()
+    db.commit()
+
+    return {"ok": True, "message": "Servicio de baño eliminado correctamente"}
 
 
 @router.get("/productos", response_class=HTMLResponse, summary="Módulo Mis Productos e Inventario de la Clínica")

@@ -183,6 +183,23 @@
                 </span>
             </button>
 
+            <!-- Novedades de la Versión (Changelog In-App) -->
+            <button 
+                type="button" 
+                onclick="abrirModalNovedades()"
+                class="btn-touch w-full px-3.5 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50/70 transition-all flex items-center justify-between group"
+                title="Ver novedades y actualizaciones de SherekePet"
+            >
+                <div class="flex items-center gap-3">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-amber-500 shrink-0 group-hover:scale-110 transition-transform" aria-hidden="true"></i>
+                    <span>Novedades v2.4</span>
+                </div>
+                <span id="badgeNovedadesPunto" class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                </span>
+            </button>
+
             {% if current_user and (current_user.rol == 'SUPER_ADMIN' or current_user.is_superadmin) %}
             <div class="pt-2 mt-2 border-t border-slate-100">
                 <a 
@@ -420,6 +437,22 @@
                 </div>
                 <span class="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 rounded-md">
                     WhatsApp
+                </span>
+            </button>
+
+            <!-- Novedades de la Versión Móvil -->
+            <button 
+                type="button" 
+                onclick="toggleMobileSidebar(); abrirModalNovedades();"
+                class="btn-touch w-full px-3.5 py-3 text-sm font-semibold rounded-xl text-slate-700 hover:text-teal-700 hover:bg-teal-50 transition-colors flex items-center justify-between"
+            >
+                <div class="flex items-center gap-3">
+                    <i data-lucide="sparkles" class="w-5 h-5 text-amber-500 shrink-0" aria-hidden="true"></i>
+                    <span>Novedades v2.4</span>
+                </div>
+                <span id="badgeNovedadesPuntoMobile" class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
                 </span>
             </button>
 
@@ -682,8 +715,164 @@
         </div>
     </div>
 
+    <!-- ========================================================== -->
+    <!-- MODAL: NOVEDADES Y ACTUALIZACIONES DE LA PLATAFORMA (VET) -->
+    <!-- ========================================================== -->
+    <div id="modalNovedades" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 flex items-center justify-center">
+        <div class="bg-white max-w-xl w-full rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] sm:max-h-[88vh] overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150">
+            <!-- Header con Gradiente y Badge de Versión -->
+            <div class="p-5 sm:p-6 bg-gradient-to-r from-teal-600 via-teal-700 to-emerald-700 text-white relative">
+                <div class="flex items-center justify-between">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-white/20 backdrop-blur-xs text-white border border-white/30">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+                        <span>Versión 2.4.0</span>
+                    </span>
+                    <button 
+                        type="button" 
+                        onclick="cerrarModalNovedades()" 
+                        class="p-1.5 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                        aria-label="Cerrar modal"
+                    >
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                <h3 class="text-xl sm:text-2xl font-black mt-2 text-white">¡Nuevas funciones en SherekePet!</h3>
+                <p class="text-xs sm:text-sm text-teal-100 mt-1 leading-snug">
+                    Hemos implementado mejoras clave para tu clínica veterinaria y la relación con tus clientes:
+                </p>
+            </div>
+
+            <!-- Lista de Novedades con Tarjetas Visuales -->
+            <div class="p-5 sm:p-6 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
+                
+                <!-- 1. Confidencialidad Médica -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-teal-300 transition-colors flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                        <i data-lucide="lock" class="w-5 h-5 text-teal-400"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs sm:text-sm font-bold text-slate-900">Confidencialidad Médica en Atenciones</h4>
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md">Privacidad</span>
+                        </div>
+                        <p class="text-xs text-slate-600 mt-1 leading-relaxed">
+                            Tus <strong>diagnósticos técnicos, sospechas clínicas y notas internas</strong> ahora son 100% privados para tu equipo y nunca se exponen al dueño. Además, puedes ocultar atenciones completas con el nuevo interruptor de carnet.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2. Simulador de Carnet en Vivo -->
+                <div class="p-3.5 rounded-2xl bg-teal-50/70 border border-teal-200 hover:border-teal-400 transition-colors flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                        <i data-lucide="smartphone" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs sm:text-sm font-bold text-teal-950">Simulador de Carnet en Vivo (Live Preview)</h4>
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 bg-teal-200 text-teal-900 rounded-md">Novedad</span>
+                        </div>
+                        <p class="text-xs text-teal-800 mt-1 leading-relaxed">
+                            Al registrar una atención, observa en tiempo real al costado del formulario una pantalla de celular con la vista exacta que verá el dueño en su carnet digital.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. Cartel QR para Sala de Espera / Mostrador -->
+                <div class="p-3.5 rounded-2xl bg-sky-50/70 border border-sky-200 hover:border-sky-400 transition-colors flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                        <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs sm:text-sm font-bold text-sky-950">Cartel QR Imprimible para Sala de Espera</h4>
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 bg-sky-200 text-sky-900 rounded-md">Mostrador</span>
+                        </div>
+                        <p class="text-xs text-sky-800 mt-1 leading-relaxed">
+                            Desde el módulo de <strong>Pacientes</strong>, haz clic en <em>"Código QR Mostrador"</em> para descargar o imprimir un cartel institucional listo para colocar en recepción y sala de espera.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 4. Edición de Mascotas y Soporte Directo -->
+                <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 hover:border-emerald-400 transition-colors flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                        <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs sm:text-sm font-bold text-emerald-950">Edición de Pacientes & Soporte WhatsApp</h4>
+                            <span class="text-[9px] font-black uppercase px-2 py-0.5 bg-emerald-200 text-emerald-900 rounded-md">Mejora</span>
+                        </div>
+                        <p class="text-xs text-emerald-800 mt-1 leading-relaxed">
+                            Ahora puedes modificar nombre, peso, fecha de nacimiento y datos de la mascota en cualquier momento. Y si tienes cualquier consulta, usa el botón <strong>Soporte & Ayuda</strong> para contactarnos directo por WhatsApp.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer con Botón Entendido -->
+            <div class="p-4 sm:p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+                <span class="text-[11px] text-slate-500 font-medium">SherekePet Cloud • Versión 2.4.0</span>
+                <button 
+                    type="button" 
+                    onclick="cerrarModalNovedades()" 
+                    class="btn-touch px-6 py-2.5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-xl font-bold text-xs shadow-xs transition-colors flex items-center gap-2"
+                >
+                    <span>¡Excelente, Entendido!</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Script para control del Drawer Móvil y Lucide Icons -->
     <script>
+        const SHEREKE_CURRENT_VERSION = "2.4.0";
+
+        function abrirModalNovedades() {
+            const modal = document.getElementById("modalNovedades");
+            if (modal) {
+                modal.classList.remove("hidden");
+                window.initLucideIcons?.();
+            }
+        }
+
+        function cerrarModalNovedades() {
+            const modal = document.getElementById("modalNovedades");
+            if (modal) modal.classList.add("hidden");
+            try {
+                localStorage.setItem("shereke_last_seen_version", SHEREKE_CURRENT_VERSION);
+            } catch(e) {}
+            const badge = document.getElementById("badgeNovedadesPunto");
+            if (badge) badge.classList.add("hidden");
+            const badgeM = document.getElementById("badgeNovedadesPuntoMobile");
+            if (badgeM) badgeM.classList.add("hidden");
+        }
+
+        function verificarNovedadesAlCargar() {
+            try {
+                const lastSeen = localStorage.getItem("shereke_last_seen_version");
+                const badge = document.getElementById("badgeNovedadesPunto");
+                const badgeM = document.getElementById("badgeNovedadesPuntoMobile");
+
+                if (lastSeen !== SHEREKE_CURRENT_VERSION) {
+                    if (badge) badge.classList.remove("hidden");
+                    if (badgeM) badgeM.classList.remove("hidden");
+
+                    // Mostrar el modal automáticamente después de 650ms si no lo ha visto
+                    setTimeout(() => {
+                        abrirModalNovedades();
+                    }, 650);
+                } else {
+                    if (badge) badge.classList.add("hidden");
+                    if (badgeM) badgeM.classList.add("hidden");
+                }
+            } catch(e) {
+                console.warn("Storage not available", e);
+            }
+        }
+
         {% if show_sidebar %}
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('mobileSidebar');
@@ -778,7 +967,12 @@
                 });
             }
         }
-        document.addEventListener('DOMContentLoaded', initLucideIcons);
+        document.addEventListener('DOMContentLoaded', () => {
+            initLucideIcons();
+            {% if show_sidebar %}
+            verificarNovedadesAlCargar();
+            {% endif %}
+        });
         window.initLucideIcons = initLucideIcons;
     </script>
 

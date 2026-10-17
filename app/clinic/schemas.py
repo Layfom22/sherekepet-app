@@ -44,6 +44,8 @@ class PacienteRapidoRequest(BaseModel):
     mascota_raza: Optional[str] = Field(None, description="Texto de raza (fallback/legacy)")
     mascota_peso: Optional[float] = Field(None, ge=0, description="Peso actual en kg")
     fecha_nacimiento: Optional[date] = Field(None, description="Fecha de nacimiento estimada o exacta de la mascota")
+    mascota_sexo: Optional[str] = Field(None, max_length=20, description="Sexo de la mascota: 'Macho' o 'Hembra'")
+    sexo: Optional[str] = Field(None, max_length=20, description="Alias de sexo de la mascota")
     
     # Salud y alergias
     tiene_alergias: bool = Field(False, description="¿Tiene alergias conocidas?")
@@ -78,6 +80,7 @@ class MascotaSummary(BaseModel):
     nombre: str
     especie: str
     raza: Optional[str]
+    sexo: Optional[str] = None
     peso: Optional[float]
     fecha_nacimiento: Optional[date] = None
     foto_url: Optional[str] = None

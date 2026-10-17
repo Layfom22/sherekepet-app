@@ -43,6 +43,11 @@
                         <span class="px-3 py-0.5 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200">
                             {{ mascota.especie }}
                         </span>
+                        {% if mascota.sexo %}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold {% if mascota.sexo == 'Macho' %}bg-sky-50 text-sky-700 border border-sky-200{% elif mascota.sexo == 'Hembra' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-slate-50 text-slate-700 border border-slate-200{% endif %}">
+                            {{ '♂ Macho' if mascota.sexo == 'Macho' else ('♀ Hembra' if mascota.sexo == 'Hembra' else mascota.sexo) }}
+                        </span>
+                        {% endif %}
                         {% if mascota.raza %}
                         <span class="text-xs text-slate-500">&bull; Raza: {{ mascota.raza }}</span>
                         {% endif %}

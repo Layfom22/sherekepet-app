@@ -243,6 +243,21 @@
                     </select>
                 </div>
 
+                <!-- Sexo de la Mascota -->
+                <div>
+                    <label for="mascota_sexo" class="block text-xs font-semibold text-slate-700 mb-1">
+                        Sexo de la Mascota
+                    </label>
+                    <select 
+                        id="mascota_sexo" 
+                        class="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white font-medium"
+                    >
+                        <option value="">-- Seleccionar Sexo --</option>
+                        <option value="Macho">♂ Macho</option>
+                        <option value="Hembra">♀ Hembra</option>
+                    </select>
+                </div>
+
                 <div>
                     <label for="mascota_peso" class="block text-xs font-semibold text-slate-700 mb-1">
                         Peso Actual (kg)
@@ -763,6 +778,9 @@ function calcularEdad(fechaStr) {
 // Preparar formulario para agregar nueva mascota para este dueño
 function prepararNuevaMascotaParaDueño() {
     document.getElementById('mascota_nombre').value = '';
+    if (document.getElementById('mascota_sexo')) {
+        document.getElementById('mascota_sexo').value = '';
+    }
     document.getElementById('mascota_peso').value = '';
     if (document.getElementById('fecha_nacimiento')) {
         document.getElementById('fecha_nacimiento').value = '';
@@ -880,6 +898,7 @@ document.getElementById('formPaciente').addEventListener('submit', async functio
         nombre_completo: document.getElementById('nombre_completo').value.trim(),
         telefono: document.getElementById('telefono').value.trim(),
         mascota_nombre: document.getElementById('mascota_nombre').value.trim(),
+        mascota_sexo: document.getElementById('mascota_sexo') ? document.getElementById('mascota_sexo').value : null,
         especie_id: especieSelect.value && !isNaN(parseInt(especieSelect.value)) ? parseInt(especieSelect.value) : null,
         raza_id: razaSelect.value && !isNaN(parseInt(razaSelect.value)) ? parseInt(razaSelect.value) : null,
         mascota_especie: especieSelect.options[especieSelect.selectedIndex]?.text || "Canino",

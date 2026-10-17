@@ -90,6 +90,37 @@ def test_fecha_nacimiento_y_deduplicacion_pacientes(client, db_session, vet_setu
     assert "Bobby" in resp_html.text
 
 
+def test_registro_paciente_con_sexo(client, db_session, vet_setup):
+    """
+    Verifica que el campo 'sexo' / 'mascota_sexo' se guarde correctamente al registrar
+    un paciente rápido y se retorne en la respuesta y en la base de datos.
+    """
+    clinica = vet_setup["clinica"]
+    vet = vet_setup["vet"]
+
+    payload = {
+        "clinica_id": clinica.id,
+        "dni": "88776655",
+        "nombres": "María",
+        "apellido_paterno": "Gonzales",
+        "telefono": "912345678",
+        "mascota_nombre": "Luna",
+        "mascota_especie": "Felino",
+        "mascota_raza": "Siamés",
+        "mascota_sexo": "Hembra",
+        "fecha_nacimiento": "2023-05-10",
+    }
+    resp = client.post("/api/clinic/paciente-rapido", json=payload)
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["mascota"]["sexo"] == "Hembra"
+    mascota_id = data["mascota"]["id"]
+
+    mascota_db = db_session.get(Mascota, mascota_id)
+    assert mascota_db.sexo == "Hembra"
+    assert mascota_db.nombre == "Luna"
+
+
 def test_validacion_estricta_receta_medica(client, db_session, vet_setup):
     """
     Validación estricta de receta:

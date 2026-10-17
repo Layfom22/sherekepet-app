@@ -585,12 +585,12 @@
         {% endif %}
 
         <!-- Main Content Area -->
-        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6">
             {% block content %}{% endblock %}
         </main>
 
         <!-- Footer -->
-        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto">
+        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 mt-auto mb-16 md:mb-0">
             <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
                 <span>SherekePet SaaS Veterinario &bull; Zona Horaria: America/Lima &bull; Multi-Tenant Seguro</span>
                 <button 
@@ -604,6 +604,166 @@
             </div>
         </footer>
     </div>
+
+    {% if show_sidebar %}
+    <!-- ========================================================== -->
+    <!-- 5. BARRA DE NAVEGACIÓN INFERIOR MÓVIL ESTILO APP (md:hidden)-->
+    <!-- ========================================================== -->
+    <nav 
+        id="vetMobileBottomBar" 
+        class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] px-2 py-1.5 flex items-center justify-around select-none"
+        style="padding-bottom: max(0.375rem, env(safe-area-inset-bottom));"
+        aria-label="Navegación principal móvil"
+    >
+        <!-- 1. Inicio / Dashboard -->
+        <a 
+            href="/dashboard" 
+            class="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-slate-500 hover:text-teal-700 active:scale-95 transition-all group"
+            id="bottomNavDashboard"
+        >
+            <div class="relative">
+                <i data-lucide="layout-dashboard" class="w-5 h-5 text-slate-500 group-hover:text-teal-600 transition-colors"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight mt-0.5 leading-none">Inicio</span>
+        </a>
+
+        <!-- 2. Pacientes -->
+        <a 
+            href="/pacientes" 
+            class="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-slate-500 hover:text-teal-700 active:scale-95 transition-all group"
+            id="bottomNavPacientes"
+        >
+            <div class="relative">
+                <i data-lucide="paw-print" class="w-5 h-5 text-slate-500 group-hover:text-teal-600 transition-colors"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight mt-0.5 leading-none">Pacientes</span>
+        </a>
+
+        <!-- 3. Botón Flotante Central: Acción Rápida (+) -->
+        <div class="relative flex items-center justify-center px-1">
+            <button 
+                type="button" 
+                id="btnQuickActionFab"
+                onclick="toggleQuickActionMenu()"
+                class="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 active:scale-90 text-white shadow-lg shadow-teal-600/30 flex items-center justify-center transition-all cursor-pointer border-2 border-white ring-2 ring-teal-500/20"
+                aria-label="Acciones Rápidas"
+            >
+                <i id="iconQuickActionFab" data-lucide="plus" class="w-6 h-6 transition-transform duration-200"></i>
+            </button>
+        </div>
+
+        <!-- 4. Agenda de Citas -->
+        <a 
+            href="/agenda" 
+            class="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-slate-500 hover:text-teal-700 active:scale-95 transition-all group relative"
+            id="bottomNavAgenda"
+        >
+            <div class="relative">
+                <i data-lucide="calendar-days" class="w-5 h-5 text-slate-500 group-hover:text-teal-600 transition-colors"></i>
+                {% if p_count and p_count > 0 %}
+                <span class="absolute -top-1 -right-2 px-1.5 py-0.2 text-[9px] font-black bg-amber-500 text-white rounded-full animate-pulse shadow-xs">
+                    {{ p_count }}
+                </span>
+                {% endif %}
+            </div>
+            <span class="text-[10px] font-bold tracking-tight mt-0.5 leading-none">Agenda</span>
+        </a>
+
+        <!-- 5. Menú Completo (Drawer) -->
+        <button 
+            type="button" 
+            onclick="toggleMobileSidebar()" 
+            class="flex flex-col items-center justify-center flex-1 py-1 px-1 rounded-xl text-slate-500 hover:text-teal-700 active:scale-95 transition-all group"
+            id="bottomNavMenu"
+            aria-label="Abrir menú"
+        >
+            <div class="relative">
+                <i data-lucide="menu" class="w-5 h-5 text-slate-500 group-hover:text-teal-600 transition-colors"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-tight mt-0.5 leading-none">Menú</span>
+        </button>
+    </nav>
+
+    <!-- Menú de Acciones Rápidas Desplegable (Bottom Sheet / Popover) -->
+    <div 
+        id="quickActionBackdrop" 
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs z-50 hidden md:hidden transition-opacity duration-200 opacity-0"
+        onclick="toggleQuickActionMenu()"
+    ></div>
+
+    <div 
+        id="quickActionMenu" 
+        class="fixed bottom-20 left-4 right-4 z-50 hidden md:hidden transition-all duration-200 transform translate-y-4 opacity-0"
+    >
+        <div class="bg-white rounded-3xl p-4 shadow-2xl border border-slate-200/80 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-teal-50 text-teal-700 flex items-center justify-center">
+                        <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    </div>
+                    <span class="text-xs font-black uppercase tracking-wider text-slate-800">Acciones Rápidas</span>
+                </div>
+                <button type="button" onclick="toggleQuickActionMenu()" class="p-1 text-slate-400 hover:text-slate-600" aria-label="Cerrar menú">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <!-- Nuevo Paciente -->
+                <a 
+                    href="/pacientes/nuevo" 
+                    onclick="toggleQuickActionMenu()"
+                    class="btn-touch p-3 rounded-2xl bg-teal-50/70 hover:bg-teal-100/80 border border-teal-200/70 flex flex-col items-center text-center gap-1.5 transition-all group active:scale-95"
+                >
+                    <div class="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                        <i data-lucide="paw-print" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-xs font-bold text-teal-950">Nuevo Paciente</span>
+                    <span class="text-[10px] text-teal-700">Ficha + Dueño</span>
+                </a>
+
+                <!-- Agendar Cita -->
+                <a 
+                    href="/agenda?agendar=1" 
+                    onclick="toggleQuickActionMenu()"
+                    class="btn-touch p-3 rounded-2xl bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200/70 flex flex-col items-center text-center gap-1.5 transition-all group active:scale-95"
+                >
+                    <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                        <i data-lucide="calendar-plus" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-xs font-bold text-indigo-950">Agendar Cita</span>
+                    <span class="text-[10px] text-indigo-700">Teléfono o WhatsApp</span>
+                </a>
+
+                <!-- Mis Productos / Insumos -->
+                <a 
+                    href="/productos" 
+                    onclick="toggleQuickActionMenu()"
+                    class="btn-touch p-3 rounded-2xl bg-amber-50/70 hover:bg-amber-100/80 border border-amber-200/70 flex flex-col items-center text-center gap-1.5 transition-all group active:scale-95"
+                >
+                    <div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                        <i data-lucide="package" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-xs font-bold text-amber-950">Productos / Baños</span>
+                    <span class="text-[10px] text-amber-700">Control de Insumos</span>
+                </a>
+
+                <!-- Soporte Técnico Inmediato -->
+                <button 
+                    type="button" 
+                    onclick="toggleQuickActionMenu(); abrirModalSoportePlataforma();"
+                    class="btn-touch p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100/80 border border-emerald-200/70 flex flex-col items-center text-center gap-1.5 transition-all group active:scale-95"
+                >
+                    <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                        <i data-lucide="life-buoy" class="w-5 h-5"></i>
+                    </div>
+                    <span class="text-xs font-bold text-emerald-950">Soporte y Ayuda</span>
+                    <span class="text-[10px] text-emerald-700">WhatsApp Directo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- ========================================================== -->
     <!-- MODAL: SOPORTE TÉCNICO Y REPORTE DE ERRORES                -->
@@ -876,6 +1036,63 @@
                 document.body.classList.remove('overflow-hidden');
             }
         }
+
+        function toggleQuickActionMenu() {
+            const menu = document.getElementById('quickActionMenu');
+            const backdrop = document.getElementById('quickActionBackdrop');
+            const fabIcon = document.getElementById('iconQuickActionFab');
+            if (!menu || !backdrop) return;
+
+            const isHidden = menu.classList.contains('hidden');
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                backdrop.classList.remove('hidden');
+                requestAnimationFrame(() => {
+                    backdrop.classList.remove('opacity-0');
+                    backdrop.classList.add('opacity-100');
+                    menu.classList.remove('opacity-0', 'translate-y-4');
+                    menu.classList.add('opacity-100', 'translate-y-0');
+                    if (fabIcon) fabIcon.classList.add('rotate-45');
+                });
+                window.initLucideIcons?.();
+            } else {
+                backdrop.classList.remove('opacity-100');
+                backdrop.classList.add('opacity-0');
+                menu.classList.remove('opacity-100', 'translate-y-0');
+                menu.classList.add('opacity-0', 'translate-y-4');
+                if (fabIcon) fabIcon.classList.remove('rotate-45');
+                setTimeout(() => {
+                    menu.classList.add('hidden');
+                    backdrop.classList.add('hidden');
+                }, 200);
+            }
+        }
+
+        function resaltarBottomNavActivo() {
+            const path = window.location.pathname;
+            const navInicio = document.getElementById('bottomNavDashboard');
+            const navPacientes = document.getElementById('bottomNavPacientes');
+            const navAgenda = document.getElementById('bottomNavAgenda');
+
+            const marcarActivo = (el) => {
+                if (!el) return;
+                el.classList.remove('text-slate-500');
+                el.classList.add('text-teal-700', 'font-black');
+                const icon = el.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('text-slate-500');
+                    icon.classList.add('text-teal-600', 'scale-110');
+                }
+            };
+
+            if (path.startsWith('/dashboard')) {
+                marcarActivo(navInicio);
+            } else if (path.startsWith('/pacientes')) {
+                marcarActivo(navPacientes);
+            } else if (path.startsWith('/agenda')) {
+                marcarActivo(navAgenda);
+            }
+        }
         {% endif %}
 
         function abrirModalSoportePlataforma() {
@@ -955,6 +1172,7 @@
             initLucideIcons();
             {% if show_sidebar %}
             verificarNovedadesAlCargar();
+            resaltarBottomNavActivo();
             {% endif %}
         });
         window.initLucideIcons = initLucideIcons;

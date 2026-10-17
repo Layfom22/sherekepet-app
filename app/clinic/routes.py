@@ -1565,6 +1565,9 @@ def registrar_paciente_rapido(
             mascota_existente.especie = nombre_especie
         if nombre_raza:
             mascota_existente.raza = nombre_raza
+        sexo_val = (payload.mascota_sexo or payload.sexo or "").strip() or None
+        if sexo_val:
+            mascota_existente.sexo = sexo_val
         if payload.mascota_peso:
             mascota_existente.peso = payload.mascota_peso
         if payload.fecha_nacimiento:
@@ -1581,6 +1584,7 @@ def registrar_paciente_rapido(
         db.refresh(mascota_existente)
         mascota = mascota_existente
     else:
+        sexo_val = (payload.mascota_sexo or payload.sexo or "").strip() or None
         mascota = Mascota(
             clinica_id=target_clinica_id,
             cliente_id=cliente.id,
@@ -1589,6 +1593,7 @@ def registrar_paciente_rapido(
             nombre=nombre_mascota_limpio,
             especie=nombre_especie,
             raza=nombre_raza,
+            sexo=sexo_val,
             peso=payload.mascota_peso,
             fecha_nacimiento=payload.fecha_nacimiento,
             foto_url=payload.foto_url,
